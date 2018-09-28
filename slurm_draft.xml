@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#SBATCH --time=1:59:00
+#SBATCH --mem=2000
+#SBATCH --error={bpath}/slurm.err
+#SBATCH --output={bpath}/slurm.out
+bash /scratch9/tglauch/Fermi_Tools/SED/env.sh {args}
