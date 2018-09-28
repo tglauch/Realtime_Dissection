@@ -54,26 +54,27 @@ if not os.path.exists(vou_out):
     os.makedirs(vou_out)
 os.chdir(vou_out)
 subprocess.call(cmd)
-os.chdir(this_path)
 print('Get Sources....')
 src_dict = get_sources(args['ra'], args['dec'])
+os.chdir(this_path)
 #get_data(args['ra'], args['dec'], emin=2000,
 #         dt=168, out_dir=fermi_data)  # dt hardcoded!!!!
 for i, src in enumerate(src_dict['name']):
     src = src.replace(' ', '_')
-    bpath = os.path.join(bpath, src)
-    if os.path.exists(bpath):
-        shutil.rmtree(bpath)
-    os.makedirs(bpath)
-    args = '--target_src {} --free_radius 2 --data_path {} --use_3FGL --outfolder {} '.format(src, fermi_data, bpath)
+    bpath_src = os.path.join(bpath, src)
+    print bpath_src
+    if os.path.exists(bpath_src):
+        shutil.rmtree(bpath_src)
+    os.makedirs(bpath_src)
+    args = '--target_src {} --free_radius 2 --data_path {} --use_3FGL --outfolder {} '.format(src, fermi_data, bpath_src)
     if '3FGL' not in src:
-        xml_path = os.path.join(bpath, 'add_source.xml')
+        xml_path = os.path.join(bpath_src, 'add_source.xml')
         generate_src_xml(src, src_dict['ra'][i], src_dict['dec'][i], xml_path)
         args += '--xml_path {}'.format(xml_path)
 
     with open('./slurm_draft.xml', 'r') as f:
-        submit = (f.read()).format(bpath=bpath, args=args)
-    submitfile = os.path.join(bpath, 'submit.sub')
+        submit = (f.read()).format(bpath=bpath_src, args=args)
+    submitfile = os.path.join(bpath_src, 'submit.sub')
     with open(submitfile, "w+") as file:
         file.write(submit)
  #   os.system("sbatch {}".format(submitfile))
