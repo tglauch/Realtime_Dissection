@@ -57,16 +57,15 @@ subprocess.call(cmd)
 print('Get Sources....')
 src_dict = get_sources(args['ra'], args['dec'])
 os.chdir(this_path)
-#get_data(args['ra'], args['dec'], emin=2000,
-#         dt=168, out_dir=fermi_data)  # dt hardcoded!!!!
+get_data(args['ra'], args['dec'], emin=2000,
+         dt=364, out_dir=fermi_data)  # dt hardcoded!!!!
 for i, src in enumerate(src_dict['name']):
-    src = src.replace(' ', '_')
-    bpath_src = os.path.join(bpath, src)
+    bpath_src = os.path.join(bpath, src.replace(' ', '_'))
     print bpath_src
     if os.path.exists(bpath_src):
         shutil.rmtree(bpath_src)
     os.makedirs(bpath_src)
-    args = '--target_src {} --free_radius 2 --data_path {} --use_3FGL --outfolder {} '.format(src, fermi_data, bpath_src)
+    args = '--target_src {} --free_radius 2 --data_path {} --use_3FGL --outfolder {} '.format(src.replace(' ', '_'), fermi_data, bpath_src)
     if '3FGL' not in src:
         xml_path = os.path.join(bpath_src, 'add_source.xml')
         generate_src_xml(src, src_dict['ra'][i], src_dict['dec'][i], xml_path)
@@ -77,4 +76,4 @@ for i, src in enumerate(src_dict['name']):
     submitfile = os.path.join(bpath_src, 'submit.sub')
     with open(submitfile, "w+") as file:
         file.write(submit)
- #   os.system("sbatch {}".format(submitfile))
+    os.system("sbatch {}".format(submitfile))

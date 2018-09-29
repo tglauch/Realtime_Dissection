@@ -6,17 +6,17 @@ import collections
 fields = ['name', 'ra', 'dec', 'alt_name']
 
 files = collections.OrderedDict(
-    {'3fgl': {'file': './results/3fgl.1.csv',
+    {'3fgl': {'file': '3fgl.1.csv',
               'keys': ['name', 'ra', 'dec']},
-     '3fhl': {'file': './results/3fhl.1.csv',
+     '3fhl': {'file': '3fhl.1.csv',
               'keys': ['name', 'ra', 'dec']},
-     '5bzcat': {'file': './results/5bzcat.1.csv',
+     '5bzcat': {'file': '5bzcat.1.csv',
                 'keys': ['Name', 'RAJ2000', 'DEJ2000']},
-     '3hsp': {'file': './results/3hsp.1.csv',
+     '3hsp': {'file': '3hsp.1.csv',
               'keys': ['Name', 'ra', 'dec']},
-     'fermi8yr': {'file': './results/fermi8yr.1.csv',
+     'fermi8yr': {'file': 'fermi8yr.1.csv',
                   'keys': ['Source_Name', 'RAJ2000', 'DEJ2000']},
-     'crates': {'file': './results/crates.1.csv',
+     'crates': {'file': 'crates.1.csv',
                 'keys': ['name', 'ra', 'dec']}})
 
 
