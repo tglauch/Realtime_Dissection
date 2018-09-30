@@ -65,7 +65,8 @@ for i, src in enumerate(src_dict['name']):
     if os.path.exists(bpath_src):
         shutil.rmtree(bpath_src)
     os.makedirs(bpath_src)
-    args = '--target_src {} --free_radius 2 --data_path {} --use_3FGL --outfolder {} '.format(src.replace(' ', '_'), fermi_data, bpath_src)
+    args = '--target_src {} --free_radius 2 --data_path {} --use_3FGL --outfolder {} '
+    args.format(src.replace(' ', '_'), fermi_data, os.path.join(bpath_src, 'all_time'))
     if '3FGL' not in src:
         xml_path = os.path.join(bpath_src, 'add_source.xml')
         generate_src_xml(src, src_dict['ra'][i], src_dict['dec'][i], xml_path)
