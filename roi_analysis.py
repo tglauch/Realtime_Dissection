@@ -13,6 +13,7 @@ import os
 from roi_functions import get_sources
 import shutil
 import datetime
+from slack_lib import print_to_slack
 
 
 def parseArguments():
@@ -81,6 +82,7 @@ os.chdir(vou_out)
 subprocess.call(cmd)
 print('Get Sources....')
 src_dict = get_sources(args['ra'], args['dec'])
+print_to_slack(src_dict, os.path.join(vou_out, 'RX_map.ps'))
 os.chdir(this_path)
 MET = get_data(args['ra'], args['dec'], emin=2000,
                dt=364, out_dir=fermi_data)  # dt hardcoded!!!!
