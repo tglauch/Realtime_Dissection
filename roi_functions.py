@@ -80,15 +80,21 @@ def get_sources(ra, dec):
             del(src_dict['dec'][j - k])
         i += 1
 
-    fmt_str = '\n\n {} \n ra: {:.2f}deg \n dec: {:.2f}deg \n distance: {:.2f}deg \n alt names: {}'
+    fmt_str = '\n\n *{}* \n ra: {:.2f} deg |  dec: {:.2f} deg | distance: {:.2f} deg [ra:{:.2f} , dec:{:.2f}]'
+    out_str = ' Source Candiates: \n' 
     for i in range(len(src_dict['name'])):
         gcd = GreatCircleDistance(np.radians(src_dict['ra'][i]),
                                   np.radians(src_dict['dec'][i]),
                                   np.radians(ra),
                                   np.radians(dec))
-        print(fmt_str.format(src_dict['name'][i],
+        ostr= fmt_str.format(src_dict['name'][i],
                              src_dict['ra'][i],
                              src_dict['dec'][i],
                              np.degrees(gcd),
-                             src_dict['alt_name'][i]))
-    return src_dict
+                             src_dict['ra'][i] - ra,
+                             src_dict['dec'][i] - dec)
+        if len(src_dict['alt_name'][i]) > 0:
+            ostr +=  '\n Alt Names: {}'.format(', '.join(src_dict['alt_name'][i]))
+        print(ostr)
+        out_str += ostr + '\n'
+    return src_dict, out_str

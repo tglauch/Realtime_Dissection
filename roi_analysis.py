@@ -4,9 +4,7 @@
 import sys
 sys.path.append('/scratch9/tglauch/Fermi_Tools/get_fermi_data')
 sys.path.append('/scratch9/tglauch/realtime_service/python/lib/python2.7/site-packages')
-sys.path.append('/scratch9/tglauch/Fermi_Tools/SED')
 from get_fermi_data import get_data
-from run_SED_fit import MET_to_MJD
 import subprocess
 import argparse
 import os
@@ -14,7 +12,11 @@ from roi_functions import get_sources
 import shutil
 import datetime
 from slack_lib import print_to_slack
+import numpy as np
 
+MJDREF = 51910.0 + 7.428703703703703E-4
+def MET_to_MJD(met_time):
+    return float(met_time / 86400. + MJDREF)
 
 def parseArguments():
     """Parse the command line arguments
@@ -40,7 +42,7 @@ def submit_fit(args, bpath, src_dict, which, trange=''):
         args += ' --outfolder {} '.format(opath)
     else:
         opath = os.path.join(
-            bpath, 'lightcurve/{}_{}'.format(trange[0], trange[1]))
+            bpath, 'lightcurve/{:.1f}_{:.1f}'.format(trange[0], trange[1]))
         args += ' --time_range {} {} '.format(trange[0], trange[1])
         args += ' --outfolder {} '.format(opath)
     os.makedirs(opath)
@@ -81,20 +83,30 @@ if not os.path.exists(vou_out):
 os.chdir(vou_out)
 subprocess.call(cmd)
 print('Get Sources....')
-src_dict = get_sources(args['ra'], args['dec'])
-print_to_slack(src_dict, os.path.join(vou_out, 'RX_map.ps'))
+src_dict, out_str = get_sources(args['ra'], args['dec'])
+cand_ps = os.path.join(vou_out, 'candidates.ps')
+cand_png= os.path.join(vou_out, 'candidates.png')
+os.system('convert ' + cand_ps + ' -density 600 ' + cand_png )
+print_to_slack(out_str, cand_png)
+'''
 os.chdir(this_path)
 MET = get_data(args['ra'], args['dec'], emin=2000,
-               dt=364, out_dir=fermi_data)  # dt hardcoded!!!!
-MJD = [MET_to_MJD(i) for i in MET]
+               dt=56, out_dir=fermi_data)  # dt hardcoded!!!!
+MJD = [MET_to_MJD(float(i)) for i in MET]
+print MJD
 for i, src in enumerate(src_dict['name']):
     bpath_src = os.path.join(bpath, src.replace(' ', '_'))
     print bpath_src
     if os.path.exists(bpath_src):
         shutil.rmtree(bpath_src)
     args = '--target_src {} --free_radius 2 --data_path {} --use_3FGL '
-    args.format(src.replace(' ', '_'), fermi_data)
+    print fermi_data
+    args = args.format(src.replace(' ', '_'), fermi_data)
+    print args
     time_windows = [[k, k+28.] for k in np.arange(MJD[0], MJD[1], 28)]
     time_windows.append('')
     for t_window in time_windows:
-        submit_fit(args, bpath_src, src_dict, i, trange=time_windows)
+        print t_window
+        submit_fit(args, bpath_src, src_dict, i, trange=t_window)
+
+'''
