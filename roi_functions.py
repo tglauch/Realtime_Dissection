@@ -56,7 +56,8 @@ def get_sources(ra, dec):
                      ('DEJ2000', '<f8')]
             temp = temp.astype(dtype)
         for i in range(len(files[key]['keys'])):
-            src_dict[fields[i]].extend(temp[files[key]['keys'][i]])
+            app =np.atleast_1d(temp[files[key]['keys'][i]])
+            src_dict[fields[i]].extend(app)
 
     i = 0
     while i < len(src_dict['dec']):
@@ -81,16 +82,15 @@ def get_sources(ra, dec):
         i += 1
 
     fmt_str = '\n\n *{}* \n ra: {:.2f} deg |  dec: {:.2f} deg | distance: {:.2f} deg [ra:{:.2f} , dec:{:.2f}]'
-    out_str = ' Source Candiates: \n' 
-    for i in range(len(src_dict['name'])):
-        gcd = GreatCircleDistance(np.radians(src_dict['ra'][i]),
-                                  np.radians(src_dict['dec'][i]),
-                                  np.radians(ra),
-                                  np.radians(dec))
+    gcd = [GreatCircleDistance(np.radians(src_dict['ra'][i]), np.radians(src_dict['dec'][i]), np.radians(ra),
+           np.radians(dec)) for i in range(len(src_dict['name']))]
+    inds = np.argsort(gcd)
+    out_str = '--------------- *Catalog Source Candiates:* --------------- \n' 
+    for i in inds:
         ostr= fmt_str.format(src_dict['name'][i],
                              src_dict['ra'][i],
                              src_dict['dec'][i],
-                             np.degrees(gcd),
+                             np.degrees(gcd[i]),
                              src_dict['ra'][i] - ra,
                              src_dict['dec'][i] - dec)
         if len(src_dict['alt_name'][i]) > 0:
