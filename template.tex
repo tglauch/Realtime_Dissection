@@ -1,0 +1,67 @@
+\documentclass[a4paper]{{article}}
+
+\usepackage[english]{{babel}}
+\usepackage[utf8]{{inputenc}}
+\usepackage{{amsmath}}
+\usepackage{{graphicx}}
+\usepackage[left=30mm, right=30mm, bottom=30mm]{{geometry}}
+\title{{Dissecting the Region around \textit{{{event}}}}}
+
+\author{{Authors}}
+
+\date{{\today}}
+
+\begin{{document}}
+\maketitle
+
+\begin{{abstract}}
+We report here on the muli-wavenlength dissection of the region around the IceCube alert event \textit{{{event}}}
+\end{{abstract}}
+
+\section{{Multi-Wavenlength Analysis of the Region around \textit{{{event}}}}}
+The search for possible counterparts is based on the VOU-Blazar Tool \ref{{voublazar}}. The tool compares existing catalogs to find all positions in the region around the neutrino event that have a \textit{{blazar-like}} radio to X-ray emission. For each match gamma-ray catalogs are checked to identify possible counterparts. \\
+
+The following gamma-ray analysis is based on the latest version of the FSSC Tools v11r5p3 [ref] and the fermipy package. The dataset contains photon energies above 2 GeV and a time window between [MJD1] and [MJD2]
+
+\subsection{{Quick Summary: Catalog Sources in the Region}}
+The following list gives a short overview about the most interesting catalog sources in the region. Check the following section for a more detailed analysis. The sources are sorted by their distance to the neutrino direction.
+\\ \\
+{cat_srcs}
+
+\clearpage
+\subsection{{Full MW Study of the Region}}
+In this section the full multi-wavelength search for neutrino counterparts is presented. Despite catalog sources also candidate sources are listed based on the x-ray to radio emission. The sources are sorted by their right ascension.
+\\ \\ \\
+{vou_output}
+
+\clearpage
+
+\begin{{figure}}[h!]
+\centering
+  \includegraphics[width=1.0\textwidth]{{{vou_pic}}}
+  \caption{{Radio and X-ray sources within 90 arc-minutes of the position of the event. Symbol diameters are proportional to source intensity. Radio sources appear as red filled circles, X-ray sources as open blue circles}}
+\end{{figure}}
+
+\begin{{figure}}[h!]
+\centering
+  \includegraphics[width=0.9\textwidth]{{{ts_map}}}
+  \caption{{The TS Map of the region. The analysis model includes all the known sources from the 3FGL Catalog}}
+\end{{figure}}
+
+\begin{{figure}}[h!]
+\centering
+  \includegraphics[width=0.9\textwidth]{{{res_map}}}
+  \caption{{The Residual Map of the region. The analysis model includes all the known sources from the 3FGL Catalog}}
+\end{{figure}}
+
+\clearpage
+\section{{Sources SEDs and Lightcurves}}
+{src_latex}
+
+
+\begin{{thebibliography}}{{9}}
+\bibitem{{voublazar}}
+  Y.Chang,
+  \emph{{https://github.com/ecylchang/VOU\_Blazars}}.
+\end{{thebibliography}}
+\end{{document}}
