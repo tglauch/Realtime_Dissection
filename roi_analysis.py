@@ -19,6 +19,11 @@ import plot
 import warnings
 import re
 
+
+path_settings = {'sed': 'all_year/sed',
+                 'lc': 'lightcurve'}
+
+
 def parseArguments():
     """Parse the command line arguments
     Returns:
@@ -49,6 +54,30 @@ def parseArguments():
     return args.__dict__
 
 
+def source_summary(bpath, src):
+    l_str = '\subsection{{{srcname}}} \
+             ra = ${ra:.2f}^\circ$ , dec = ${dec:.2f}^\circ$ , ts = {ts:.2f}'
+    with open('source_summary.tex', 'r') as infile:
+        fig_str = infile.read()
+    bpath_src = src_path(bpath, src)
+    lc_path = os.path.join(bpath_src, path_settings['lc'], 'lightcurve.pdf')
+    sed_path = os.path.join(bpath_src, path_settings['sed'])
+    fit_res = np.load(os.path.join(sed_path, 'llh.npy'))[()]
+    sed_path = os.path.join(sed_path, 'sed.pdf')
+    ts = fit_res['sources'][src]['ts']
+    print ts
+    ra = fit_res['sources'][src]['RAJ2000']
+    dec = fit_res['sources'][src]['DEJ2000']
+    ## include right ascension and declination
+    l_str = l_str.format(srcname=src, ts=ts, ra=ra, dec=dec)
+    if os.path.exists(sed_path):
+        l_str += fig_str.format(path = sed_path, caption='SED for {}'.format(src))
+    if os.path.exists(lc_path):
+        l_str += fig_str.format(path = lc_path, caption='Lightcurve for {}'.format(src))
+    l_str += '\\clearpage \n'
+    return l_str
+
+
 def submit_fit(args, opath, src_dict, which, trange='', ana_type='SED'):
     if trange != '':
         args += ' --time_range {} {} '.format(trange[0], trange[1])
@@ -77,8 +106,13 @@ def generate_src_xml(name, ra, dec, xml_path):
     return
 
 
+def src_path(bpath, src):
+    return os.path.join(bpath, src.replace(' ', '_'))
+
+
 dtime = datetime.datetime.now()
-ev_str = 'IC{}{:02d}{:02d}'.format(str(dtime.year)[-2:], dtime.month, dtime.day)
+ev_str = 'IC{}{:02d}{:02d}'.format(str(dtime.year)[-2:],
+                                   dtime.month, dtime.day)
 bpath = '/scratch9/tglauch/realtime_service/output/{}'.format(ev_str)
 this_path = os.path.dirname(os.path.abspath(__file__))
 fermi_data = os.path.join(bpath, 'fermi_data')
@@ -96,15 +130,15 @@ print('Get Sources....')
 src_dict, out_str = get_sources(args['ra'], args['dec'])
 np.save('src_dict.npy', src_dict)
 cand_ps = os.path.join(vou_out, 'candidates.ps')
-cand_png= os.path.join(vou_out, 'candidates.png')
-os.system('convert ' + cand_ps + ' -density 600 ' + cand_png )
+cand_png = os.path.join(vou_out, 'candidates.png')
+os.system('convert ' + cand_ps + ' -density 600 ' + cand_png)
 print_to_slack(out_str)
 with open('./phase1', 'r') as ifile:
     lines = ifile.read().split('Gamma-ray Counterparts')[0]
     lines = re.sub('\\[..?;.?m', ' ', lines)
     lines = lines.replace('[0m', ' ')
-    print lines
-    lines = '\n\n --------------- *All Non-Thermal Sources* --------------- \n\n' + lines
+    header = '\n\n --------------- *All Non-Thermal Sources* --------------- \n\n'
+    lines = header + lines
     print_to_slack(lines, cand_png)
 os.chdir(this_path)
 MET = get_data(args['ra'], args['dec'], emin=args['emin'],
@@ -114,28 +148,29 @@ print MJD
 print('Submit TS Map')
 sargs = '--target_src center --free_radius 2 --data_path {} --use_3FGL --emin {} '
 sargs = sargs.format(fermi_data, args['emin'])
-ts_dict = {'name' : ['center'], 'ra' : [args['ra']], 'dec': [args['dec']]}
-ts_map_path =  os.path.join(bpath, 'ts_map')
+ts_dict = {'name': ['center'], 'ra': [args['ra']], 'dec': [args['dec']]}
+ts_map_path = os.path.join(bpath, 'ts_map')
 submit_fit(sargs, ts_map_path, ts_dict, 0, ana_type='TS_Map')
 
 print('Submit_SEDs')
 job_dict = {}
 for i, src in enumerate(src_dict['name']):
-    bpath_src = os.path.join(bpath, src.replace(' ', '_'))
+    bpath_src = src_path(bpath, src)
     print bpath_src
     if os.path.exists(bpath_src):
         shutil.rmtree(bpath_src)
     sargs = '--target_src {} --free_radius 2 --data_path {} --use_3FGL --emin {} '
     sargs = sargs.format(src.replace(' ', '_'), fermi_data, args['emin'])
     print args
-    time_windows = [[k, k+args['dt_lc']] for k in np.arange(MJD[0], MJD[1], args['dt_lc'])]
+    time_windows = [[k, k + args['dt_lc']] for k in
+                    np.arange(MJD[0], MJD[1], args['dt_lc'])]
     time_windows.append('')
-    job_dict[src] = {'sed' : os.path.join(bpath_src, 'all_year', 'sed'),
-                     'lc' : os.path.join(bpath_src, 'lightcurve')}
+    job_dict[src] = {'sed': os.path.join(bpath_src, path_settings['sed']),
+                     'lc': os.path.join(bpath_src, path_settings['lc'])}
     print job_dict
     for t_window in time_windows:
         print('{}'.format(t_window))
-        if t_window =='':
+        if t_window == '':
             opath = job_dict[src]['sed']
         else:
             add_str = '{:.1f}_{:.1f}'.format(t_window[0], t_window[1])
@@ -152,9 +187,10 @@ while (len_jobs > 0) and (mins < 45):
     time.sleep(60)
 try:
     plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'))
-except:
-   warnings.warn("Couldn't create ts map...")
- 
+except Exception as inst:
+    warnings.warn("Couldn't create ts map...")
+    print(inst)
+
 for key in job_dict.keys():
     print('Make Plots for Source {}'.format(key))
     try:
@@ -162,8 +198,43 @@ for key in job_dict.keys():
     except Exception as inst:
         warnings.warn("Couldn't create lightcurve for source {}".format(key))
         print(inst)
-    try:    
+    try:
         plot.make_sed_plot(job_dict[key]['sed'])
     except Exception as inst:
         warnings.warn("Couldn't create SED for source {}".format(key))
         print(inst)
+
+src_latex = ''
+for src in src_dict['name']:
+    src_latex += source_summary(bpath, src)
+with open(os.path.join(bpath, 'vou_blazar/full_output'), 'r') as f:
+    full_out = f.read().encode('utf8').replace('\x1b', '').replace('nu_p', 'nu peak')
+    full_out = re.sub('\*([^\*]*)\*', r'\\textbf{\1}', full_out)
+    full_out = re.sub('(Match[^\\\\]*)', r'\\textbf{\1}', full_out)
+    full_out = re.sub('(Dist[^\\\\]*)', r'\\textbf{\1}', full_out)
+    full_out = [i.strip() + ' \n' for i in full_out.split('\n')]
+    full_out = [i if i != '\\\\ \n' else '\\\\\\\ \n' for i in full_out]
+    full_out = ' '.join(full_ out)
+with open(os.path.join(bpath, 'vou_blazar/short_output'), 'r') as f:
+    short_out = f.read().encode('utf8').replace('\x1b', '')
+    short_out = re.sub('\*([^\*]*)\*', r'\\textbf{\1}', short_out)
+with open('./template.tex') as f:
+    template = f.read()
+
+out = template.format(cat_srcs=short_out,
+                      vou_pic=os.path.join(bpath, 'vou_blazar/candidates.png'),
+                      ts_map=os.path.join(bpath, 'ts_map/ts_map.png'),
+                      res_map=os.path.join(bpath, 'ts_map/resmap_map.png'),
+                      vou_output=full_out,
+                      event=ev_str,
+                      src_latex=src_latex)
+with open('./summary.tex', 'w+') as f:
+    f.write(out)
+
+cmd = ['pdflatex', '-interaction', 'nonstopmode', './summary.tex']
+proc = subprocess.Popen(cmd)
+proc.communicate()
+
+retcode = proc.returncode
+if not retcode == 0:
+    raise ValueError('Error {} executing command: {}'.format(retcode, ' '.join(cmd))) 
