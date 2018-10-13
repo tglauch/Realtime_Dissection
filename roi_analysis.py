@@ -215,7 +215,8 @@ src_latex = ''
 for src in src_dict['name']:
     src_latex += source_summary(bpath, src)
 with open(os.path.join(bpath, 'vou_blazar/full_output'), 'r') as f:
-    full_out = f.read().encode('utf8').replace('\x1b', '').replace('nu_p', 'nu peak')
+    full_out = f.read().encode('utf8').\
+        replace('\x1b', '').replace('nu_p', 'nu peak')
     full_out = re.sub('\*([^\*]*)\*', r'\\textbf{\1}', full_out)
     full_out = re.sub('(Match[^\\\\]*)', r'\\textbf{\1}', full_out)
     full_out = re.sub('(Dist[^\\\\]*)', r'\\textbf{\1}', full_out)
