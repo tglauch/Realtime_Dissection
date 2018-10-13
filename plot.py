@@ -15,7 +15,7 @@ MeV_to_erg = 1.60218e-6
 
 def make_lc_plot(basepath):
     lc_dict = dict()
-    keys = ['dgamma','gamma', 'ts',  'flux_ul95',  'flux_err', 'flux']
+    keys = ['ts', 'dgamma','gamma',  'flux_ul95',  'flux_err', 'flux']
     for key in keys:
         lc_dict[key] = [] 
     lc_dict['tmid'] = []
@@ -29,8 +29,8 @@ def make_lc_plot(basepath):
             flux_dict = inp['sources'][source]
         else:
             continue
-        lc_dict['tmid'].append((float(folder.split('_')[1])+float(folder.split('_')[0]))/2)
-        lc_dict['bin_len'].append(float(folder.split('_')[1])-float(folder.split('_')[0]))
+        if not np.isfinite(flux_dict['ts']):
+            continue
         for key in keys:
             if key=='gamma':
                 lc_dict[key].append(get_index(flux_dict))
@@ -38,40 +38,48 @@ def make_lc_plot(basepath):
                 lc_dict[key].append(get_index_err(flux_dict))   
             else:
                 lc_dict[key].append(flux_dict[key])
+        lc_dict['tmid'].append((float(folder.split('_')[1])+float(folder.split('_')[0]))/2)
+        lc_dict['bin_len'].append(float(folder.split('_')[1])-float(folder.split('_')[0]))
     lc_arr = dict_to_nparray(lc_dict)
     ind = np.argsort(lc_arr['tmid'])
     lc_arr = lc_arr[ind]
     fig = plt.figure(figsize=figsize(0.5, 0.7))
-    mask  = (np.abs(lc_dict['ts'])>4)
+    print lc_arr.dtype.fields
+    print lc_arr
+    mask  = (np.abs(lc_arr['ts'])>4) & ((lc_arr['dgamma']/lc_arr['gamma'])<0.5)
 
     ## Flux Axis
-    ax1=fig.add_axes((.0, .60,1.,.4))
+    ax1=fig.add_axes((.0, .20,1.,.4))
     scaling = -round(np.max(np.log10(lc_arr['flux'])))+1
-    ax1.errorbar(lc_arr['tmid'], 10**scaling*lc_arr['flux'],
-                 yerr = 10**scaling*lc_arr['flux_err'],
-                 xerr=lc_arr['bin_len']/2,linestyle=' ')
-    ax1.errorbar(lc_arr['tmid'][~mask], lc_arr['flux_ul95'][~mask],
-                 xerr=lc_arr['bin_len'][~mask]/2, color='#808080')
-    ax1.errorbar(lc_arr['tmid'][~mask], lc_arr['flux_ul95'][~mask],
-                 yerr=0.1*np.ones(len(lc_arr['flux_ul95']))[~mask],
-                 color='#808080', uplims=True)
+    ax1.errorbar(lc_arr['tmid'][mask], 10**scaling*lc_arr['flux'][mask],
+                 yerr = 10**scaling*lc_arr['flux_err'][mask],
+                 xerr=lc_arr['bin_len'][mask]/2,linestyle=' ')
+    ax1.errorbar(lc_arr['tmid'][~mask], 10**scaling*lc_arr['flux_ul95'][~mask],
+                 xerr=lc_arr['bin_len'][~mask]/2, color='#808080', linestyle=' ')
+    serr = 0.1*(ax1.get_ylim()[1] - ax1.get_ylim()[0])
+    ax1.errorbar(lc_arr['tmid'][~mask], 10**scaling*lc_arr['flux_ul95'][~mask],
+                 yerr=serr,
+                 color='#808080', uplims=True, linestyle=' ')
     ax1.set_ylabel(r'$10^{'+'{:.0f}'.format(-scaling)+'}\,$'+r'ph cm$^{-2}$ s$^{-1}$')
-    ax1.set_xticks([])
+    ax1.set_xlabel('Time (MJD)')
 
     ## Spectral Index Axis
-    ax2=fig.add_axes((.0, .2,1.,.40))
+    ax2=fig.add_axes((.0, .6,1.,.4))
     av_gamma, std_gamma = weighted_avg_and_std(lc_arr['gamma'],
                                                weights=1./lc_arr['dgamma'])
     ax2.axhline(av_gamma,linestyle='--', color='grey',
                 alpha=0.85, zorder = -1, linewidth=0.9)
+    print lc_arr['tmid'][mask]
+    print lc_arr['gamma'][mask]
     ax2.errorbar(lc_arr['tmid'][mask], lc_arr['gamma'][mask],
                  yerr=lc_arr['dgamma'][mask],
                  xerr=lc_arr['bin_len'][mask]/2., linestyle='')
     ax2.set_ylabel('Index', labelpad=5)
-    ax2.set_xlabel('Time (MJD)')
-    ax1.text(0.8, 1.1, source,
+    ax2.set_ylim(1.1,4)
+    ax2.set_xticks([])
+    ax2.text(0.8, 1.1, source,
         horizontalalignment='center',
-        verticalalignment='center', transform=ax1.transAxes)
+        verticalalignment='center', transform=ax2.transAxes)
     plt.savefig(os.path.join(basepath, 'lightcurve.pdf'),
                 bbox_inches='tight')
     return
@@ -80,6 +88,8 @@ def make_sed_plot(basepath):
     sed = np.load(os.path.join(basepath, 'sed.npy'))[()]
     bowtie = np.load(os.path.join(basepath, 'bowtie.npy'))[()]
     llh = np.load(os.path.join(basepath, 'llh.npy'))[()]
+    source = llh['config']['selection']['target']
+    ts = llh['sources'][source]['ts']
     fig, ax = newfig(0.9)
     ax = fig.add_subplot(111)
     color='red'
@@ -104,15 +114,17 @@ def make_sed_plot(basepath):
     ax.errorbar(x[m], yul[m], xerr=xerr0,
                  yerr=(yul[m]*(0.15), np.zeros(len(yul[m]))),  uplims=True,
                  color='k', fmt='o', zorder=2)
-    ax.plot(energies,
-            bowtie['dnde'] * e2 * MeV_to_erg, color=color, zorder=1)
 
-    ax.plot(energies,
-            bowtie['dnde_lo'] * e2 * MeV_to_erg, color=color,
-            linestyle='--', zorder=1)
-    ax.plot(energies,
-            bowtie['dnde_hi'] * e2 * MeV_to_erg, color=color,
-            linestyle='--', zorder=1)
+    if ts>4:
+        ax.plot(energies,
+                bowtie['dnde'] * e2 * MeV_to_erg, color=color, zorder=1)
+
+        ax.plot(energies,
+                bowtie['dnde_lo'] * e2 * MeV_to_erg, color=color,
+                linestyle='--', zorder=1)
+        ax.plot(energies,
+                bowtie['dnde_hi'] * e2 * MeV_to_erg, color=color,
+                linestyle='--', zorder=1)
 
     ax.fill_between(energies,
                     bowtie['dnde_lo'] * e2 * MeV_to_erg,
@@ -122,7 +134,6 @@ def make_sed_plot(basepath):
     ax.set_yscale('log')
     ax.set_xlabel('Energy [GeV]')
     ax.set_ylabel(r'$\nu f(\nu)$ [erg cm$^{-2}$ s$^{-1}$]')
-    source = llh['config']['selection']['target']
     tmin = llh['config']['selection']['tmin']
     tmax = llh['config']['selection']['tmax']
     ax.text(0.2, 1.02, source,
@@ -206,8 +217,8 @@ def make_ts_plot(basepath, srcs, mode='ts'):
     ax2.tick_params(axis='x', which='major', pad=3)
     ax.legend(bbox_to_anchor=(1.1, 1.05))
     plt.tight_layout()
-    plt.savefig(os.path.join(basepath,'{}_map.pdf'.format(mode)),
-                bbox_inches='tight')
+    plt.savefig(os.path.join(basepath,'{}_map.png'.format(mode)),
+                bbox_inches='tight', dpi=300)
 
 
 def get_index(flux_dict):

@@ -99,12 +99,15 @@ cand_ps = os.path.join(vou_out, 'candidates.ps')
 cand_png= os.path.join(vou_out, 'candidates.png')
 os.system('convert ' + cand_ps + ' -density 600 ' + cand_png )
 print_to_slack(out_str)
+with open('./short_output', 'w+') as ofile:
+    ofile.write(out_str.replace('\n' ,'\\\ \n'))
 with open('./phase1', 'r') as ifile:
     lines = ifile.read().split('Gamma-ray Counterparts')[0]
     lines = re.sub('\\[..?;.?m', ' ', lines)
     lines = lines.replace('[0m', ' ')
-    lines = '\n\n --------------- *All Non-Thermal Sources* --------------- \n\n' + lines
     print_to_slack(lines, cand_png)
+with open('./full_output', 'w+') as ofile:
+    ofile.write(lines.replace('\n' ,'\\\ \n'))
 os.chdir(this_path)
 MET = get_data(args['ra'], args['dec'], emin=args['emin'],
                dt=args['dt'], out_dir=fermi_data)  # dt hardcoded!!!!
@@ -143,7 +146,7 @@ for i, src in enumerate(src_dict['name']):
 
 len_jobs = 5
 mins = 0
-while (len_jobs > 0) and (mins < 45):
+while (len_jobs > 0) and (mins < 600):
     print len_jobs
     jobs = os.popen('squeue --user ga53lag').read()
     len_jobs = len([i for i in jobs.split('\n') if 'fermi' in i])
