@@ -137,8 +137,6 @@ with open('./phase1', 'r') as ifile:
     lines = ifile.read().split('Gamma-ray Counterparts')[0]
     lines = re.sub('\\[..?;.?m', ' ', lines)
     lines = lines.replace('[0m', ' ')
-    header = '\n\n --------------- *All Non-Thermal Sources* --------------- \n\n'
-    lines = header + lines
     print_to_slack(lines, cand_png)
 os.chdir(this_path)
 MET = get_data(args['ra'], args['dec'], emin=args['emin'],
@@ -185,10 +183,19 @@ while (len_jobs > 0) and (mins < 45):
     len_jobs = len([i for i in jobs.split('\n') if 'fermi' in i])
     mins += 1
     time.sleep(60)
+
 try:
-    plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'))
+    plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
+                      mode='ts')
 except Exception as inst:
     warnings.warn("Couldn't create ts map...")
+    print(inst)
+
+try:
+    plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
+                      mode='resmap')
+except Exception as inst:
+    warnings.warn("Couldn't create residual map...")
     print(inst)
 
 for key in job_dict.keys():
