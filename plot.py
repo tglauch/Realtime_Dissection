@@ -8,6 +8,7 @@ import os
 from myfunctions import dict_to_nparray, MET_to_MJD
 from astropy.time import Time
 import pyfits as fits
+import warnings
 from matplotlib.colors import LinearSegmentedColormap
 ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'])
 re_cmap = LinearSegmentedColormap.from_list('mycmap2', ['#67a9cf', '#f7f7f7', '#ef8a62'])
@@ -77,6 +78,7 @@ def make_lc_plot(basepath):
     ax2.set_ylabel('Index', labelpad=5)
     ax2.set_ylim(1.1,4)
     ax2.set_xticks([])
+    ax2.set_xlim(ax1.get_xlim()[0], ax1.get_xlim()[1])
     ax2.text(0.8, 1.1, source,
         horizontalalignment='center',
         verticalalignment='center', transform=ax2.transAxes)
@@ -85,13 +87,19 @@ def make_lc_plot(basepath):
     return
 
 def make_sed_plot(basepath):
-    sed = np.load(os.path.join(basepath, 'sed.npy'))[()]
-    bowtie = np.load(os.path.join(basepath, 'bowtie.npy'))[()]
-    llh = np.load(os.path.join(basepath, 'llh.npy'))[()]
+    try:
+        sed = np.load(os.path.join(basepath, 'sed.npy'))[()]
+        bowtie = np.load(os.path.join(basepath, 'bowtie.npy'))[()]
+        llh = np.load(os.path.join(basepath, 'llh.npy'))[()]
+    except Exception as inst:
+        warnings.warn('SED files not found')
+        print(inst)
+        return
     source = llh['config']['selection']['target']
     ts = llh['sources'][source]['ts']
     fig, ax = newfig(0.9)
-    ax = fig.add_subplot(111)
+    ax.set_xscale('log')
+    ax.set_yscale('log')   
     color='red'
     e2 = 10 ** (2 * bowtie['log_energies'])
     energies = np.array(10 ** bowtie['log_energies'])/1e3
@@ -108,13 +116,6 @@ def make_sed_plot(basepath):
     xerr0 = np.vstack((delo[m], dehi[m]))
     xerr1 = np.vstack((delo[~m], dehi[~m]))
 
-    ax.errorbar(x[~m], y[~m], xerr=xerr1,
-                 yerr=(yerr_lo[~m], yerr_hi[~m]),
-                 linestyle='', color='k', fmt='o', zorder=2)
-    ax.errorbar(x[m], yul[m], xerr=xerr0,
-                 yerr=(yul[m]*(0.15), np.zeros(len(yul[m]))),  uplims=True,
-                 color='k', fmt='o', zorder=2)
-
     if ts>4:
         ax.plot(energies,
                 bowtie['dnde'] * e2 * MeV_to_erg, color=color, zorder=1)
@@ -126,12 +127,20 @@ def make_sed_plot(basepath):
                 bowtie['dnde_hi'] * e2 * MeV_to_erg, color=color,
                 linestyle='--', zorder=1)
 
-    ax.fill_between(energies,
-                    bowtie['dnde_lo'] * e2 * MeV_to_erg,
-                    bowtie['dnde_hi'] * e2 * MeV_to_erg,
-                    alpha=0.5, color=color, zorder=-1)
-    ax.set_xscale('log')
-    ax.set_yscale('log')
+        ax.fill_between(energies,
+                        bowtie['dnde_lo'] * e2 * MeV_to_erg,
+                        bowtie['dnde_hi'] * e2 * MeV_to_erg,
+                        alpha=0.5, color=color, zorder=-1)
+    ax.errorbar(x[~m], y[~m], xerr=xerr1,
+                yerr=(yerr_lo[~m], yerr_hi[~m]),
+                linestyle='', color='k', fmt='o', zorder=2)
+    factor = np.log10(ax.get_ylim()[1]) - np.log10(ax.get_ylim()[0])
+    serr = 10**np.log10(yul[m]) - 10**(np.log10(yul[m])-0.2/4.*factor)
+    ax.errorbar(x[m], yul[m], xerr=xerr0,
+                yerr=serr,  uplims=True,
+                color='k', fmt='o', zorder=2)
+
+
     ax.set_xlabel('Energy [GeV]')
     ax.set_ylabel(r'$\nu f(\nu)$ [erg cm$^{-2}$ s$^{-1}$]')
     tmin = llh['config']['selection']['tmin']
@@ -161,12 +170,15 @@ def make_edges(data_f):
     return xmin, xmax, ymin, ymax, xbins, ybins
 
 
-def make_ts_plot(basepath, srcs, mode='ts'):
+def make_ts_plot(basepath, srcs, mode='tsmap'):
     markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7]
-    if mode == 'ts':
-        inp = fits.open(os.path.join(basepath,'fit1_pointsource_powerlaw_2.00_tsmap.fits'))
-    elif mode == 'resmap':
-        inp = fits.open(os.path.join(basepath,'fit1_pointsource_powerlaw_2.00_residmap.fits'))
+    fname = 'fit1_pointsource_powerlaw_2.00_{}.fits'.format(mode)
+    try:
+        inp = fits.open(os.path.join(basepath, fname))
+    except Exception as inst:
+        warnings.warn('Files for {} not found'.format(mode))
+        print(inst)
+        return
     srcs = np.load(srcs)[()]
     fig = plt.figure(figsize=figsize(0.4, 1.))
     plt.clf()
@@ -175,11 +187,11 @@ def make_ts_plot(basepath, srcs, mode='ts'):
     X=np.linspace(xmin, xmax, xbins)[::-1]
     Y=np.linspace(ymin, ymax, ybins)
     xs, ys = np.meshgrid(X,Y)
-    if mode == 'ts':
+    if mode == 'tsmap':
         Z=inp[2].data
         minmax = (0,9)
         cmap = ts_cmap
-    elif mode == 'resmap':
+    elif mode == 'residmap':
         Z=inp[0].data
         minmax = (-3, 3)
         cmap = re_cmap
@@ -208,16 +220,16 @@ def make_ts_plot(basepath, srcs, mode='ts'):
     ax2=fig.add_axes((.0, .73,0.7,.05))
     plt_cbar = fig.colorbar(cbar, orientation="horizontal", cax=ax2,
                             ticks=np.arange(minmax[0], minmax[1] , 1))
-    if mode == 'ts':
+    if mode == 'tsmap':
         plt_cbar.set_label(r'TS Value', labelpad=8)
-    elif mode == 'resmap':
+    elif mode == 'residmap':
         plt_cbar.set_label(r'Significance [$\sigma$]', labelpad=8)
     plt_cbar.ax.xaxis.set_ticks_position('top')
     plt_cbar.ax.xaxis.set_label_position('top')
     ax2.tick_params(axis='x', which='major', pad=3)
     ax.legend(bbox_to_anchor=(1.1, 1.05))
     plt.tight_layout()
-    plt.savefig(os.path.join(basepath,'{}_map.png'.format(mode)),
+    plt.savefig(os.path.join(basepath,'{}.png'.format(mode)),
                 bbox_inches='tight', dpi=300)
 
 

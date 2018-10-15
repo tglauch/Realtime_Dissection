@@ -49,7 +49,11 @@ def parseArguments():
     parser.add_argument(
         "--emin",
         help="lower energy bound for SED",
-        type=float, default=2000)
+        type=float, default=1000)
+    parser.add_argument(
+        "--event",
+        help="event name",
+        required=False)
     args = parser.parse_args()
     return args.__dict__
 
@@ -62,14 +66,17 @@ def source_summary(bpath, src):
     bpath_src = src_path(bpath, src)
     lc_path = os.path.join(bpath_src, path_settings['lc'], 'lightcurve.pdf')
     sed_path = os.path.join(bpath_src, path_settings['sed'])
-    fit_res = np.load(os.path.join(sed_path, 'llh.npy'))[()]
-    sed_path = os.path.join(sed_path, 'sed.pdf')
-    ts = fit_res['sources'][src]['ts']
-    print ts
-    ra = fit_res['sources'][src]['RAJ2000']
-    dec = fit_res['sources'][src]['DEJ2000']
-    ## include right ascension and declination
-    l_str = l_str.format(srcname=src, ts=ts, ra=ra, dec=dec)
+    try:
+        fit_res = np.load(os.path.join(sed_path, 'llh.npy'))[()]
+        sed_path = os.path.join(sed_path, 'sed.pdf')
+        ts = fit_res['sources'][src]['ts']
+        ra = fit_res['sources'][src]['RAJ2000']
+        dec = fit_res['sources'][src]['DEJ2000']
+        l_str = l_str.format(srcname=src, ts=ts, ra=ra, dec=dec)
+    except Exception as inst:
+        warnings.warn("Can not Fit fit result for {}".format(src))
+        print(inst)
+        
     if os.path.exists(sed_path):
         l_str += fig_str.format(path = sed_path, caption='SED for {}'.format(src))
     if os.path.exists(lc_path):
@@ -110,16 +117,19 @@ def src_path(bpath, src):
     return os.path.join(bpath, src.replace(' ', '_'))
 
 
+args = parseArguments()
 dtime = datetime.datetime.now()
-ev_str = 'IC{}{:02d}{:02d}'.format(str(dtime.year)[-2:],
-                                   dtime.month, dtime.day)
+if args['event'] is not None:
+    ev_str = args['event']
+else:
+    ev_str = 'IC{}{:02d}{:02d}'.format(str(dtime.year)[-2:],
+                                       dtime.month, dtime.day)
 bpath = '/scratch9/tglauch/realtime_service/output/{}'.format(ev_str)
 this_path = os.path.dirname(os.path.abspath(__file__))
 fermi_data = os.path.join(bpath, 'fermi_data')
 
-args = parseArguments()
 cmd = [os.path.realpath('/scratch9/tglauch/VOU_Blazars/bin/vou-blazars'),
-       str(args['ra']), str(args['dec']), str(90), str(30), str(60)]
+       str(args['ra']), str(args['dec']), str(120), str(30), str(90)]
 vou_out = os.path.join(bpath, 'vou_blazar')
 if not os.path.exists(vou_out):
     os.makedirs(vou_out)
@@ -190,14 +200,14 @@ while (len_jobs > 0) and (mins < 600):
 
 try:
     plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
-                      mode='ts')
+                      mode='tsmap')
 except Exception as inst:
     warnings.warn("Couldn't create ts map...")
     print(inst)
 
 try:
     plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
-                      mode='resmap')
+                      mode='residmap')
 except Exception as inst:
     warnings.warn("Couldn't create residual map...")
     print(inst)
@@ -226,7 +236,7 @@ with open(os.path.join(bpath, 'vou_blazar/full_output'), 'r') as f:
     full_out = re.sub('(Dist[^\\\\]*)', r'\\textbf{\1}', full_out)
     full_out = [i.strip() + ' \n' for i in full_out.split('\n')]
     full_out = [i if i != '\\\\ \n' else '\\\\\\\ \n' for i in full_out]
-    full_out = ' '.join(full_ out)
+    full_out = ' '.join(full_out)
 with open(os.path.join(bpath, 'vou_blazar/short_output'), 'r') as f:
     short_out = f.read().encode('utf8').replace('\x1b', '')
     short_out = re.sub('\*([^\*]*)\*', r'\\textbf{\1}', short_out)
@@ -235,15 +245,21 @@ with open('./template.tex') as f:
 
 out = template.format(cat_srcs=short_out,
                       vou_pic=os.path.join(bpath, 'vou_blazar/candidates.png'),
-                      ts_map=os.path.join(bpath, 'ts_map/ts_map.png'),
-                      res_map=os.path.join(bpath, 'ts_map/resmap_map.png'),
+                      ts_map=os.path.join(bpath, 'ts_map/tsmap.png'),
+                      res_map=os.path.join(bpath, 'ts_map/residmap.png'),
                       vou_output=full_out,
                       event=ev_str,
-                      src_latex=src_latex)
-with open('./summary.tex', 'w+') as f:
+                      src_latex=src_latex,
+                      mjd1 = MJD[0],
+                      mjd2 = MJD[1],
+                      energy = args['emin'])
+latex_path = os.path.join(bpath,'summary.tex')
+if os.path.exists(latex_path):
+    os.remove(latex_path)
+with open(latex_path, 'w+') as f:
     f.write(out)
 
-cmd = ['pdflatex', '-interaction', 'nonstopmode', './summary.tex']
+cmd = ['pdflatex', '-interaction', 'nonstopmode', '-output-directory', bpath,  latex_path]
 proc = subprocess.Popen(cmd)
 proc.communicate()
 
