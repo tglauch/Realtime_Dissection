@@ -84,6 +84,7 @@ def get_sources(ra, dec):
     fmt_str = '*{}* \n ra: {:.2f} deg |  dec: {:.2f} deg | distance: {:.2f} deg [ra:{:.2f} , dec:{:.2f}]'
     gcd = [GreatCircleDistance(np.radians(src_dict['ra'][i]), np.radians(src_dict['dec'][i]), np.radians(ra),
            np.radians(dec)) for i in range(len(src_dict['name']))]
+    src_dict['dist'] = np.degrees(gcd)
     inds = np.argsort(gcd)
     out_str = '' 
     for i in inds:

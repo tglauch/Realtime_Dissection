@@ -5,7 +5,7 @@ sys.path.append('/home/ga53lag/Software/python_scripts/')
 from fancy_plot import *
 import numpy as np
 import os
-from myfunctions import dict_to_nparray, MET_to_MJD
+from myfunctions import dict_to_nparray, MET_to_MJD, GreatCircleDistance
 from astropy.time import Time
 import pyfits as fits
 import warnings
@@ -170,8 +170,9 @@ def make_edges(data_f):
     return xmin, xmax, ymin, ymax, xbins, ybins
 
 
-def make_ts_plot(basepath, srcs, mode='tsmap'):
+def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap'):
     markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7]
+    ROI = 130./60.
     fname = 'fit1_pointsource_powerlaw_2.00_{}.fits'.format(mode)
     try:
         inp = fits.open(os.path.join(basepath, fname))
@@ -180,6 +181,19 @@ def make_ts_plot(basepath, srcs, mode='tsmap'):
         print(inst)
         return
     srcs = np.load(srcs)[()]
+    cand_pos = np.genfromtxt(vou_cand)
+
+    cand = {'ra': cand_pos[:,0], 'dec': cand_pos[:,1]}
+    distances = np.ones(len(cand['ra']))
+    for i in range(len(cand['ra'])):
+        tdist= [GreatCircleDistance(
+                  cand['ra'][i], cand['dec'][i], srcs['ra'][j],
+                  srcs['dec'][j], unit='deg') for j in range(len(srcs['ra']))]
+        distances[i] = np.degrees(np.min(tdist))
+    inds =  np.argsort(distances)[-len(srcs['ra'])-1:]
+    cand['ra'] = cand['ra'][inds]
+    cand['dec'] = cand['dec'][inds]
+
     fig = plt.figure(figsize=figsize(0.4, 1.))
     plt.clf()
     ax=fig.add_axes((.0, .0,0.7,.7))
@@ -189,11 +203,13 @@ def make_ts_plot(basepath, srcs, mode='tsmap'):
     xs, ys = np.meshgrid(X,Y)
     if mode == 'tsmap':
         Z=inp[2].data
-        minmax = (0,9)
+        minmax = (0,25)
+        ticks = 5
         cmap = ts_cmap
     elif mode == 'residmap':
         Z=inp[0].data
-        minmax = (-3, 3)
+        minmax = (-5, 5)
+        ticks = 2 
         cmap = re_cmap
     cbar = ax.contourf(X,Y,Z,
                        levels=np.linspace(minmax[0], minmax[1], 500),
@@ -206,7 +222,7 @@ def make_ts_plot(basepath, srcs, mode='tsmap'):
     plt.gca().invert_xaxis()
     ax.plot(inp[0].header['CRVAL1'], inp[0].header['CRVAL2'],
             marker='o', color='blue', ms=3, fillstyle='none')
-    circle = plt.Circle((inp[0].header['CRVAL1'], inp[0].header['CRVAL2']), 1.0,
+    circle = plt.Circle((inp[0].header['CRVAL1'], inp[0].header['CRVAL2']), 1.5,
                         color='b', fill=False, linewidth=0.5)
     ax.add_artist(circle)
     for i, src in enumerate(zip(srcs['ra'], srcs['dec'])):
@@ -215,11 +231,13 @@ def make_ts_plot(basepath, srcs, mode='tsmap'):
                 linestyle = '',
                 label=srcs['name'][i],
                 color='k', ms=4)
-    ax.set_xlim(inp[0].header['CRVAL1']+2.05, inp[0].header['CRVAL1']-2.05)
-    ax.set_ylim(inp[0].header['CRVAL2']-2.05, inp[0].header['CRVAL2']+2.05)
+    ax.plot(cand['ra'], cand['dec'], color='k', ms=4, marker="8",
+            linestyle = '', fillstyle='none', label='VOU Sources')
+    ax.set_xlim(inp[0].header['CRVAL1']+ROI, inp[0].header['CRVAL1']-ROI)
+    ax.set_ylim(inp[0].header['CRVAL2']-ROI, inp[0].header['CRVAL2']+ROI)
     ax2=fig.add_axes((.0, .73,0.7,.05))
     plt_cbar = fig.colorbar(cbar, orientation="horizontal", cax=ax2,
-                            ticks=np.arange(minmax[0], minmax[1] , 1))
+                            ticks=np.arange(minmax[0], minmax[1] , ticks))
     if mode == 'tsmap':
         plt_cbar.set_label(r'TS Value', labelpad=8)
     elif mode == 'residmap':

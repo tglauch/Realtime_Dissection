@@ -23,6 +23,7 @@ import re
 path_settings = {'sed': 'all_year/sed',
                  'lc': 'lightcurve'}
 
+partition_t = {'kta':'2:29:59', 'long':'1-23:59:59'}
 
 def parseArguments():
     """Parse the command line arguments
@@ -33,11 +34,11 @@ def parseArguments():
     parser.add_argument(
         "--ra",
         help="right ascension",
-        type=float, required=True)
+        type=float)
     parser.add_argument(
         "--dec",
         help="declination",
-        type=float, required=True)
+        type=float)
     parser.add_argument(
         "--dt_lc",
         help="time lenght of bins in the light curve",
@@ -54,13 +55,17 @@ def parseArguments():
         "--event",
         help="event name",
         required=False)
+    parser.add_argument(
+        "--recovery",
+        help="Is this a run that recovers the previous processing?",
+        action="store_true", default = False)
     args = parser.parse_args()
     return args.__dict__
 
 
-def source_summary(bpath, src):
+def source_summary(bpath, src, dist):
     l_str = '\subsection{{{srcname}}} \
-             ra = ${ra:.2f}^\circ$ , dec = ${dec:.2f}^\circ$ , ts = {ts:.2f}'
+             ra = ${ra:.2f}^\circ$ , dec = ${dec:.2f}^\circ$ , ts = {ts:.2f}, distance = ${dist:.2f}^\circ$'
     with open('source_summary.tex', 'r') as infile:
         fig_str = infile.read()
     bpath_src = src_path(bpath, src)
@@ -72,7 +77,7 @@ def source_summary(bpath, src):
         ts = fit_res['sources'][src]['ts']
         ra = fit_res['sources'][src]['RAJ2000']
         dec = fit_res['sources'][src]['DEJ2000']
-        l_str = l_str.format(srcname=src, ts=ts, ra=ra, dec=dec)
+        l_str = l_str.format(srcname=src, ts=ts, ra=ra, dec=dec, dist=dist)
     except Exception as inst:
         warnings.warn("Can not Fit fit result for {}".format(src))
         print(inst)
@@ -85,7 +90,7 @@ def source_summary(bpath, src):
     return l_str
 
 
-def submit_fit(args, opath, src_dict, which, trange='', ana_type='SED'):
+def submit_fit(args, opath, src_dict, which, trange='', ana_type='SED', partition='kta'):
     if trange != '':
         args += ' --time_range {} {} '.format(trange[0], trange[1])
     args += ' --outfolder {} '.format(opath)
@@ -97,7 +102,10 @@ def submit_fit(args, opath, src_dict, which, trange='', ana_type='SED'):
                          src_dict['dec'][which], xml_path)
         args += '--xml_path {}'.format(xml_path)
     with open('./slurm_draft.xml', 'r') as f:
-        submit = (f.read()).format(bpath=opath, args=args, ana_type=ana_type)
+        submit = (f.read()).format(bpath=opath, args=args,
+                                   ana_type=ana_type,
+                                   time=partition_t[partition],
+                                   partition=partition)
     submitfile = os.path.join(opath, 'fermi.sub')
     with open(submitfile, "w+") as file:
         file.write(submit)
@@ -118,6 +126,8 @@ def src_path(bpath, src):
 
 
 args = parseArguments()
+print('Run with args')
+print(args)
 dtime = datetime.datetime.now()
 if args['event'] is not None:
     ev_str = args['event']
@@ -127,49 +137,69 @@ else:
 bpath = '/scratch9/tglauch/realtime_service/output/{}'.format(ev_str)
 this_path = os.path.dirname(os.path.abspath(__file__))
 fermi_data = os.path.join(bpath, 'fermi_data')
-
-cmd = [os.path.realpath('/scratch9/tglauch/VOU_Blazars/bin/vou-blazars'),
-       str(args['ra']), str(args['dec']), str(120), str(30), str(90)]
 vou_out = os.path.join(bpath, 'vou_blazar')
-if not os.path.exists(vou_out):
-    os.makedirs(vou_out)
-os.chdir(vou_out)
-subprocess.call(cmd)
 
-print('Get Sources....')
-src_dict, out_str = get_sources(args['ra'], args['dec'])
-np.save('src_dict.npy', src_dict)
-cand_ps = os.path.join(vou_out, 'candidates.ps')
-cand_png = os.path.join(vou_out, 'candidates.png')
-os.system('convert ' + cand_ps + ' -density 600 ' + cand_png)
-print_to_slack(out_str)
-with open('./short_output', 'w+') as ofile:
-    ofile.write(out_str.replace('\n' ,'\\\ \n'))
-with open('./phase1', 'r') as ifile:
-    lines = ifile.read().split('Gamma-ray Counterparts')[0]
-    lines = re.sub('\\[..?;.?m', ' ', lines)
-    lines = lines.replace('[0m', ' ')
-    print_to_slack(lines, cand_png)
-with open('./full_output', 'w+') as ofile:
-    ofile.write(lines.replace('\n' ,'\\\ \n'))
-os.chdir(this_path)
-MET = get_data(args['ra'], args['dec'], emin=args['emin'],
-               dt=args['dt'], out_dir=fermi_data)  # dt hardcoded!!!!
-MJD = [MET_to_MJD(float(i)) for i in MET]
-print MJD
-print('Submit TS Map')
+if not args['recovery']:
+    cmd = [os.path.realpath('/scratch9/tglauch/VOU_Blazars/bin/vou-blazars'),
+           str(args['ra']), str(args['dec']), str(120), str(30), str(90)]
+    if not os.path.exists(vou_out):
+        os.makedirs(vou_out)
+    os.chdir(vou_out)
+    subprocess.call(cmd)
+
+    # Setup Variables
+    src_dict, out_str = get_sources(args['ra'], args['dec'])
+    np.save('src_dict.npy', src_dict)
+    print_to_slack(out_str)
+
+    # Convert VOU Blazar Output
+    rx_ps = os.path.join(vou_out, 'RX_map.ps')
+    rx_png = os.path.join(vou_out, 'RX_map.png')
+    os.system('convert ' + rx_ps + ' -density 600 ' + rx_png)
+    cand_ps = os.path.join(vou_out, 'candidates.ps')
+    cand_png = os.path.join(vou_out, 'candidates.png')
+    os.system('convert ' + cand_ps + ' -density 600 ' + cand_png)
+
+    #Create VOU Source Summary
+    with open('./short_output', 'w+') as ofile:
+        ofile.write(out_str.replace('\n' ,'\\\ \n'))
+    with open('./phase1', 'r') as ifile:
+        lines = ifile.read().split('Gamma-ray Counterparts')[0]
+        lines = re.sub('\\[..?;.?m', ' ', lines)
+        lines = lines.replace('[0m', ' ')
+        print_to_slack(lines, cand_png)
+    with open('./full_output', 'w+') as ofile:
+        ofile.write(lines.replace('\n' ,'\\\ \n'))
+    os.chdir(this_path)
+
+    # download gamma-ray data
+    MET = get_data(args['ra'], args['dec'], emin=args['emin'],
+                   dt=args['dt'], out_dir=fermi_data)
+    MJD = [MET_to_MJD(float(i)) for i in MET]
+    run_info = {'MJD' : MJD,
+                'args' : args,
+                'src_dict' : src_dict}
+    np.save(os.path.join(bpath,'run_info.npy'), run_info)
+else:
+    run_info = np.load(os.path.join(bpath,'run_info.npy'))[()]
+    MJD = run_info['MJD']
+    args = run_info['args']
+    src_dict = run_info['src_dict']
+print src_dict
+
+# start the gamma-ray analysis
 sargs = '--target_src center --free_radius 2 --data_path {} --use_3FGL --emin {} '
 sargs = sargs.format(fermi_data, args['emin'])
 ts_dict = {'name': ['center'], 'ra': [args['ra']], 'dec': [args['dec']]}
 ts_map_path = os.path.join(bpath, 'ts_map')
-submit_fit(sargs, ts_map_path, ts_dict, 0, ana_type='TS_Map')
+submit_fit(sargs, ts_map_path, ts_dict, 0, ana_type='TS_Map', partition='long')
 
 print('Submit_SEDs')
 job_dict = {}
 for i, src in enumerate(src_dict['name']):
     bpath_src = src_path(bpath, src)
     print bpath_src
-    if os.path.exists(bpath_src):
+    if os.path.exists(bpath_src) and (args['recovery']==False):
         shutil.rmtree(bpath_src)
     sargs = '--target_src {} --free_radius 2 --data_path {} --use_3FGL --emin {} '
     sargs = sargs.format(src.replace(' ', '_'), fermi_data, args['emin'])
@@ -184,10 +214,12 @@ for i, src in enumerate(src_dict['name']):
         print('{}'.format(t_window))
         if t_window == '':
             opath = job_dict[src]['sed']
+            partition='long'
         else:
             add_str = '{:.1f}_{:.1f}'.format(t_window[0], t_window[1])
             opath = os.path.join(job_dict[src]['lc'], add_str)
-        submit_fit(sargs, opath, src_dict, i, trange=t_window)
+            partition='kta'
+        submit_fit(sargs, opath, src_dict, i, trange=t_window, partition=partition)
 
 len_jobs = 5
 mins = 0
@@ -200,6 +232,7 @@ while (len_jobs > 0) and (mins < 600):
 
 try:
     plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
+                      os.path.join(vou_out, 'candidates_image_position.txt'),
                       mode='tsmap')
 except Exception as inst:
     warnings.warn("Couldn't create ts map...")
@@ -207,6 +240,7 @@ except Exception as inst:
 
 try:
     plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
+                      os.path.join(vou_out, 'candidates_image_position.txt'),
                       mode='residmap')
 except Exception as inst:
     warnings.warn("Couldn't create residual map...")
@@ -226,8 +260,8 @@ for key in job_dict.keys():
         print(inst)
 
 src_latex = ''
-for src in src_dict['name']:
-    src_latex += source_summary(bpath, src)
+for i,src in enumerate(src_dict['name']):
+    src_latex += source_summary(bpath, src, src_dict['dist'][i])
 with open(os.path.join(bpath, 'vou_blazar/full_output'), 'r') as f:
     full_out = f.read().encode('utf8').\
         replace('\x1b', '').replace('nu_p', 'nu peak')
@@ -244,15 +278,16 @@ with open('./template.tex') as f:
     template = f.read()
 
 out = template.format(cat_srcs=short_out,
-                      vou_pic=os.path.join(bpath, 'vou_blazar/candidates.png'),
+                      rx_map=os.path.join(vou_out, 'RX_map.png'),
+                      vou_pic=os.path.join(vou_out, 'candidates.png'),
                       ts_map=os.path.join(bpath, 'ts_map/tsmap.png'),
                       res_map=os.path.join(bpath, 'ts_map/residmap.png'),
                       vou_output=full_out,
                       event=ev_str,
                       src_latex=src_latex,
-                      mjd1 = MJD[0],
-                      mjd2 = MJD[1],
-                      energy = args['emin'])
+                      mjd1=MJD[0],
+                      mjd2=MJD[1],
+                      energy=args['emin']/1000)
 latex_path = os.path.join(bpath,'summary.tex')
 if os.path.exists(latex_path):
     os.remove(latex_path)
