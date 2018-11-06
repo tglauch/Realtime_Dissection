@@ -1,9 +1,15 @@
+# coding: utf-8
+
+import sys
+sys.path.append('/home/ga53lag/Software/python_scripts/')
 import numpy as np
 from astropy.coordinates import SkyCoord
 import os
 import collections
-
+from myfunctions import dict_to_nparray 
 fields = ['name', 'ra', 'dec', 'alt_name']
+odtype = np.dtype([('name', np.unicode, 32), ('ra', np.float32), ('dec', np.float32), ('dist', np.float32)]) 
+
 
 files = collections.OrderedDict(
     {'3fgl': {'file': '3fgl.1.csv',
@@ -81,7 +87,7 @@ def get_sources(ra, dec):
             del(src_dict['dec'][j - k])
         i += 1
 
-    fmt_str = '*{}* \n ra: {:.2f} deg |  dec: {:.2f} deg | distance: {:.2f} deg [ra:{:.2f} , dec:{:.2f}]'
+    fmt_str = '*{}* \n ra: {:.2f} deg |  dec: {:.2f} deg | distance: {:.2f} deg [ra: {:.2f} deg , dec:{:.2f} deg]'
     gcd = [GreatCircleDistance(np.radians(src_dict['ra'][i]), np.radians(src_dict['dec'][i]), np.radians(ra),
            np.radians(dec)) for i in range(len(src_dict['name']))]
     src_dict['dist'] = np.degrees(gcd)
@@ -98,4 +104,4 @@ def get_sources(ra, dec):
             ostr +=  '\n Alt Names: {}'.format(', '.join(src_dict['alt_name'][i]))
         print(ostr)
         out_str += ostr + '\n\n'
-    return src_dict, out_str
+    return dict_to_nparray(src_dict, dtype=odtype), out_str

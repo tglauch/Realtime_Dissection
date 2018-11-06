@@ -1,0 +1,156 @@
+\documentclass[a4paper]{article}
+
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[left=30mm, right=30mm, bottom=30mm]{geometry}
+\title{Dissecting the Region around \textit{IC181013}}
+
+\author{Authors}
+
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We report here on the muli-wavenlength dissection of the region around the IceCube alert event \textit{IC181013}
+\end{abstract}
+
+\section{Multi-Wavenlength Analysis of the Region around \textit{IC181013}}
+The search for possible counterparts is based on the VOU-Blazar Tool \ref{voublazar}. The tool compares existing catalogs to find all positions in the region around the neutrino event that have a \textit{blazar-like} radio to X-ray emission. For each match gamma-ray catalogs are checked to identify possible counterparts. \\
+
+The following gamma-ray analysis is based on the latest version of the FSSC Tools v11r5p3 [ref] and the fermipy package. The dataset contains photon energies above 2 GeV and a time window between [MJD1] and [MJD2]
+
+\subsection{Quick Summary: Catalog Sources in the Region}
+The following list gives a short overview about the most interesting catalog sources in the region. Check the following section for a more detailed analysis. The sources are sorted by their distance to the neutrino direction.
+\\ \\
+\textbf{3FGL J0509.4+0541} \\ 
+ ra: 77.36 deg |  dec: 5.70 deg | distance: 0.07 deg [ra:-0.07 , dec:-0.02]\\ 
+ Alt Names: CRATES J050926+054143, FL8Y J0509.4+0542, 5BZB J0509+0541, 3FHL J0509.4+0542\\ 
+\\ 
+\textbf{3HSP J050833.3+053109} \\ 
+ ra: 77.14 deg |  dec: 5.52 deg | distance: 0.35 deg [ra:-0.29 , dec:-0.20]\\ 
+\\ 
+\textbf{CRATES J051256+060835} \\ 
+ ra: 78.24 deg |  dec: 6.14 deg | distance: 0.90 deg [ra:0.81 , dec:0.42]\\ 
+\\ 
+\textbf{3FGL J0505.3+0459} \\ 
+ ra: 76.34 deg |  dec: 5.00 deg | distance: 1.30 deg [ra:-1.09 , dec:-0.72]\\ 
+ Alt Names: CRATES J050523+045945, FL8Y J0505.3+0459, 5BZQ J0505+0459, 3FHL J0505.4+0458\\ 
+\\ 
+
+
+\clearpage
+\subsection{Full MW Study of the Region}
+In this section the full multi-wavelength search for neutrino counterparts is presented. Despite catalog sources also candidate sources are listed based on the x-ray to radio emission. The sources are sorted by their right ascension.
+\\ \\ \\
+RASS/NVSS ra dec 05 05 23.2, 04 59 42.9 radio flux d.   986.400 flux-ratio     32. arx  0.818                         possible LBL   \textbf{Dist.  77.971 arcmin}\\ 
+ XRT/NVSS ra dec 05 05 23.2, 04 59 42.9 radio flux d.   986.400 flux-ratio     14. arx  0.861                         possible LBL   \textbf{Dist.  77.971 arcmin}\\ 
+ \textbf{Match nr.   1        ra dec:  76.34662,  4.99525}\\ 
+ ................Cataloged sources.................\\ 
+ 5BZQ J0505+0459               \\ 
+ CRATES J050523+045945         \\ 
+ \\\\ 
+ XMMSLEW/NVSS ra dec 05 08 33.5, 05 31 12.4 radio flux d.   45.300 X-ray/radio flux-ratio    973. arx  0.637 Log(nu peak) 16.1+/-~1   possible HBL  \textbf{Dist.  21.087 arcmin}\\ 
+ \textbf{Match nr.   2        ra dec:  77.13954,  5.52011}\\ 
+ ................Cataloged sources.................\\ 
+ 3HSP J050833.3+053109         \\ 
+ \\\\ 
+ RASS/NVSS ra dec 05 08 58.0, 06 26 29.1 radio flux d.   19.200 X-ray/radio flux-ratio   4688. arx  0.554 Log(nu peak) 17.7+/-~1   possible HBL  \textbf{Dist.  44.722 arcmin}\\ 
+ \textbf{Match nr.   3        ra dec:  77.24154,  6.44142}\\ 
+ ................Cataloged sources.................\\ 
+ \\\\ 
+ RASS/NVSS ra dec 05 09 26.0, 05 41 35.7 radio flux d.   535.900 flux-ratio     55. arx  0.788                         possible LBL   \textbf{Dist.   4.577 arcmin}\\ 
+ XRT/NVSS ra dec 05 09 26.0, 05 41 35.7 radio flux d.   535.900 flux-ratio     63. arx  0.781                         possible LBL   \textbf{Dist.   4.577 arcmin}\\ 
+ \textbf{Match nr.   4        ra dec:  77.35821,  5.69325}\\ 
+ ................Cataloged sources.................\\ 
+ 5BZB J0509+0541               \\ 
+ CRATES J050926+054143         \\ 
+ \\\\ 
+ 3XMM/NVSS ra dec 05 11 46.1, 05 12  2.9 radio flux d.   42.200 X-ray/radio flux-ratio    105. arx  0.755 Log(nu peak) 13.7+/-~1   possible IBL  \textbf{Dist.  43.655 arcmin}\\ 
+ \textbf{Match nr.   5        ra dec:  77.94204,  5.20081}\\ 
+ ................Cataloged sources.................\\ 
+ zw  4472                      \\ 
+ \\\\ 
+ Candidate nr.   6, Known flat spectrum radio source with no radio/X-ray match:  CRATES J051256+060835 found at a distance of  54.283 arcmin \\ 
+ \\\\ 
+  
+
+
+\clearpage
+
+\begin{figure}[h!]
+\centering
+  \includegraphics[width=1.0\textwidth]{/scratch9/tglauch/realtime_service/output/IC181013/vou_blazar/candidates.png}
+  \caption{Radio and X-ray sources within 90 arc-minutes of the position of the event. Symbol diameters are proportional to source intensity. Radio sources appear as red filled circles, X-ray sources as open blue circles}
+\end{figure}
+
+\begin{figure}[h!]
+\centering
+  \includegraphics[width=0.9\textwidth]{/scratch9/tglauch/realtime_service/output/IC181013/ts_map/ts_map.png}
+  \caption{The TS Map of the region. The analysis model includes all the known sources from the 3FGL Catalog}
+\end{figure}
+
+\begin{figure}[h!]
+\centering
+  \includegraphics[width=0.9\textwidth]{/scratch9/tglauch/realtime_service/output/IC181013/ts_map/resmap_map.png}
+  \caption{The Residual Map of the region. The analysis model includes all the known sources from the 3FGL Catalog}
+\end{figure}
+
+\clearpage
+\section{Sources SEDs and Lightcurves}
+\subsection{3FGL J0505.3+0459}              ra = $76.34^\circ$ , dec = $5.00^\circ$ , ts = 1.61\begin{figure}[h!]
+\centering
+  \includegraphics[width=0.9\textwidth]{/scratch9/tglauch/realtime_service/output/IC181013/3FGL_J0505.3+0459/all_year/sed/sed.pdf}
+  \caption{SED for 3FGL J0505.3+0459}
+\end{figure}
+\begin{figure}[h!]
+\centering
+  \includegraphics[width=0.9\textwidth]{/scratch9/tglauch/realtime_service/output/IC181013/3FGL_J0505.3+0459/lightcurve/lightcurve.pdf}
+  \caption{Lightcurve for 3FGL J0505.3+0459}
+\end{figure}
+\clearpage 
+\subsection{3FGL J0509.4+0541}              ra = $77.36^\circ$ , dec = $5.70^\circ$ , ts = 277.13\begin{figure}[h!]
+\centering
+  \includegraphics[width=0.9\textwidth]{/scratch9/tglauch/realtime_service/output/IC181013/3FGL_J0509.4+0541/all_year/sed/sed.pdf}
+  \caption{SED for 3FGL J0509.4+0541}
+\end{figure}
+\begin{figure}[h!]
+\centering
+  \includegraphics[width=0.9\textwidth]{/scratch9/tglauch/realtime_service/output/IC181013/3FGL_J0509.4+0541/lightcurve/lightcurve.pdf}
+  \caption{Lightcurve for 3FGL J0509.4+0541}
+\end{figure}
+\clearpage 
+\subsection{CRATES J051256+060835}              ra = $78.24^\circ$ , dec = $6.14^\circ$ , ts = -0.00\begin{figure}[h!]
+\centering
+  \includegraphics[width=0.9\textwidth]{/scratch9/tglauch/realtime_service/output/IC181013/CRATES_J051256+060835/all_year/sed/sed.pdf}
+  \caption{SED for CRATES J051256+060835}
+\end{figure}
+\begin{figure}[h!]
+\centering
+  \includegraphics[width=0.9\textwidth]{/scratch9/tglauch/realtime_service/output/IC181013/CRATES_J051256+060835/lightcurve/lightcurve.pdf}
+  \caption{Lightcurve for CRATES J051256+060835}
+\end{figure}
+\clearpage 
+\subsection{3HSP J050833.3+053109}              ra = $77.14^\circ$ , dec = $5.52^\circ$ , ts = -0.00\begin{figure}[h!]
+\centering
+  \includegraphics[width=0.9\textwidth]{/scratch9/tglauch/realtime_service/output/IC181013/3HSP_J050833.3+053109/all_year/sed/sed.pdf}
+  \caption{SED for 3HSP J050833.3+053109}
+\end{figure}
+\begin{figure}[h!]
+\centering
+  \includegraphics[width=0.9\textwidth]{/scratch9/tglauch/realtime_service/output/IC181013/3HSP_J050833.3+053109/lightcurve/lightcurve.pdf}
+  \caption{Lightcurve for 3HSP J050833.3+053109}
+\end{figure}
+\clearpage 
+
+
+
+\begin{thebibliography}{9}
+\bibitem{voublazar}
+  Y.Chang,
+  \emph{https://github.com/ecylchang/VOU\_Blazars}.
+\end{thebibliography}
+\end{document}

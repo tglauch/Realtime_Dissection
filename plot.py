@@ -180,7 +180,7 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap'):
         warnings.warn('Files for {} not found'.format(mode))
         print(inst)
         return
-    srcs = np.load(srcs)[()]
+    srcs = np.load(srcs)
     cand_pos = np.genfromtxt(vou_cand)
 
     cand = {'ra': cand_pos[:,0], 'dec': cand_pos[:,1]}
@@ -225,11 +225,11 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap'):
     circle = plt.Circle((inp[0].header['CRVAL1'], inp[0].header['CRVAL2']), 1.5,
                         color='b', fill=False, linewidth=0.5)
     ax.add_artist(circle)
-    for i, src in enumerate(zip(srcs['ra'], srcs['dec'])):
-        ax.plot(src[0], src[1],
+    for i, src in enumerate(srcs):
+        ax.plot(src['ra'], src['dec'],
                 marker=markers[i],
                 linestyle = '',
-                label=srcs['name'][i],
+                label=src['name'],
                 color='k', ms=4)
     ax.plot(cand['ra'], cand['dec'], color='k', ms=4, marker="8",
             linestyle = '', fillstyle='none', label='VOU Sources')

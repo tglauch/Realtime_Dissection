@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --time={time}
-#SBATCH --mem=2000
+#SBATCH --mem=4000
 #SBATCH --partition={partition}
 #SBATCH --error={bpath}/slurm.err
 #SBATCH --output={bpath}/slurm.out
