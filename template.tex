@@ -4,6 +4,7 @@
 \usepackage[utf8]{{inputenc}}
 \usepackage{{amsmath}}
 \usepackage{{graphicx}}
+\usepackage{{xcolor}}
 \usepackage[left=30mm, right=30mm, bottom=30mm]{{geometry}}
 \title{{Dissecting the Region around \textit{{{event}}}}}
 
@@ -15,28 +16,25 @@
 \maketitle
 
 \begin{{abstract}}
-On !date! IceCube has reported the detection of an highly-energetic neutrino, \textit{{{event}}}, with direction
+{prelim}On MJD {date} the IceCube Neutrino Observatory  has reported the detection of a highly-energetic neutrino, \textit{{{event}}}, with direction
 ra: {ra:.2f}$^\circ$, dec: {dec:.2f}$^\circ$ (l: {l:.2f}$^\circ$, b: {b:.2f}$^\circ$) that has a good chance of being of astropysical origin. With the goal of identifing
-the corresponding electromagnetic  counterpart we report here on the muli-wavenlength dissection of the region around the event.
+the corresponding electromagnetic counterpart we report here on the muli-wavenlength dissection of the region around the event.
 \end{{abstract}}
 
-\section{{Multi-Wavenlength Analysis of the Region around \textit{{{event}}}}}
+\section{{Identifying counterpart candidates}}
 The search for possible counterparts is based on the VOU-Blazar Tool \cite{{voublazar}}. The tool compares existing
 multi-wavelengths catalogs to find all positions in the region around the event that have a \textit{{blazar-like}} radio
 to X-ray emission ratio. For each match existing gamma-ray catalogs are checked to identify possible counterparts. \\
 
 The following gamma-ray analysis is based on the latest version of the FSSC Tools v11r5p3 and the fermipy package
-\cite{{fermipy}}
-\cite{{fermipy}}.
-The dataset contains photon energies above {emin} GeV and a time window between {mjd1:.1f} and {mjd2:.1f}
+\cite{{fermipy}}. The dataset contains photon energies above {emin} GeV and a time window between {mjd1:.1f} and {mjd2:.1f}
 
-\subsection{{Quick Summary: Catalog Sources in the Region}}
+\subsection{{Quick summary: Catalog sources in the region}}
 The following list gives a short overview about the most interesting catalog sources in the region. Check the following section for a more detailed analysis. The sources are sorted by their distance to the neutrino direction.
 \\ \\
 {cat_srcs}
 
-\clearpage
-\subsection{{Full MW Study of the Region}}
+\subsection{{Full multi-wavelength study of the region}}
 In this section the full multi-wavelength search for neutrino counterparts is presented. Despite catalog sources also candidate sources are listed based on the x-ray to radio emission. The sources are sorted by their right ascension.
 \\ \\ \\
 {vou_output}
@@ -70,7 +68,7 @@ proportional to source intensity. Radio sources appear as red filled circles, X-
 \end{{figure}}
 
 \clearpage
-\section{{Sources SEDs and Lightcurves}}
+\section{{The closer look: SEDs and light curves}}
 {src_latex}
 
 {{\small\bibliographystyle{{unsrt}}

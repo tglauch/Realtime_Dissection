@@ -14,12 +14,13 @@ import datetime
 from slack_lib import print_to_slack
 import numpy as np
 from myfunctions import MET_to_MJD, dict_to_nparray
-import time
 import plot
 import warnings
 import re
+import time
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
+from astropy.time import Time
 
 path_settings = {'sed': 'all_year/sed',
                  'lc': 'lightcurve'}
@@ -57,7 +58,7 @@ def parseArguments():
     parser.add_argument(
         "--emin",
         help="lower energy bound for SED",
-        type=float, default=100)
+        type=float, default=1000)
     parser.add_argument(
         "--event",
         help="event name",
@@ -76,22 +77,21 @@ def parseArguments():
 
 def source_summary(bpath, src):
     print src['name']
-    l_str = 'Failed to Create Plots for {} \\clearpage'.format(src['name'])
     bpath_src = src_path(bpath, src['name'])
     lc_path = os.path.join(bpath_src, path_settings['lc'], 'lightcurve.pdf')
     sed_path = os.path.join(bpath_src, path_settings['sed'])
+    l_str ='\subsection{{{srcname}}}\n'.format(srcname=src['name'])
     try:
         fit_res = np.load(os.path.join(sed_path, 'llh.npy'))[()]
         sed_path = os.path.join(sed_path, 'sed.pdf')
         ts = fit_res['sources'][src['name']]['ts']
         ra = fit_res['sources'][src['name']]['RAJ2000']
         dec = fit_res['sources'][src['name']]['DEJ2000']
+        t_str = 'ra = {ra:.2f}$^\circ$ , dec = {dec:.2f}$^\circ$ , ts = {ts:.2f}, distance = {dist:.2f}$^\circ$ \n'
+        l_str += t_str.format(ts=ts, ra=ra, dec=dec, dist=src['dist'])
     except Exception as inst:
         warnings.warn("Can not find fit result for {}".format(src['name']))
         print(inst)
-    l_str ='\subsection{{{srcname}}}\n'
-    l_str += 'ra = ${ra:.2f}^\circ$ , dec = ${dec:.2f}^\circ$ , ts = {ts:.2f}, distance = ${dist:.2f}^\circ$ \n'
-    l_str = l_str.format(srcname=src['name'],ts=ts, ra=ra, dec=dec, dist=src['dist'])
 
     try:
         srcprob = fits.open(os.path.join(bpath,'srcprob/ft1_srcprob_00.fits'))
@@ -179,12 +179,16 @@ rec = args['recovery']
 make_pdf = args['make_pdf']
 print('Run with args')
 print(args)
-dtime = datetime.datetime.now()
+if args['mjd'] is not None:
+    t = Time(args['mjd'], format='mjd')
+else:
+    t = Time.now()
+    args['mjd'] = t.mjd
 if args['event'] is not None:
     ev_str = args['event']
 else:
-    ev_str = 'IC{}{:02d}{:02d}'.format(str(dtime.year)[-2:],
-                                       dtime.month, dtime.day)
+    ev_str = 'IC{}{:02d}{:02d}'.format(str(t.datetime.year)[-2:],
+                                       t.datetime.month, t.datetime.day)
 bpath = '/scratch9/tglauch/realtime_service/output/{}'.format(ev_str)
 this_path = os.path.dirname(os.path.abspath(__file__))
 fermi_data = os.path.join(bpath, 'fermi_data')
@@ -224,8 +228,11 @@ if not rec and not make_pdf:
     os.chdir(this_path)
 
     # download gamma-ray data
-    MET = get_data(args['ra'], args['dec'], emin=args['emin'],
-                   dt=args['dt'], out_dir=fermi_data)
+    kwargs= {'emin': args['emin'], 'days': args['dt'], 'out_dir' : fermi_data}
+    if args['mjd'] is not None:
+        kwargs['mjd'] = args['mjd']
+        kwargs['mode'] = 'mid'
+    MET = get_data(args['ra'], args['dec'], **kwargs)
     MJD = [MET_to_MJD(float(i)) for i in MET]
     run_info = {'MJD' : MJD,
                 'args' : args,
@@ -287,98 +294,105 @@ for src in src_dict:
             partition='kta'
         submit_fit(sargs, opath, src, trange=t_window, partition=partition, **args)
 
-if not make_pdf:
-    len_jobs = 5
-    mins = 0
-    while (len_jobs > 0) and (mins < 600):
-        print len_jobs
-        jobs = os.popen('squeue --user ga53lag').read()
-        len_jobs = len([i for i in jobs.split('\n') if 'fermi' in i])
-        mins += 1
-        time.sleep(60)
+mins = 0
+final_pdf = False
+while not final_pdf:
+    time.sleep(60)
+    mins += 1
+    jobs = os.popen('squeue --user ga53lag').read()
+    len_jobs = len([i for i in jobs.split('\n') if 'fermi' in i])
+    print len_jobs
+    if len_jobs == 0 or make_pdf:
+        final_pdf = True
+    if not mins % 15 == 1:
+        continue
 
-try:
-    plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
-                      os.path.join(vou_out, 'candidates_image_position.txt'),
-                      mode='tsmap')
-except Exception as inst:
-    warnings.warn("Couldn't create ts map...")
-    print(inst)
-
-try:
-    plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
-                      os.path.join(vou_out, 'candidates_image_position.txt'),
-                      mode='residmap')
-except Exception as inst:
-    warnings.warn("Couldn't create residual map...")
-    print(inst)
-
-for key in job_dict.keys():
-    print('Make Plots for Source {}'.format(key))
     try:
-        plot.make_lc_plot(job_dict[key]['lc'])
+        plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
+                          os.path.join(vou_out, 'candidates_image_position.txt'),
+                          mode='tsmap')
     except Exception as inst:
-        warnings.warn("Couldn't create lightcurve for source {}".format(key))
-        print(inst)
-    try:
-        plot.make_sed_plot(job_dict[key]['sed'])
-    except Exception as inst:
-        warnings.warn("Couldn't create SED for source {}".format(key))
+        warnings.warn("Couldn't create ts map...")
         print(inst)
 
-src_latex = ''
-for src in src_dict:
-    src_latex += source_summary(bpath, src)
-with open(os.path.join(bpath, 'vou_blazar/full_output'), 'r') as f:
-    full_out = f.read().encode('utf8').\
-        replace('\x1b', '').replace('nu_p', 'nu peak')
-    full_out = re.sub('\*([^\*]*)\*', r'\\textbf{\1}', full_out)
-    full_out = re.sub('(Match[^\\\\]*)', r'\\textbf{\1}', full_out)
-    full_out = re.sub('(Dist[^\\\\]*)', r'\\textbf{\1}', full_out)
-    full_out = [i.strip() + ' \n' for i in full_out.split('\n')]
-    full_out = [i if i != '\\\\ \n' else '\\\\\\\ \n' for i in full_out]
-    full_out = ' '.join(full_out)
-with open(os.path.join(bpath, 'vou_blazar/short_output'), 'r') as f:
-    short_out = f.read().encode('utf8').replace('\x1b', '')
-    short_out = re.sub('\*([^\*]*)\*', r'\\textbf{\1}', short_out)
-with open('./template.tex') as f:
-    template = f.read()
+    try:
+        plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
+                          os.path.join(vou_out, 'candidates_image_position.txt'),
+                          mode='residmap')
+    except Exception as inst:
+        warnings.warn("Couldn't create residual map...")
+        print(inst)
 
-c = SkyCoord(args['ra'], args['dec'], frame='icrs', unit="deg")
-gal = c.galactic
-out = template.format(ra = args['ra'],
-                      dec = args['dec'],
-                      emin = args['emin'],
-                      l = gal.l.deg,
-                      b = gal.b.deg,
-                      cat_srcs=short_out,
-                      rx_map=os.path.join(vou_out, 'RX_map.png'),
-                      vou_pic=os.path.join(vou_out, 'candidates.png'),
-                      ts_map=os.path.join(bpath, 'ts_map/tsmap.png'),
-                      res_map=os.path.join(bpath, 'ts_map/residmap.png'),
-                      vou_output=full_out,
-                      event=ev_str,
-                      src_latex=src_latex,
-                      mjd1=MJD[0],
-                      mjd2=MJD[1],
-                      energy=args['emin']/1000.)
-latex_path = os.path.join(bpath,'summary.tex')
-if os.path.exists(latex_path):
-    os.remove(latex_path)
-with open(latex_path, 'w+') as f:
-    f.write(out)
+    for key in job_dict.keys():
+        print('Make Plots for Source {}'.format(key))
+        try:
+            plot.make_lc_plot(job_dict[key]['lc'])
+        except Exception as inst:
+            warnings.warn("Couldn't create lightcurve for source {}".format(key))
+            print(inst)
+        try:
+            plot.make_sed_plot(job_dict[key]['sed'])
+        except Exception as inst:
+            warnings.warn("Couldn't create SED for source {}".format(key))
+            print(inst)
 
-cmd  = [
-    ['pdflatex', '-interaction', 'nonstopmode', '-output-directory', bpath,  latex_path]
-    ['bibtex', latex_path[:-4] + '.aux'],
-    ['pdflatex', '-interaction', 'nonstopmode', '-output-directory', bpath, latex_path]
-    ['pdflatex', '-interaction', 'nonstopmode', '-output-directory', bpath, latex_path]
-]
+    src_latex = ''
+    for src in src_dict:
+        src_latex += source_summary(bpath, src)
+    with open(os.path.join(bpath, 'vou_blazar/full_output'), 'r') as f:
+        full_out = f.read().encode('utf8').\
+            replace('\x1b', '').replace('nu_p', 'nu peak')
+        full_out = re.sub('\*([^\*]*)\*', r'\\textbf{\1}', full_out)
+        full_out = re.sub('(Match[^\\\\]*)', r'\\textbf{\1}', full_out)
+        full_out = re.sub('(Dist[^\\\\]*)', r'\\textbf{\1}', full_out)
+        full_out = [i.strip() + ' \n' for i in full_out.split('\n')]
+        full_out = [i if i != '\\\\ \n' else '\\\\\\\ \n' for i in full_out]
+        full_out = ' '.join(full_out)
+    with open(os.path.join(bpath, 'vou_blazar/short_output'), 'r') as f:
+        short_out = f.read().encode('utf8').replace('\x1b', '')
+        short_out = re.sub('\*([^\*]*)\*', r'\\textbf{\1}', short_out)
+    with open('./template.tex') as f:
+        template = f.read()
 
-cmd = ['pdflatex', '-interaction', 'nonstopmode', '-output-directory', bpath,  latex_path]
-proc = subprocess.Popen(cmd)
-proc.communicate()
-print_to_slack('Fit Results', os.path.join(bpath, 'summary.pdf'))
-retcode = proc.returncode
-if not retcode == 0:
-    raise ValueError('Error {} executing command: {}'.format(retcode, ' '.join(cmd))) 
+    c = SkyCoord(args['ra'], args['dec'], frame='icrs', unit="deg")
+    gal = c.galactic
+    if not final_pdf:
+        prelim = '{\color{red} Warning: The following results are all preliminary and will be continously updated whenerver new data is available }'
+    else:
+        prelim = ' '
+    out = template.format(prelim=prelim,
+                          date=args['mjd'],
+                          ra=args['ra'],
+                          dec=args['dec'],
+                          emin=1.*args['emin']/1000.,
+                          l=gal.l.deg,
+                          b=gal.b.deg,
+                          cat_srcs=short_out,
+                          rx_map=os.path.join(vou_out, 'RX_map.png'),
+                          vou_pic=os.path.join(vou_out, 'candidates.png'),
+                          ts_map=os.path.join(bpath, 'ts_map/tsmap.png'),
+                          res_map=os.path.join(bpath, 'ts_map/residmap.png'),
+                          vou_output=full_out,
+                          event=ev_str,
+                          src_latex=src_latex,
+                          mjd1=MJD[0],
+                          mjd2=MJD[1],
+                          energy=args['emin']/1000.)
+    latex_path = os.path.join(bpath,ev_str + '.tex')
+    if os.path.exists(latex_path):
+        os.remove(latex_path)
+    with open(latex_path, 'w+') as f:
+        f.write(out)
+    if not os.path.exists(os.path.join(bpath, 'sample.bib')):
+        shutil.copyfile('sample.bib', os.path.join(bpath, 'sample.bib'))
+    os.chdir(bpath)
+    cmds  = [
+        ['pdflatex', '-interaction', 'nonstopmode', ev_str + '.tex'],
+        ['bibtex', ev_str + '.aux'],
+        ['pdflatex', '-interaction', 'nonstopmode',  ev_str + '.tex'],
+        ['pdflatex', '-interaction', 'nonstopmode',  ev_str + '.tex'],
+    ]
+    for c in cmds:
+        subprocess.call(c)
+    os.chdir(this_path)
+    print_to_slack('Fit Results', os.path.join(bpath, ev_str + '.pdf'))
