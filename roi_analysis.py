@@ -45,8 +45,12 @@ def parseArguments():
         type=float,)
     parser.add_argument(
         "--mjd",
-        help="mjd",
+        help="The MJD time of the event",
         type=float)
+    parser.add_argument(
+        "--mjd_range",
+        help="The mjd range for the analysis",
+        type=float, nargs='+')
     parser.add_argument(
         "--dt_lc",
         help="time lenght of bins in the light curve",
@@ -63,6 +67,10 @@ def parseArguments():
         "--event",
         help="event name",
         required=False)
+    parser.add_argument(
+        "--mode",
+        help="end if given mjd is at the end of the time window, mid if in the middle'",
+        type=str, default='end')
     parser.add_argument(
         "--recovery",
         help="Is this a run that recovers the previous processing?",
@@ -209,11 +217,9 @@ if not rec and not make_pdf:
 
     # Convert VOU Blazar Output
     rx_ps = os.path.join(vou_out, 'RX_map.ps')
-    rx_png = os.path.join(vou_out, 'RX_map.png')
-    os.system('convert ' + rx_ps + ' -density 600 ' + rx_png)
+    os.system('ps2eps -B ' + rx_ps)
     cand_ps = os.path.join(vou_out, 'candidates.ps')
-    cand_png = os.path.join(vou_out, 'candidates.png')
-    os.system('convert ' + cand_ps + ' -density 600 ' + cand_png)
+    os.system('ps2eps -B ' + cand_ps )
 
     #Create VOU Source Summary
     with open('./short_output', 'w+') as ofile:
@@ -222,16 +228,19 @@ if not rec and not make_pdf:
         lines = ifile.read().split('Gamma-ray Counterparts')[0]
         lines = re.sub('\\[..?;.?m', ' ', lines)
         lines = lines.replace('[0m', ' ')
-        print_to_slack(lines, cand_png)
+        print_to_slack(lines, os.path.join(vou_out, 'candidates.eps'))
     with open('./full_output', 'w+') as ofile:
         ofile.write(lines.replace('\n' ,'\\\ \n'))
     os.chdir(this_path)
 
     # download gamma-ray data
-    kwargs= {'emin': args['emin'], 'days': args['dt'], 'out_dir' : fermi_data}
-    if args['mjd'] is not None:
+    kwargs = {'emin': args['emin'], 'days': args['dt'], 'out_dir' : fermi_data}
+    if args['mjd_range'] is None:
         kwargs['mjd'] = args['mjd']
-        kwargs['mode'] = 'mid'
+        kwargs['mode'] = args['mode']
+    else:
+        kwargs['mjd'] = args['mjd_range']
+    print kwargs
     MET = get_data(args['ra'], args['dec'], **kwargs)
     MJD = [MET_to_MJD(float(i)) for i in MET]
     run_info = {'MJD' : MJD,
@@ -297,14 +306,15 @@ for src in src_dict:
 mins = 0
 final_pdf = False
 while not final_pdf:
-    time.sleep(60)
+    if not make_pdf:
+        time.sleep(60)
     mins += 1
     jobs = os.popen('squeue --user ga53lag').read()
     len_jobs = len([i for i in jobs.split('\n') if 'fermi' in i])
     print len_jobs
     if len_jobs == 0 or make_pdf:
         final_pdf = True
-    if not mins % 15 == 1:
+    if not mins % 15 == 1 and not final_pdf:
         continue
 
     try:
@@ -357,7 +367,7 @@ while not final_pdf:
     c = SkyCoord(args['ra'], args['dec'], frame='icrs', unit="deg")
     gal = c.galactic
     if not final_pdf:
-        prelim = '{\color{red} Warning: The following results are all preliminary and will be continously updated whenerver new data is available }'
+        prelim = '{\color{red} Warning: The following results are all preliminary and will be continously updated whenever calculations are finished.}'
     else:
         prelim = ' '
     out = template.format(prelim=prelim,
@@ -368,8 +378,8 @@ while not final_pdf:
                           l=gal.l.deg,
                           b=gal.b.deg,
                           cat_srcs=short_out,
-                          rx_map=os.path.join(vou_out, 'RX_map.png'),
-                          vou_pic=os.path.join(vou_out, 'candidates.png'),
+                          rx_map=os.path.join(vou_out, 'RX_map.eps'),
+                          vou_pic=os.path.join(vou_out, 'candidates.eps'),
                           ts_map=os.path.join(bpath, 'ts_map/tsmap.png'),
                           res_map=os.path.join(bpath, 'ts_map/residmap.png'),
                           vou_output=full_out,

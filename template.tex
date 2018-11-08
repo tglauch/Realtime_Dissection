@@ -5,6 +5,7 @@
 \usepackage{{amsmath}}
 \usepackage{{graphicx}}
 \usepackage{{xcolor}}
+\usepackage[outdir=./]{{epstopdf}}
 \usepackage[left=30mm, right=30mm, bottom=30mm]{{geometry}}
 \title{{Dissecting the Region around \textit{{{event}}}}}
 
@@ -22,12 +23,14 @@ the corresponding electromagnetic counterpart we report here on the muli-wavenle
 \end{{abstract}}
 
 \section{{Identifying counterpart candidates}}
-The search for possible counterparts is based on the VOU-Blazar Tool \cite{{voublazar}}. The tool compares existing
-multi-wavelengths catalogs to find all positions in the region around the event that have a \textit{{blazar-like}} radio
-to X-ray emission ratio. For each match existing gamma-ray catalogs are checked to identify possible counterparts. \\
+The search for possible counterparts is based on the VOU-Blazar Tool \cite{{voublazar}} and follows closely the pipeline
+developed in \cite{{Padovani:2018acg}}.  VOU-Blazar compares 28
+multi-wavelengths catalogs to find all positions in the vicinity of the event that have a \textit{{blazar-like}} radio
+to X-ray emission ratio. For each match, existing source catalogs are checked to identify possible counterparts. \\
 
-The following gamma-ray analysis is based on the latest version of the FSSC Tools v11r5p3 and the fermipy package
-\cite{{fermipy}}. The dataset contains photon energies above {emin} GeV and a time window between {mjd1:.1f} and {mjd2:.1f}
+Subsequently we run a Fermi-LAT gamma-ray analysis based on the latest version of the FSSC Tools v11r5p3 and the fermipy package
+\cite{{fermipy}} and using the standart \\textit{{gtlike}} procedure. The dataset contains photons with energies above
+{emin} GeV in a time window between {mjd1:.1f} and {mjd2:.1f}
 
 \subsection{{Quick summary: Catalog sources in the region}}
 The following list gives a short overview about the most interesting catalog sources in the region. Check the following section for a more detailed analysis. The sources are sorted by their distance to the neutrino direction.
