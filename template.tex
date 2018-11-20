@@ -5,73 +5,94 @@
 \usepackage{{amsmath}}
 \usepackage{{graphicx}}
 \usepackage{{xcolor}}
+\usepackage{{authblk}}
+\usepackage{{caption}}
+\usepackage{{subcaption}}
 \usepackage[outdir=./converted]{{epstopdf}}
 \usepackage[left=30mm, right=30mm, bottom=30mm]{{geometry}}
 \title{{Dissecting the Region around \textit{{{event}}}}}
 
-\author{{Authors}}
-
+\author[1,$\dagger$]{{Theo Glauch}}
+\affil[1]{{Technical University Munich, Garching, Germany}}
+\affil[$\dagger$]{{theo.glauch@tum.de}}
 \date{{\today}}
 
 \begin{{document}}
 \maketitle
 
 \begin{{abstract}}
-{prelim}On MJD {date} the IceCube Neutrino Observatory  has reported the detection of a highly-energetic neutrino, \textit{{{event}}}, with direction
-ra: {ra:.2f}$^\circ$, dec: {dec:.2f}$^\circ$ (l: {l:.2f}$^\circ$, b: {b:.2f}$^\circ$) that has a good chance of being of astropysical origin. With the goal of identifing
+{prelim}On MJD {date} the IceCube Neutrino Observatory  has reported the detection of a highly-energetic neutrino,
+\textit{{{event}}}, with direction ra: {ra:.2f}$^\circ$, dec: {dec:.2f}$^\circ$ in equatorial and l: {l:.2f}$^\circ$, b:
+{b:.2f}$^\circ$ in galactic coordinates. Due to the high-energy and the track-like signature the event has a good
+pointing and is likely of astrophysical origin. With the goal of identifing
 the corresponding electromagnetic counterpart we report here on the muli-wavenlength dissection of the region around the event.
 \end{{abstract}}
 
 \section{{Identifying counterpart candidates}}
 The search for possible counterparts is based on the VOU-Blazar Tool \cite{{voublazar}} and follows closely the pipeline
-developed in \cite{{Padovani:2018acg}}.  VOU-Blazar compares 28
-multi-wavelengths catalogs to find all positions in the vicinity of the event that have a \textit{{blazar-like}} radio
-to X-ray emission ratio. For each match, existing source catalogs are checked to identify possible counterparts. \\
+developed in \cite{{Padovani:2018acg}}.  VOU-Blazar compares 32 multi-wavelengths catalogs\footnote{{List of the 32 catalogs used in this
+analysis: SDS82 , 3HSP , Fermi8YR ,1BIGB, MST9Y, FIRST, SUMSS, WGACAT, IPC2E, ZWCLUSTERS,
+PSZ2, ABELL , SDSSWHL, CRATES, NVSS, SXPS, RASS, XMMSL, BMW , IPCSL, CHANDRA, MCXC,  5BZCat, SWXCS, PULSAR, F2PSR,
+3FHL, 3FGL, 3XMM, MAXI, FermiMEV, AGILE}}
+to find all positions in the vicinity of the alert event with a \textit{{blazar-like}} radio
+to X-ray emission ratio. Each match is then checked against existing blazar catalogs to identify possible associations. \\
 
-Subsequently we run a Fermi-LAT gamma-ray analysis based on the latest version of the FSSC Tools v11r5p3 and the fermipy package
-\cite{{fermipy}} and using the standart \\textit{{gtlike}} procedure. The dataset contains photons with energies above
-{emin} GeV in a time window between {mjd1:.1f} and {mjd2:.1f}
+In order to search for gamma-ray anomalies in the region we use Fermi-LAT data around the event time and run three different analysis
+pipelines. Firstly, TS and residual maps are generated to search for unknown gamma-ray emmitters, e.g. indication for
+emission from the previously identfied \textit{{VOU-Sources}} without gamma-ray association. At the same time the
+residual map gives information of the 
+the goodness of fit using the 3FGL model. Subsequently SEDs and light curves are produced for each identified catalog
+source. This allows as to search for specific features in flux and spectral shape around the neutrino arrival time. The
+analyses are based on the latest version of the FSSC Tools v11r5p3 and the fermipy package
+\cite{{fermipy}}. We use the the standart procedures as described in the Fermi-LAT Cicerone \cite{{fermi_ci}}. The
+dataset for the analysis contains events with photon energy above {emin} GeV in a time window between {mjd1:.1f} and {mjd2:.1f}.
 
 \subsection{{Quick summary: Catalog sources in the region}}
-The following list gives a short overview about the most interesting catalog sources in the region. Check the following section for a more detailed analysis. The sources are sorted by their distance to the neutrino direction.
+The following list gives a quick overview about the catalog blazars and flat-spectrum radio sources in the region. The
+full output of VOU-Blazar is given below. Sources are sorted by their angular distance to the neutrino direction.
 \\ \\
 {cat_srcs}
 
 \subsection{{Full multi-wavelength study of the region}}
-In this section the full multi-wavelength search for neutrino counterparts is presented. Despite catalog sources also candidate sources are listed based on the x-ray to radio emission. The sources are sorted by their right ascension.
+In this section we present the full multi-wavelength search for possible neutrino counterparts. Starting from 32
+multi-wavenlength catalogs the VOU-Blazar Tool \cite{{voublazar}} uses the radio to x-ray emission ratio in order to search for
+non-thermal counterparts candidates. In the following sources are sorted by their right ascension.
 \\ \\ \\
 {vou_output}
 
 \clearpage
 \begin{{figure}}[h!]
 \centering
-  \includegraphics[width=0.5\textwidth]{{{rx_map}}}
-  \caption{{Radio and X-ray sources within 120 arc-minutes of the position of the neutrino event. Symbol diameters are
-proportional to source intensity. Radio sources appear as red filled circles, X-ray sources as open blue circles}}
+\begin{{subfigure}}{{.5\textwidth}}
+  \centering
+  \includegraphics[width=.8\linewidth]{{{rx_map}}}
+\end{{subfigure}}%
+\begin{{subfigure}}{{.5\textwidth}}
+\centering
+  \includegraphics[width=.8\linewidth]{{{vou_pic}}}
+\end{{subfigure}}
+ \caption{{Left Plot: Radio and X-ray sources within 120 arc-minutes of the position of the neutrino event. Symbol
+diameters are proportional to source intensity. Radio sources appear as red filled circles, X-ray sources as open blue
+circles  Right Plot: Counterpart candidates in a 120 arc-minutes radius around the event direction. Dark blue circles represent LBL type candidates, that is sources with flux ratio in the range observed in the sample of LBL blazars of
+the latest edition of the BZCAT catalogue \cite{{Massaro:2015nia}}, cyan symbols are for IBL type candidates, and orange symbols are for
+HBL candidates. Known blazars are marked by a red diamond if they are included in the BZCAT catalogue or a star if
+they are part of the 2WHSP sample. The shaded area marks a circle of 90 arcmis around the events-best fit direction. }}
 \end{{figure}}
 
 
 \begin{{figure}}[h!]
 \centering
-  \includegraphics[width=0.5\textwidth]{{{vou_pic}}}
-  \caption{{Counterpart candidates in a 120 arc-minutes radius around the event direction. Dark blue circles represent LBL type candidates, that is sources with flux ratio in the range observed in the sample of LBL blazars of
-the latest edition of the BZCAT catalogue (Massaro et al. 2015), cyan symbols are for IBL type candidates, and orange symbols are for
-HBL candidates. Known blazars are also marked by a red diamond if they are included in the BZCAT catalogue or a star if
-they are part of the 2WHSP sample. The diameters of filled and open circles are proportional to radio flux density and X-ray flux, respectively. }}
-\end{{figure}}
+\begin{{subfigure}}{{.37\textwidth}}
+  \includegraphics[height=7cm]{{{res_map}}}
 
-\clearpage
-
-\begin{{figure}}[h!]
+\end{{subfigure}}%
+\begin{{subfigure}}{{.63\textwidth}}
 \centering
-  \includegraphics[width=0.9\textwidth]{{{ts_map}}}
-  \caption{{The TS Map of the region for MJD {mjd1:.1f} and {mjd2:.1f} and energies above {energy} GeV. The analysis model includes all the known sources from the 3FGL Catalog}}
-\end{{figure}}
-
-\begin{{figure}}[h!]
-\centering
-  \includegraphics[width=0.9\textwidth]{{{res_map}}}
-  \caption{{The Residual Map of the region for MJD {mjd1:.1f} and {mjd2:.1f} and energies above {energy} GeV. The analysis model includes all the known sources from the 3FGL Catalog}}
+  \includegraphics[height=7cm]{{{ts_map}}}
+\end{{subfigure}}
+\caption{{Left: The residual map of the region. Right: The TS map of the region. Both plots are down for  MJD
+{mjd1:.1f} to {mjd2:.1f} and energies above {energy} GeV. The analysis model includes all known sources from the 3FGL
+catalog. The blue circle indicates a radius of 90 arcmin around the the event best-fit direction. }}
 \end{{figure}}
 
 \clearpage

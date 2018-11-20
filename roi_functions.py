@@ -6,7 +6,10 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 import os
 import collections
-from myfunctions import dict_to_nparray 
+from myfunctions import dict_to_nparray
+import scipy.integrate
+import pyfits as fits 
+ 
 fields = ['name', 'ra', 'dec', 'alt_name']
 odtype = np.dtype([('name', np.unicode, 32), ('ra', np.float32), ('dec', np.float32), ('dist', np.float32)]) 
 
@@ -24,6 +27,36 @@ files = collections.OrderedDict(
                   'keys': ['Source_Name', 'RAJ2000', 'DEJ2000']},
      'crates': {'file': 'crates.1.csv',
                 'keys': ['name', 'ra', 'dec']}})
+
+def get_lc_time(src_of_interest):
+    catalog = fits.open('./gll_psc_v16.fit')
+    nph0 = 6.50485292223e-05
+    names = catalog[1].data['Source_Name']
+    ind = np.where(names==src_of_interest)[0][0]
+    src = catalog[1].data[ind]
+    spec = get_spectrum(src)
+    nph = scipy.integrate.quad(spec, 1e3, 1e5)[0]*1e4
+    return  1/((0.08+nph0/nph/200-0.005)**2*nph)/(24*60*60)
+
+
+def get_spectrum(src):
+    '''
+    src is a row from the 3FGL catalog
+    '''
+    print('Create Spectrum for {}'.format(src['Source_Name']))
+    if src['SpectrumType'] == 'PowerLaw':
+        print('{}*(E/{})^-{}'.format(src['Flux_Density'],
+                                     src['Pivot_Energy'],
+                                     src['Spectral_Index']))
+        return lambda x: src['Flux_Density']*(x/src['Pivot_Energy'])**(-src['Spectral_Index'])
+    elif src['SpectrumType'] == 'LogParabola':
+        eq_str='{N}*(E/{piv:.2f})^-({a:.2f}+{b:.2f}*log(E/{piv:.2f})'
+        print eq_str.format(N=src['Flux_Density'], piv=src['Pivot_Energy'],
+                            a=src['Spectral_Index'],b=src['beta'])
+        return lambda x: src['Flux_Density']*(x/src['Pivot_Energy'])**(-(src['Spectral_Index']+src['beta']*np.log(x/src['Pivot_Energy'])))
+    else:
+        print('Unkown Spectrum Type: Fall back to Powerlaw')
+        return lambda x: src['Flux_Density']*(x/src['Pivot_Energy'])**(-src['Spectral_Index'])
 
 
 def GreatCircleDistance(ra_1, dec_1, ra_2, dec_2):
@@ -45,6 +78,7 @@ def get_sources(ra, dec):
             continue
         temp = np.genfromtxt(files[key]['file'], dtype=None,
                              names=True, delimiter=',')
+        temp = np.atleast_1d(temp)
         if key == '5bzcat':
             for src in temp:
                 ra_split = src[1].split(' ')

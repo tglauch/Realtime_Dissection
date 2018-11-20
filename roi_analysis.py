@@ -8,7 +8,7 @@ from get_fermi_data import get_data
 import subprocess
 import argparse
 import os
-from roi_functions import get_sources
+from roi_functions import get_sources, get_lc_time
 import shutil
 import datetime
 from slack_lib import print_to_slack
@@ -54,11 +54,11 @@ def parseArguments():
     parser.add_argument(
         "--dt_lc",
         help="time lenght of bins in the light curve",
-        type=float, default=28)
+        type=float, default=100)
     parser.add_argument(
         "--dt",
         help="length of time window to analyze",
-        type=float, default=28)
+        type=float, default=700)
     parser.add_argument(
         "--emin",
         help="lower energy bound for SED",
@@ -67,6 +67,10 @@ def parseArguments():
         "--event",
         help="event name",
         required=False)
+    parser.add_argument(
+        "--only_vou",
+        help="event name",
+        action="store_true", default = False)
     parser.add_argument(
         "--mode",
         help="end if given mjd is at the end of the time window, mid if in the middle'",
@@ -79,6 +83,10 @@ def parseArguments():
         "--make_pdf",
         help="Only create the output pdf form a previous run ",
         action="store_true", default = False)
+    parser.add_argument(
+        "--basepath",
+        help = 'basepath for the output',
+        type=str, default = '/scratch9/tglauch/realtime_service/output/')
     args = parser.parse_args()
     return args.__dict__
 
@@ -112,9 +120,9 @@ def source_summary(bpath, src):
             tab_str = f.read()
         prob_str = ''
         for i in range(np.min([5, len(mjd[prob_mask][ind])])):
-            prob_str += '{:.2f} & {:.2f} & {:.2f} \\\\ \n'.format(mjd[prob_mask][ind][i],
-                                                                  src_prob[prob_mask][i]*100,
-                                                                  energy[prob_mask][i]/1e3)
+            prob_str += '{:.2f} & {:.2f} & {:.2f} \\\\ \n'.format(mjd[prob_mask][ind[i]],
+                                                                  src_prob[prob_mask][ind[i]]*100,
+                                                                  energy[prob_mask][ind[i]]/1e3)
         tab_str = tab_str.format(events=prob_str)
         l_str += tab_str
     except Exception as inst:
@@ -131,24 +139,26 @@ def source_summary(bpath, src):
     return l_str
 
 
-def submit_fit(args, opath, src_arr, trange='', ana_type='SED', partition='kta', **kwargs):
+def submit_fit(args, opath, src_arr=None, trange='', ana_type='SED', partition='kta', **kwargs):
     if kwargs.get('make_pdf'):
         return    
     print('submit with args {}'.format(args))
-    odtype = np.dtype([('name', np.unicode, 32), ('ra', np.float32), ('dec', np.float32)])
-    if isinstance(src_arr, dict):
-        src_arr=dict_to_nparray(src_arr, dtype=odtype)
-    src_arr = np.atleast_1d(src_arr)
     if trange != '':
         args += ' --time_range {} {} '.format(trange[0], trange[1])
-    args += ' --outfolder {} '.format(opath)
     if not os.path.exists(opath):
         os.makedirs(opath)
-    mask = np.array(['3FGL' not in sname for sname in src_arr['name']])
-    if len(src_arr[mask])>0:
-        xml_path = os.path.join(opath, 'add_source.xml')
-        generate_src_xml(src_arr[mask], xml_path)
-        args += '--xml_path {}'.format(xml_path)
+    args += ' --outfolder {} '.format(opath)
+    odtype = np.dtype([('name', np.unicode, 32), ('ra', np.float32), ('dec', np.float32)])
+    if src_arr is not None:
+        if isinstance(src_arr, dict):
+            src_arr=dict_to_nparray(src_arr, dtype=odtype)
+        src_arr = np.atleast_1d(src_arr)
+
+        mask = np.array(['3FGL' not in sname for sname in src_arr['name']])
+        if len(src_arr[mask])>0:
+            xml_path = os.path.join(opath, 'add_source.xml')
+            generate_src_xml(src_arr[mask], xml_path)
+            args += '--xml_path {}'.format(xml_path)
     with open('./slurm_draft.xml', 'r') as f:
         submit = (f.read()).format(bpath=opath, args=args,
                                    ana_type=ana_type,
@@ -197,7 +207,10 @@ if args['event'] is not None:
 else:
     ev_str = 'IC{}{:02d}{:02d}'.format(str(t.datetime.year)[-2:],
                                        t.datetime.month, t.datetime.day)
-bpath = '/scratch9/tglauch/realtime_service/output/{}'.format(ev_str)
+bpath = os.path.join(args['basepath'], ev_str)
+if os.path.exists(bpath) and not rec and not args['only_vou']:
+    print('Folder already exist....exit. Only create PDF')
+    make_pdf=True
 this_path = os.path.dirname(os.path.abspath(__file__))
 fermi_data = os.path.join(bpath, 'fermi_data')
 vou_out = os.path.join(bpath, 'vou_blazar')
@@ -228,10 +241,12 @@ if not rec and not make_pdf:
         lines = ifile.read().split('Gamma-ray Counterparts')[0]
         lines = re.sub('\\[..?;.?m', ' ', lines)
         lines = lines.replace('[0m', ' ')
-        print_to_slack(lines, os.path.join(vou_out, 'candidates.eps'))
+        print_to_slack('', pic=os.path.join(vou_out, 'candidates.eps'))
     with open('./full_output', 'w+') as ofile:
         ofile.write(lines.replace('\n' ,'\\\ \n'))
     os.chdir(this_path)
+    if args['only_vou']:
+        exit()
 
     # download gamma-ray data
     kwargs = {'emin': args['emin'], 'days': args['dt'], 'out_dir' : fermi_data}
@@ -259,11 +274,11 @@ print src_dict
 # start the gamma-ray analysis
 
 #TS maps
-sargs = '--target_src center --free_radius 2 --data_path {} --use_3FGL --emin {} '
-sargs = sargs.format(fermi_data, args['emin'])
+sargs = ' --free_radius 2 --data_path {} --use_3FGL --emin {} --ra {} --dec {}'
+sargs = sargs.format(fermi_data, args['emin'], args['ra'], args['dec'])
 ts_dict = {'name': ['center'], 'ra': [args['ra']], 'dec': [args['dec']]}
 ts_map_path = os.path.join(bpath, 'ts_map')
-submit_fit(sargs, ts_map_path, ts_dict, ana_type='TS_Map', partition='long', **args)
+submit_fit(sargs, ts_map_path, ana_type='TS_Map', partition='long', **args)
 
 #getsrcprob
 sargs = '--target_src center --free_radius 2 --data_path {} --use_3FGL --emin {} '
@@ -285,9 +300,13 @@ for src in src_dict:
         shutil.rmtree(bpath_src)
     sargs = '--target_src {} --free_radius 2 --data_path {} --use_3FGL --emin {} '
     sargs = sargs.format(src['name'].replace(' ', '_'), fermi_data, args['emin'])
-    print args
-    time_windows = [[k, k + args['dt_lc']] for k in
-                    np.arange(MJD[0], MJD[1], args['dt_lc'])]
+    if '3FGL' in src['name']:
+        dt_lc = get_lc_time(src['name'])
+    else:
+        dt_lc = args['dt_lc']
+    print('LC dt: {}'.format(dt_lc))
+    time_windows = [[k, k + dt_lc] for k in
+                    np.arange(MJD[0], MJD[1], dt_lc)]
     time_windows.append('')
     job_dict[src['name']] = {'sed': os.path.join(bpath_src, path_settings['sed']),
                              'lc': os.path.join(bpath_src, path_settings['lc'])}
@@ -314,21 +333,25 @@ while not final_pdf:
     print len_jobs
     if len_jobs == 0 or make_pdf:
         final_pdf = True
-    if not mins % 15 == 1 and not final_pdf:
+    if not mins % 30 == 1 and not final_pdf:
         continue
 
     try:
+        if final_pdf:
+            yaxis = False
+        else:
+            yaxis = True
         plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
-                          os.path.join(vou_out, 'candidates_image_position.txt'),
-                          mode='tsmap')
+                          os.path.join(vou_out, 'find_out_temp.txt'),
+                          mode='tsmap', yaxis=yaxis)
     except Exception as inst:
         warnings.warn("Couldn't create ts map...")
         print(inst)
 
     try:
         plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
-                          os.path.join(vou_out, 'candidates_image_position.txt'),
-                          mode='residmap')
+                          os.path.join(vou_out, 'find_out_temp.txt'),
+                          mode='residmap', legend=False)
     except Exception as inst:
         warnings.warn("Couldn't create residual map...")
         print(inst)
@@ -336,7 +359,7 @@ while not final_pdf:
     for key in job_dict.keys():
         print('Make Plots for Source {}'.format(key))
         try:
-            plot.make_lc_plot(job_dict[key]['lc'])
+            plot.make_lc_plot(job_dict[key]['lc'], args['mjd'])
         except Exception as inst:
             warnings.warn("Couldn't create lightcurve for source {}".format(key))
             print(inst)

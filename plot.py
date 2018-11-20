@@ -14,7 +14,7 @@ ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'
 re_cmap = LinearSegmentedColormap.from_list('mycmap2', ['#67a9cf', '#f7f7f7', '#ef8a62'])
 MeV_to_erg = 1.60218e-6
 
-def make_lc_plot(basepath):
+def make_lc_plot(basepath, mjd, **kwargs):
     lc_dict = dict()
     keys = ['ts', 'dgamma','gamma',  'flux_ul95',  'flux_err', 'flux']
     for key in keys:
@@ -47,8 +47,8 @@ def make_lc_plot(basepath):
     fig = plt.figure(figsize=figsize(0.5, 0.7))
     print lc_arr.dtype.fields
     print lc_arr
-    mask  = (np.abs(lc_arr['ts'])>4) & ((lc_arr['dgamma']/lc_arr['gamma'])<0.5)
-
+    mask  = (np.abs(lc_arr['ts'])>4)
+    gam_mask = ((lc_arr['dgamma']/lc_arr['gamma'])<2.)
     ## Flux Axis
     ax1=fig.add_axes((.0, .20,1.,.4))
     scaling = -round(np.max(np.log10(lc_arr['flux'])))+1
@@ -62,22 +62,29 @@ def make_lc_plot(basepath):
                  yerr=serr,
                  color='#808080', uplims=True, linestyle=' ')
     ax1.set_ylabel(r'$10^{'+'{:.0f}'.format(-scaling)+'}\,$'+r'ph cm$^{-2}$ s$^{-1}$')
+    ax1.axvline(mjd, color='#696969', linestyle='--')
     ax1.set_xlabel('Time (MJD)')
 
     ## Spectral Index Axis
     ax2=fig.add_axes((.0, .6,1.,.4))
-    av_gamma, std_gamma = weighted_avg_and_std(lc_arr['gamma'],
+    if '3FGL' in source:
+        if kwargs.get('3fgl_average', True):
+            catalog = fits.open('./gll_psc_v16.fit')
+            names = catalog[1].data['Source_Name']
+            ind = np.where(names == source)[0][0]
+            av_gamma = catalog[1].data[ind]['Spectral_Index']
+        else:
+            av_gamma, _ = weighted_avg_and_std(lc_arr['gamma'],
                                                weights=1./lc_arr['dgamma'])
-    ax2.axhline(av_gamma,linestyle='--', color='grey',
-                alpha=0.85, zorder = -1, linewidth=0.9)
-    print lc_arr['tmid'][mask]
-    print lc_arr['gamma'][mask]
-    ax2.errorbar(lc_arr['tmid'][mask], lc_arr['gamma'][mask],
-                 yerr=lc_arr['dgamma'][mask],
-                 xerr=lc_arr['bin_len'][mask]/2., linestyle='')
+        ax2.axhline(av_gamma,linestyle='--', color='grey',
+                    alpha=0.85, zorder = -1, linewidth=0.9)
+    ax2.errorbar(lc_arr['tmid'][mask&gam_mask], lc_arr['gamma'][mask&gam_mask],
+                 yerr=lc_arr['dgamma'][mask&gam_mask],
+                 xerr=lc_arr['bin_len'][mask&gam_mask]/2., linestyle='')
     ax2.set_ylabel('Index', labelpad=5)
-    ax2.set_ylim(1.1,4)
+    ax2.set_ylim(1.1,5)
     ax2.set_xticks([])
+    ax2.axvline(mjd, color='#696969', linestyle='--')
     ax2.set_xlim(ax1.get_xlim()[0], ax1.get_xlim()[1])
     ax2.text(0.8, 1.1, source,
         horizontalalignment='center',
@@ -170,9 +177,9 @@ def make_edges(data_f):
     return xmin, xmax, ymin, ymax, xbins, ybins
 
 
-def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap'):
+def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True):
     markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7]
-    ROI = 130./60.
+    ROI = 150./60.
     fname = 'fit1_pointsource_powerlaw_2.00_{}.fits'.format(mode)
     try:
         inp = fits.open(os.path.join(basepath, fname))
@@ -182,18 +189,24 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap'):
         return
     srcs = np.load(srcs)
     cand_pos = np.genfromtxt(vou_cand)
-
+    print('Candidate Positions')
+    print(cand_pos)
     cand = {'ra': cand_pos[:,0], 'dec': cand_pos[:,1]}
+    print('srcs and cand')
+    print srcs
+    print cand
     distances = np.ones(len(cand['ra']))
     for i in range(len(cand['ra'])):
         tdist= [GreatCircleDistance(
                   cand['ra'][i], cand['dec'][i], srcs['ra'][j],
                   srcs['dec'][j], unit='deg') for j in range(len(srcs['ra']))]
         distances[i] = np.degrees(np.min(tdist))
-    inds =  np.argsort(distances)[-len(srcs['ra'])-1:]
+    print distances[np.argsort(distances)]
+    inds =  np.argsort(distances)[len(srcs['ra']):]
+    print inds
     cand['ra'] = cand['ra'][inds]
-    cand['dec'] = cand['dec'][inds]
-
+    cand['dec'] =cand['dec'][inds]
+    print cand
     fig = plt.figure(figsize=figsize(0.4, 1.))
     plt.clf()
     ax=fig.add_axes((.0, .0,0.7,.7))
@@ -218,7 +231,10 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap'):
     CS = ax.contour(X,Y,Z, levels=levels,
                     colors='black', linewidths=(0.3,))
     ax.set_xlabel(r'R.A. (degrees)')
-    ax.set_ylabel(r'Dec. (degrees)')
+    if  yaxis:
+        ax.set_ylabel(r'Dec. (degrees)')
+    else:
+        ax.set_yticklabels([])
     plt.gca().invert_xaxis()
     ax.plot(inp[0].header['CRVAL1'], inp[0].header['CRVAL2'],
             marker='o', color='blue', ms=3, fillstyle='none')
@@ -235,6 +251,7 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap'):
             linestyle = '', fillstyle='none', label='VOU Sources')
     ax.set_xlim(inp[0].header['CRVAL1']+ROI, inp[0].header['CRVAL1']-ROI)
     ax.set_ylim(inp[0].header['CRVAL2']-ROI, inp[0].header['CRVAL2']+ROI)
+
     ax2=fig.add_axes((.0, .73,0.7,.05))
     plt_cbar = fig.colorbar(cbar, orientation="horizontal", cax=ax2,
                             ticks=np.arange(minmax[0], minmax[1] , ticks))
@@ -245,7 +262,8 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap'):
     plt_cbar.ax.xaxis.set_ticks_position('top')
     plt_cbar.ax.xaxis.set_label_position('top')
     ax2.tick_params(axis='x', which='major', pad=3)
-    ax.legend(bbox_to_anchor=(1.1, 1.05))
+    if legend:
+        ax.legend(bbox_to_anchor=(1.1, 0.5), loc='center left', prop={'size': 9})
     plt.tight_layout()
     plt.savefig(os.path.join(basepath,'{}.png'.format(mode)),
                 bbox_inches='tight', dpi=300)
@@ -254,12 +272,15 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap'):
 def get_index(flux_dict):
     if flux_dict['SpectrumType']=='PowerLaw':
         return flux_dict['spectral_pars']['Index']['value']
-    
+    if flux_dict['SpectrumType']=='LogParabola':
+        return flux_dict['spectral_pars']['alpha']['value'] 
 
 def get_index_err(flux_dict):
     if flux_dict['SpectrumType']=='PowerLaw':
         return flux_dict['spectral_pars']['Index']['error']
-    
+    if flux_dict['SpectrumType']=='LogParabola':
+        print flux_dict['spectral_pars']
+        return flux_dict['spectral_pars']['alpha']['error'] 
 def weighted_avg_and_std(values, weights):
     """
     Return the weighted average and standard deviation.
