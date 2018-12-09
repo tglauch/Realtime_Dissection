@@ -68,6 +68,17 @@ def GreatCircleDistance(ra_1, dec_1, ra_2, dec_2):
         np.cos(dec_2) * (np.sin(delta_ra / 2.))**2.
     return 2. * np.arcsin(np.sqrt(x))
 
+def get_add_info(src_of_interest):
+    data = fits.open('/scratch9/tglauch/realtime_service/main/gll_psc_v16.fit')
+    eflux = data[1].data['Energy_Flux100']
+    inds = np.argsort(eflux)[::-1]
+    eflux = eflux[inds]
+    src_names = data[1].data['Source_Name'][inds]
+    if len(np.where(src_names==src_of_interest)[0]) == 0:
+        return ''
+    src_ind = np.where(src_names==src_of_interest)[0][0]
+    ostr = ' | Energy flux (E $\geq$ 100MeV): {:.2e} erg/cm/s [Top {:.1f}\% in 3FGL]'
+    return ostr.format(eflux[src_ind], 1.*src_ind/len(eflux)*100)
 
 def get_sources(ra, dec):
     src_dict = {}
@@ -98,7 +109,7 @@ def get_sources(ra, dec):
         for i in range(len(files[key]['keys'])):
             app =np.atleast_1d(temp[files[key]['keys'][i]])
             src_dict[fields[i]].extend(app)
-
+    print src_dict
     i = 0
     while i < len(src_dict['dec']):
         src_dict['alt_name'].append([])
@@ -121,14 +132,16 @@ def get_sources(ra, dec):
             del(src_dict['dec'][j - k])
         i += 1
 
-    fmt_str = '*{}* \n ra: {:.2f} deg |  dec: {:.2f} deg | distance: {:.2f} deg [ra: {:.2f} deg , dec:{:.2f} deg]'
+    fmt_str = '*{}* {}\n ra: {:.2f} deg |  dec: {:.2f} deg | distance: {:.2f} deg [ra: {:.2f} deg , dec:{:.2f} deg]'
     gcd = [GreatCircleDistance(np.radians(src_dict['ra'][i]), np.radians(src_dict['dec'][i]), np.radians(ra),
            np.radians(dec)) for i in range(len(src_dict['name']))]
     src_dict['dist'] = np.degrees(gcd)
     inds = np.argsort(gcd)
     out_str = '' 
     for i in inds:
+        add_info = get_add_info(src_dict['name'][i])
         ostr= fmt_str.format(src_dict['name'][i],
+                             add_info,
                              src_dict['ra'][i],
                              src_dict['dec'][i],
                              np.degrees(gcd[i]),

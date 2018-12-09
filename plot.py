@@ -5,7 +5,7 @@ sys.path.append('/home/ga53lag/Software/python_scripts/')
 from fancy_plot import *
 import numpy as np
 import os
-from myfunctions import dict_to_nparray, MET_to_MJD, GreatCircleDistance
+from myfunctions import dict_to_nparray, MET_to_MJD, GreatCircleDistance, pval_to_sigma, ts_to_pval
 from astropy.time import Time
 import pyfits as fits
 import warnings
@@ -45,8 +45,6 @@ def make_lc_plot(basepath, mjd, **kwargs):
     ind = np.argsort(lc_arr['tmid'])
     lc_arr = lc_arr[ind]
     fig = plt.figure(figsize=figsize(0.5, 0.7))
-    print lc_arr.dtype.fields
-    print lc_arr
     mask  = (np.abs(lc_arr['ts'])>4)
     gam_mask = ((lc_arr['dgamma']/lc_arr['gamma'])<2.)
     ## Flux Axis
@@ -189,24 +187,19 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
         return
     srcs = np.load(srcs)
     cand_pos = np.genfromtxt(vou_cand)
-    print('Candidate Positions')
-    print(cand_pos)
     cand = {'ra': cand_pos[:,0], 'dec': cand_pos[:,1]}
-    print('srcs and cand')
-    print srcs
-    print cand
-    distances = np.ones(len(cand['ra']))
-    for i in range(len(cand['ra'])):
-        tdist= [GreatCircleDistance(
-                  cand['ra'][i], cand['dec'][i], srcs['ra'][j],
-                  srcs['dec'][j], unit='deg') for j in range(len(srcs['ra']))]
-        distances[i] = np.degrees(np.min(tdist))
-    print distances[np.argsort(distances)]
-    inds =  np.argsort(distances)[len(srcs['ra']):]
-    print inds
-    cand['ra'] = cand['ra'][inds]
-    cand['dec'] =cand['dec'][inds]
-    print cand
+    if len(cand['ra'])>0 and len(srcs['ra']>0):
+        distances = np.ones(len(cand['ra']))
+        for i in range(len(cand['ra'])):
+            tdist= [GreatCircleDistance(
+                      cand['ra'][i], cand['dec'][i], srcs['ra'][j],
+                      srcs['dec'][j], unit='deg') for j in range(len(srcs['ra']))]
+            distances[i] = np.degrees(np.min(tdist))
+        mask = distances>0.1
+        inds =  np.argsort(distances)[len(srcs['ra']):]
+        cand['ra'] = cand['ra'][mask]
+        cand['dec'] =cand['dec'][mask]
+  
     fig = plt.figure(figsize=figsize(0.4, 1.))
     plt.clf()
     ax=fig.add_axes((.0, .0,0.7,.7))
@@ -215,19 +208,19 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
     Y=np.linspace(ymin, ymax, ybins)
     xs, ys = np.meshgrid(X,Y)
     if mode == 'tsmap':
-        Z=inp[2].data
-        minmax = (0,25)
-        ticks = 5
+        Z=pval_to_sigma(ts_to_pval(inp[2].data,1.))
+        minmax = (0,6)
+        ticks = 2
         cmap = ts_cmap
     elif mode == 'residmap':
         Z=inp[0].data
-        minmax = (-5, 5)
+        minmax = (-6, 6)
         ticks = 2 
         cmap = re_cmap
     cbar = ax.contourf(X,Y,Z,
                        levels=np.linspace(minmax[0], minmax[1], 500),
-                       cmap=cmap) 
-    levels=np.linspace(minmax[0], minmax[1], 4)
+                       cmap=cmap)
+    levels=np.array([2,3,4,5])
     CS = ax.contour(X,Y,Z, levels=levels,
                     colors='black', linewidths=(0.3,))
     ax.set_xlabel(r'R.A. (degrees)')
@@ -246,9 +239,10 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
                 marker=markers[i],
                 linestyle = '',
                 label=src['name'],
-                color='k', ms=4)
-    ax.plot(cand['ra'], cand['dec'], color='k', ms=4, marker="8",
-            linestyle = '', fillstyle='none', label='VOU Sources')
+                color='k', ms=4) 
+    if len(cand['ra'])>0:
+        ax.plot(cand['ra'], cand['dec'], color='#a8a8a8', ms=4, marker="8",
+                linestyle = '', fillstyle='none', label='VOU Sources', mew=1)
     ax.set_xlim(inp[0].header['CRVAL1']+ROI, inp[0].header['CRVAL1']-ROI)
     ax.set_ylim(inp[0].header['CRVAL2']-ROI, inp[0].header['CRVAL2']+ROI)
 
@@ -256,7 +250,7 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
     plt_cbar = fig.colorbar(cbar, orientation="horizontal", cax=ax2,
                             ticks=np.arange(minmax[0], minmax[1] , ticks))
     if mode == 'tsmap':
-        plt_cbar.set_label(r'TS Value', labelpad=8)
+        plt_cbar.set_label(r'Significance [$\sigma$]', labelpad=8)
     elif mode == 'residmap':
         plt_cbar.set_label(r'Significance [$\sigma$]', labelpad=8)
     plt_cbar.ax.xaxis.set_ticks_position('top')
@@ -264,6 +258,7 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
     ax2.tick_params(axis='x', which='major', pad=3)
     if legend:
         ax.legend(bbox_to_anchor=(1.1, 0.5), loc='center left', prop={'size': 9})
+
     plt.tight_layout()
     plt.savefig(os.path.join(basepath,'{}.png'.format(mode)),
                 bbox_inches='tight', dpi=300)

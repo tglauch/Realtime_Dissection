@@ -13,7 +13,7 @@ import shutil
 import datetime
 from slack_lib import print_to_slack
 import numpy as np
-from myfunctions import MET_to_MJD, dict_to_nparray
+from myfunctions import MET_to_MJD, dict_to_nparray, ts_to_pval
 import plot
 import warnings
 import re
@@ -25,7 +25,7 @@ from astropy.time import Time
 path_settings = {'sed': 'all_year/sed',
                  'lc': 'lightcurve'}
 
-partition_t = {'kta':'2:29:59', 'long':'1-23:59:59'}
+partition_t = {'kta':'2:30:00', 'long':'2-00:00:00', 'xtralong': '7-00:00:00'}
 
 
 
@@ -54,11 +54,11 @@ def parseArguments():
     parser.add_argument(
         "--dt_lc",
         help="time lenght of bins in the light curve",
-        type=float, default=100)
+        type=float, default=365)
     parser.add_argument(
         "--dt",
         help="length of time window to analyze",
-        type=float, default=700)
+        type=float)
     parser.add_argument(
         "--emin",
         help="lower energy bound for SED",
@@ -103,8 +103,8 @@ def source_summary(bpath, src):
         ts = fit_res['sources'][src['name']]['ts']
         ra = fit_res['sources'][src['name']]['RAJ2000']
         dec = fit_res['sources'][src['name']]['DEJ2000']
-        t_str = 'ra = {ra:.2f}$^\circ$ , dec = {dec:.2f}$^\circ$ , ts = {ts:.2f}, distance = {dist:.2f}$^\circ$ \n'
-        l_str += t_str.format(ts=ts, ra=ra, dec=dec, dist=src['dist'])
+        t_str = 'ra = {ra:.2f}$^\circ$ , dec = {dec:.2f}$^\circ$ , p-value = {ts:.2e}, distance = {dist:.2f}$^\circ$ \n'
+        l_str += t_str.format(ts=ts_to_pval(ts,1), ra=ra, dec=dec, dist=src['dist'])
     except Exception as inst:
         warnings.warn("Can not find fit result for {}".format(src['name']))
         print(inst)
@@ -139,10 +139,9 @@ def source_summary(bpath, src):
     return l_str
 
 
-def submit_fit(args, opath, src_arr=None, trange='', ana_type='SED', partition='kta', **kwargs):
+def submit_fit(args, opath, src_arr=None, trange='', sub_file='fermi.sub',  ana_type='SED', partition='kta', **kwargs):
     if kwargs.get('make_pdf'):
         return    
-    print('submit with args {}'.format(args))
     if trange != '':
         args += ' --time_range {} {} '.format(trange[0], trange[1])
     if not os.path.exists(opath):
@@ -164,9 +163,10 @@ def submit_fit(args, opath, src_arr=None, trange='', ana_type='SED', partition='
                                    ana_type=ana_type,
                                    time=partition_t[partition],
                                    partition=partition)
-    submitfile = os.path.join(opath, 'fermi.sub')
+    submitfile = os.path.join(opath, sub_file)
     with open(submitfile, "w+") as file:
         file.write(submit)
+    print('submit with args {}'.format(args))
     os.system("sbatch {}".format(submitfile))
     return opath
 
@@ -216,17 +216,24 @@ fermi_data = os.path.join(bpath, 'fermi_data')
 vou_out = os.path.join(bpath, 'vou_blazar')
 
 if not rec and not make_pdf:
-    cmd = [os.path.realpath('/scratch9/tglauch/VOU_Blazars/bin/vou-blazars'),
-           str(args['ra']), str(args['dec']), str(120), str(30), str(90)]
+
     if not os.path.exists(vou_out):
         os.makedirs(vou_out)
+    if os.path.exists(os.path.join(bpath,'run_info.npy')):
+        run_info = np.load(os.path.join(bpath,'run_info.npy'))[()]
+        args['ra'] = run_info['args']['ra']
+        args['dec'] = run_info['args']['dec']
     os.chdir(vou_out)
+    cmd = [os.path.realpath('/scratch9/tglauch/VOU_Blazars/bin/vou-blazars'),
+           str(args['ra']), str(args['dec']), str(120), str(30), str(90)]
     subprocess.call(cmd)
 
     # Setup Variables
     src_dict, out_str = get_sources(args['ra'], args['dec'])
     np.save('src_dict.npy', src_dict)
-    print_to_slack(out_str)
+    headline = '*Result for {} *\n'.format(ev_str)
+    sum_text = headline + out_str
+    print_to_slack(sum_text)
 
     # Convert VOU Blazar Output
     rx_ps = os.path.join(vou_out, 'RX_map.ps')
@@ -236,7 +243,7 @@ if not rec and not make_pdf:
 
     #Create VOU Source Summary
     with open('./short_output', 'w+') as ofile:
-        ofile.write(out_str.replace('\n' ,'\\\ \n'))
+        ofile.write(sum_text.replace('\n' ,'\\\ \n'))
     with open('./phase1', 'r') as ifile:
         lines = ifile.read().split('Gamma-ray Counterparts')[0]
         lines = re.sub('\\[..?;.?m', ' ', lines)
@@ -249,7 +256,9 @@ if not rec and not make_pdf:
         exit()
 
     # download gamma-ray data
-    kwargs = {'emin': args['emin'], 'days': args['dt'], 'out_dir' : fermi_data}
+    kwargs = {'emin': args['emin'], 'out_dir' : fermi_data}
+    if 'dt' in args.keys():
+        kwargs['days'] = args['dt']
     if args['mjd_range'] is None:
         kwargs['mjd'] = args['mjd']
         kwargs['mode'] = args['mode']
@@ -276,25 +285,24 @@ print src_dict
 #TS maps
 sargs = ' --free_radius 2 --data_path {} --use_3FGL --emin {} --ra {} --dec {}'
 sargs = sargs.format(fermi_data, args['emin'], args['ra'], args['dec'])
-ts_dict = {'name': ['center'], 'ra': [args['ra']], 'dec': [args['dec']]}
 ts_map_path = os.path.join(bpath, 'ts_map')
-submit_fit(sargs, ts_map_path, ana_type='TS_Map', partition='long', **args)
+submit_fit(sargs, ts_map_path, sub_file=ev_str+'.sub', ana_type='TS_Map', partition='xtralong', **args)
 
 #getsrcprob
-sargs = '--target_src center --free_radius 2 --data_path {} --use_3FGL --emin {} '
-sargs = sargs.format(fermi_data, args['emin'])
-ts_dict = {'name': np.concatenate([['center'],src_dict['name']]), 
-           'ra': np.concatenate([[args['ra']], src_dict['ra']]),
-           'dec': np.concatenate([[args['dec']], src_dict['dec']])
-          }
+
+sargs = ' --free_radius 2 --data_path {} --use_3FGL --emin {} --ra {} --dec {}'
+sargs = sargs.format(fermi_data, 5000, args['ra'], args['dec'])
 srcprob_path = os.path.join(bpath, 'srcprob')
-submit_fit(sargs, srcprob_path, ts_dict, ana_type='srcprob', partition='long', **args)
+submit_fit(sargs, srcprob_path, src_dict,sub_file=ev_str+'.sub', ana_type='srcprob', partition='xtralong', **args)
 
 print('Submit_SEDs')
 job_dict = {}
 for src in src_dict:
     bpath_src = src_path(bpath, src['name'])
-    print bpath_src
+    print('{} is at a distance {}'.format(src['name'], src['dist']))
+    if src['dist'] > 1.5:
+        print('Source exceeds distance of 1.5. No job will be submitted')
+        continue
     if os.path.exists(bpath_src) and (not args['recovery']) and (not args['make_pdf']):
         print('Remove Path: {}'.format(bpath_src))
         shutil.rmtree(bpath_src)
@@ -304,15 +312,12 @@ for src in src_dict:
         dt_lc = get_lc_time(src['name'])
     else:
         dt_lc = args['dt_lc']
-    print('LC dt: {}'.format(dt_lc))
-    time_windows = [[k, k + dt_lc] for k in
-                    np.arange(MJD[0], MJD[1], dt_lc)]
+    time_windows = [[k - dt_lc, k] for k in
+                     np.abs(np.arange(-MJD[1], -MJD[0], dt_lc))]
     time_windows.append('')
     job_dict[src['name']] = {'sed': os.path.join(bpath_src, path_settings['sed']),
                              'lc': os.path.join(bpath_src, path_settings['lc'])}
-    print job_dict
     for t_window in time_windows:
-        print('{}'.format(t_window))
         if t_window == '':
             opath = job_dict[src['name']]['sed']
             partition='long'
@@ -320,22 +325,23 @@ for src in src_dict:
             add_str = '{:.1f}_{:.1f}'.format(t_window[0], t_window[1])
             opath = os.path.join(job_dict[src['name']]['lc'], add_str)
             partition='kta'
-        submit_fit(sargs, opath, src, trange=t_window, partition=partition, **args)
+        submit_fit(sargs, opath, src, sub_file=ev_str+'.sub', trange=t_window, partition=partition, **args)
 
 mins = 0
 final_pdf = False
+prev_len_jobs = -1
 while not final_pdf:
     if not make_pdf:
         time.sleep(60)
     mins += 1
     jobs = os.popen('squeue --user ga53lag').read()
-    len_jobs = len([i for i in jobs.split('\n') if 'fermi' in i])
+    len_jobs = len([i for i in jobs.split('\n') if ev_str in i])
     print len_jobs
     if len_jobs == 0 or make_pdf:
         final_pdf = True
-    if not mins % 30 == 1 and not final_pdf:
+    if (not mins % 60 == 1 or not len_jobs != prev_len_jobs) and not final_pdf:
         continue
-
+    prev_len_jobs = len_jobs
     try:
         if final_pdf:
             yaxis = False
