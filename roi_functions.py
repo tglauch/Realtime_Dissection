@@ -30,13 +30,14 @@ files = collections.OrderedDict(
 
 def get_lc_time(src_of_interest):
     catalog = fits.open('./gll_psc_v16.fit')
-    nph0 = 6.50485292223e-05
+    nph0 = 0.287966337957
     names = catalog[1].data['Source_Name']
     ind = np.where(names==src_of_interest)[0][0]
     src = catalog[1].data[ind]
     spec = get_spectrum(src)
-    nph = scipy.integrate.quad(spec, 1e3, 1e5)[0]*1e4
-    return  1/((0.08+nph0/nph/200-0.005)**2*nph)/(24*60*60)
+    nph = scipy.integrate.quad(lambda E: spec(E)*E, 1e3, 1e5)[0]*1e4
+    print nph
+    return  28. * (nph0/nph)**(0.6)
 
 
 def get_spectrum(src):
@@ -77,7 +78,7 @@ def get_add_info(src_of_interest):
     if len(np.where(src_names==src_of_interest)[0]) == 0:
         return ''
     src_ind = np.where(src_names==src_of_interest)[0][0]
-    ostr = ' | Energy flux (E $\geq$ 100MeV): {:.2e} erg/cm/s [Top {:.1f}\% in 3FGL]'
+    ostr = ' | Energy flux (E $\geq$ 100MeV): {:.2e} erg/cm$^2$/s [Top {:.1f}\% in 3FGL]'
     return ostr.format(eflux[src_ind], 1.*src_ind/len(eflux)*100)
 
 def get_sources(ra, dec):
@@ -132,7 +133,7 @@ def get_sources(ra, dec):
             del(src_dict['dec'][j - k])
         i += 1
 
-    fmt_str = '*{}* {}\n ra: {:.2f} deg |  dec: {:.2f} deg | distance: {:.2f} deg [ra: {:.2f} deg , dec:{:.2f} deg]'
+    fmt_str = '*{}* {}\n ra: {:.2f} deg |  dec: {:.2f} deg | distance: {:.2f} deg [ra: {:.2f} deg , dec: {:.2f} deg]'
     gcd = [GreatCircleDistance(np.radians(src_dict['ra'][i]), np.radians(src_dict['dec'][i]), np.radians(ra),
            np.radians(dec)) for i in range(len(src_dict['name']))]
     src_dict['dist'] = np.degrees(gcd)

@@ -54,11 +54,15 @@ def parseArguments():
     parser.add_argument(
         "--dt_lc",
         help="time lenght of bins in the light curve",
-        type=float, default=365)
+        type=float, default=100)
     parser.add_argument(
         "--dt",
         help="length of time window to analyze",
         type=float)
+    parser.add_argument(
+        "--radius",
+        help="radius of the region to analyze",
+        type=str, default="180")
     parser.add_argument(
         "--emin",
         help="lower energy bound for SED",
@@ -134,7 +138,7 @@ def source_summary(bpath, src):
     if os.path.exists(sed_path):
         l_str += fig_str.format(path = sed_path, caption='SED for {}'.format(src['name']))
     if os.path.exists(lc_path):
-        l_str += fig_str.format(path = lc_path, caption='Lightcurve for {}'.format(src['name']))
+        l_str += fig_str.format(path = lc_path, caption='Light curve for {}'.format(src['name']))
     l_str += '\\clearpage \n'
     return l_str
 
@@ -225,7 +229,7 @@ if not rec and not make_pdf:
         args['dec'] = run_info['args']['dec']
     os.chdir(vou_out)
     cmd = [os.path.realpath('/scratch9/tglauch/VOU_Blazars/bin/vou-blazars'),
-           str(args['ra']), str(args['dec']), str(120), str(30), str(90)]
+           str(args['ra']), str(args['dec']), args['radius'], str(30), str(90)]
     subprocess.call(cmd)
 
     # Setup Variables
@@ -286,14 +290,26 @@ print src_dict
 sargs = ' --free_radius 2 --data_path {} --use_3FGL --emin {} --ra {} --dec {}'
 sargs = sargs.format(fermi_data, args['emin'], args['ra'], args['dec'])
 ts_map_path = os.path.join(bpath, 'ts_map')
-submit_fit(sargs, ts_map_path, sub_file=ev_str+'.sub', ana_type='TS_Map', partition='xtralong', **args)
+#submit_fit(sargs, ts_map_path, sub_file=ev_str+'.sub', ana_type='TS_Map', partition='xtralong', **args)
+
+sargs = ' --free_radius 2 --data_path {} --use_3FGL --emin {} --ra {} --dec {} --time_range {} {}'
+if args['mode'] == 'end':
+    tsmjd1 = args['mjd']-200
+    tsmjd2 = args['mjd']
+
+else:
+    tsmjd1 = args['mjd']-100
+    tsmjd2 = args['mjd']+100
+sargs = sargs.format(fermi_data, args['emin'], args['ra'], args['dec'],
+                     tsmjd1, tsmjd2)
+ts_map_short_path = os.path.join(bpath, 'ts_map_short')
+#submit_fit(sargs, ts_map_short_path, sub_file=ev_str+'.sub', ana_type='TS_Map', partition='xtralong', **args)
 
 #getsrcprob
-
 sargs = ' --free_radius 2 --data_path {} --use_3FGL --emin {} --ra {} --dec {}'
 sargs = sargs.format(fermi_data, 5000, args['ra'], args['dec'])
 srcprob_path = os.path.join(bpath, 'srcprob')
-submit_fit(sargs, srcprob_path, src_dict,sub_file=ev_str+'.sub', ana_type='srcprob', partition='xtralong', **args)
+#submit_fit(sargs, srcprob_path, src_dict,sub_file=ev_str+'.sub', ana_type='srcprob', partition='xtralong', **args)
 
 print('Submit_SEDs')
 job_dict = {}
@@ -311,7 +327,7 @@ for src in src_dict:
     if '3FGL' in src['name']:
         dt_lc = get_lc_time(src['name'])
     else:
-        dt_lc = args['dt_lc']
+        dt_lc = 200 #args['dt_lc']
     time_windows = [[k - dt_lc, k] for k in
                      np.abs(np.arange(-MJD[1], -MJD[0], dt_lc))]
     time_windows.append('')
@@ -355,6 +371,14 @@ while not final_pdf:
         print(inst)
 
     try:
+        plot.make_ts_plot(ts_map_short_path, os.path.join(vou_out, 'src_dict.npy'),
+                          os.path.join(vou_out, 'find_out_temp.txt'),
+                          mode='tsmap', legend=False)
+    except Exception as inst:
+        warnings.warn("Couldn't create residual map...")
+        print(inst)
+
+    try:
         plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
                           os.path.join(vou_out, 'find_out_temp.txt'),
                           mode='residmap', legend=False)
@@ -377,6 +401,9 @@ while not final_pdf:
 
     src_latex = ''
     for src in src_dict:
+        if src['dist'] > 1.5:
+            print('Source exceeds distance of 1.5. No source summary')
+            continue
         src_latex += source_summary(bpath, src)
     with open(os.path.join(bpath, 'vou_blazar/full_output'), 'r') as f:
         full_out = f.read().encode('utf8').\
@@ -410,9 +437,11 @@ while not final_pdf:
                           rx_map=os.path.join(vou_out, 'RX_map.eps'),
                           vou_pic=os.path.join(vou_out, 'candidates.eps'),
                           ts_map=os.path.join(bpath, 'ts_map/tsmap.png'),
-                          res_map=os.path.join(bpath, 'ts_map/residmap.png'),
+                          ts_map_short=os.path.join(bpath, 'ts_map_short/tsmap.png'),
                           vou_output=full_out,
                           event=ev_str,
+                          tsmjd1=tsmjd1,
+                          tsmjd2=tsmjd2,
                           src_latex=src_latex,
                           mjd1=MJD[0],
                           mjd2=MJD[1],
