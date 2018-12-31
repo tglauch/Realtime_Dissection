@@ -28,17 +28,47 @@ files = collections.OrderedDict(
      'crates': {'file': 'crates.1.csv',
                 'keys': ['name', 'ra', 'dec']}})
 
-def get_lc_time(src_of_interest):
-    catalog = fits.open('./gll_psc_v16.fit')
-    nph0 = 0.287966337957
-    names = catalog[1].data['Source_Name']
-    ind = np.where(names==src_of_interest)[0][0]
-    src = catalog[1].data[ind]
-    spec = get_spectrum(src)
-    nph = scipy.integrate.quad(lambda E: spec(E)*E, 1e3, 1e5)[0]*1e4
-    print nph
-    return  28. * (nph0/nph)**(0.6)
+#def get_lc_time(src_of_interest):
+#    catalog = fits.open('./gll_psc_v16.fit')
+#    nph0 = 0.287966337957
+#    names = catalog[1].data['Source_Name']
+#    ind = np.where(names==src_of_interest)[0][0]
+#    src = catalog[1].data[ind]
+#    spec = get_spectrum(src)
+#    nph = scipy.integrate.quad(lambda E: spec(E)*E, 1e3, 1e5)[0]*1e4
+#    print nph
+#    return  28. * (nph0/nph)**(0.6)
 
+
+def get_lc_time(src_of_interest, emin=1e3):
+    data = fits.open('gll_psc_v16.fit')
+    src_ind = np.where(data[1].data['Source_Name']==src_of_interest)[0][0]
+    
+    E_bins = [[100, '100_300'],
+              [300, '300_1000'],
+              [1000, '1000_3000'], 
+              [3000, '3000_10000'], 
+              [10000, '10000_100000']]
+    
+    for i in range(len(E_bins)):
+        if E_bins[i][0] >= emin:
+            E_bins[i][0] = 1
+        elif E_bins[i][0] < emin and E_bins[i+1][0] > emin:
+            E_bins[i][0] = 1.*(E_bins[i+1][0]-emin)/(E_bins[i+1][0] - E_bins[i][0])
+        else:
+            E_bins[i][0] = 0
+    ts_sum = np.sum([(data[1].data[src_ind]['Sqrt_TS{}'.format(e_rang[1])])**2*e_rang[0] 
+                     for e_rang in E_bins])
+    t_sens = (6/ts_sum)*(365*4-4)
+    print t_sens
+    if t_sens < 28.:
+        t_disc = (36/ts_sum)*(365*4-4)
+        print t_disc
+        if t_disc < 28.:
+            return t_disc
+        else:
+            return 28.
+    return t_sens
 
 def get_spectrum(src):
     '''

@@ -287,10 +287,11 @@ print src_dict
 # start the gamma-ray analysis
 
 #TS maps
+ts_emin = np.max([1000, args['emin']])
 sargs = ' --free_radius 2 --data_path {} --use_3FGL --emin {} --ra {} --dec {}'
-sargs = sargs.format(fermi_data, args['emin'], args['ra'], args['dec'])
+sargs = sargs.format(fermi_data, ts_emin, args['ra'], args['dec'])
 ts_map_path = os.path.join(bpath, 'ts_map')
-#submit_fit(sargs, ts_map_path, sub_file=ev_str+'.sub', ana_type='TS_Map', partition='xtralong', **args)
+submit_fit(sargs, ts_map_path, sub_file=ev_str+'.sub', ana_type='TS_Map', partition='xtralong', **args)
 
 sargs = ' --free_radius 2 --data_path {} --use_3FGL --emin {} --ra {} --dec {} --time_range {} {}'
 if args['mode'] == 'end':
@@ -300,16 +301,16 @@ if args['mode'] == 'end':
 else:
     tsmjd1 = args['mjd']-100
     tsmjd2 = args['mjd']+100
-sargs = sargs.format(fermi_data, args['emin'], args['ra'], args['dec'],
+sargs = sargs.format(fermi_data, ts_emin, args['ra'], args['dec'],
                      tsmjd1, tsmjd2)
 ts_map_short_path = os.path.join(bpath, 'ts_map_short')
-#submit_fit(sargs, ts_map_short_path, sub_file=ev_str+'.sub', ana_type='TS_Map', partition='xtralong', **args)
+submit_fit(sargs, ts_map_short_path, sub_file=ev_str+'.sub', ana_type='TS_Map', partition='xtralong', **args)
 
 #getsrcprob
 sargs = ' --free_radius 2 --data_path {} --use_3FGL --emin {} --ra {} --dec {}'
 sargs = sargs.format(fermi_data, 5000, args['ra'], args['dec'])
 srcprob_path = os.path.join(bpath, 'srcprob')
-#submit_fit(sargs, srcprob_path, src_dict,sub_file=ev_str+'.sub', ana_type='srcprob', partition='xtralong', **args)
+submit_fit(sargs, srcprob_path, src_dict,sub_file=ev_str+'.sub', ana_type='srcprob', partition='xtralong', **args)
 
 print('Submit_SEDs')
 job_dict = {}
@@ -325,7 +326,7 @@ for src in src_dict:
     sargs = '--target_src {} --free_radius 2 --data_path {} --use_3FGL --emin {} '
     sargs = sargs.format(src['name'].replace(' ', '_'), fermi_data, args['emin'])
     if '3FGL' in src['name']:
-        dt_lc = get_lc_time(src['name'])
+        dt_lc = get_lc_time(src['name'], emin=1.*args['emin'] )
     else:
         dt_lc = 200 #args['dt_lc']
     time_windows = [[k - dt_lc, k] for k in

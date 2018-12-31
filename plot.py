@@ -10,6 +10,8 @@ from astropy.time import Time
 import pyfits as fits
 import warnings
 from matplotlib.colors import LinearSegmentedColormap
+from astropy.visualization.wcsaxes import SphericalCircle
+import astropy.units as u
 ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'])
 re_cmap = LinearSegmentedColormap.from_list('mycmap2', ['#67a9cf', '#f7f7f7', '#ef8a62'])
 MeV_to_erg = 1.60218e-6
@@ -231,9 +233,11 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
     plt.gca().invert_xaxis()
     ax.plot(inp[0].header['CRVAL1'], inp[0].header['CRVAL2'],
             marker='o', color='blue', ms=3, fillstyle='none')
-    circle = plt.Circle((inp[0].header['CRVAL1'], inp[0].header['CRVAL2']), 1.5,
-                        color='b', fill=False, linewidth=0.5)
-    ax.add_artist(circle)
+    vertex = (inp[0].header['CRVAL1']*u.degree,inp[0].header['CRVAL2']*u.degree) #long, lat
+    x =  SphericalCircle(vertex,1.5*u.degree) 
+    xy = x.get_xy()
+    print('Use new circle')
+    ax.plot(xy[:,0], xy[:,1], color='b', linewidth=0.5)
     for i, src in enumerate(srcs):
         ax.plot(src['ra'], src['dec'],
                 marker=markers[i],
