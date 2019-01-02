@@ -178,7 +178,7 @@ def make_edges(data_f):
 
 
 def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True):
-    markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7]
+    markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7, 'H','d', 'v' ,'^', '<', '>', 1, 2, 3 ,8]
     ROI = 150./60.
     fname = 'fit1_pointsource_powerlaw_2.00_{}.fits'.format(mode)
     try:

@@ -324,26 +324,33 @@ for src in src_dict:
         print('Remove Path: {}'.format(bpath_src))
         shutil.rmtree(bpath_src)
     sargs = '--target_src {} --free_radius 2 --data_path {} --use_3FGL --emin {} '
-    sargs = sargs.format(src['name'].replace(' ', '_'), fermi_data, args['emin'])
+    sub_args = sargs.format(src['name'].replace(' ', '_'), fermi_data, args['emin'])
+    tsub_args = sargs.format(src['name'].replace(' ', '_'), fermi_data, 1e3)
     if '3FGL' in src['name']:
-        dt_lc = get_lc_time(src['name'], emin=1.*args['emin'] )
+        dt_lc = get_lc_time(src['name'], emin=1e3 ) ### be careful -- hardcoded
     else:
         dt_lc = 200 #args['dt_lc']
     time_windows = [[k - dt_lc, k] for k in
                      np.abs(np.arange(-MJD[1], -MJD[0], dt_lc))]
+    if (time_windows[-1][1] - MJD[0]) < dt_lc:
+        del time_windows[-1]
     time_windows.append('')
     job_dict[src['name']] = {'sed': os.path.join(bpath_src, path_settings['sed']),
                              'lc': os.path.join(bpath_src, path_settings['lc'])}
     for t_window in time_windows:
         if t_window == '':
             opath = job_dict[src['name']]['sed']
+            opath_1GeV = opath+'_1GeV'
             partition='long'
         else:
             add_str = '{:.1f}_{:.1f}'.format(t_window[0], t_window[1])
             opath = os.path.join(job_dict[src['name']]['lc'], add_str)
+            opath_1GeV = os.path.join(job_dict[src['name']]['lc']+'_1GeV', add_str)
             partition='kta'
-        submit_fit(sargs, opath, src, sub_file=ev_str+'.sub', trange=t_window, partition=partition, **args)
-
+        submit_fit(sub_args, opath, src, sub_file=ev_str+'.sub', trange=t_window, partition=partition, **args)
+        if args['emin'] < 1e3:
+            opath = os.path.join(job_dict[src['name']]['lc'], add_str)
+            submit_fit(tsub_args, opath_1GeV, src, sub_file=ev_str+'.sub', trange=t_window, partition=partition, **args)
 mins = 0
 final_pdf = False
 prev_len_jobs = -1
@@ -446,7 +453,8 @@ while not final_pdf:
                           src_latex=src_latex,
                           mjd1=MJD[0],
                           mjd2=MJD[1],
-                          energy=args['emin']/1000.)
+                          energy=args['emin']/1000.,
+                          tsemin = ts_emin)
     latex_path = os.path.join(bpath,ev_str + '.tex')
     if os.path.exists(latex_path):
         os.remove(latex_path)
