@@ -21,6 +21,7 @@ import time
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
+from collections import OrderedDict
 
 path_settings = {'sed': 'all_year/sed',
                  'lc': 'lightcurve'}
@@ -88,6 +89,10 @@ def parseArguments():
         help="Only create the output pdf form a previous run ",
         action="store_true", default = False)
     parser.add_argument(
+        "--overwrite",
+        help="Only create the output pdf form a previous run ",
+        action="store_true", default = False)
+    parser.add_argument(
         "--basepath",
         help = 'basepath for the output',
         type=str, default = '/scratch9/tglauch/realtime_service/output/')
@@ -95,11 +100,18 @@ def parseArguments():
     return args.__dict__
 
 
-def source_summary(bpath, src):
+def source_summary(bpath, src, mjd):
     print src['name']
     bpath_src = src_path(bpath, src['name'])
-    lc_path = os.path.join(bpath_src, path_settings['lc'], 'lightcurve.pdf')
-    sed_path = os.path.join(bpath_src, path_settings['sed'])
+    lc_base = os.path.join(bpath_src, path_settings['lc'])
+    lc_path = os.path.join(lc_base, 'lightcurve.pdf')
+    folders = [fold for fold in os.listdir(lc_base) if os.path.isdir(os.path.join(lc_base, fold))]
+    for fold in folders:
+        if (mjd < float(fold.split('_')[1])) and (mjd > float(fold.split('_')[0])):
+            sed_path = os.path.join(lc_base,fold)
+            break
+    print sed_path
+    #sed_path = os.path.join(bpath_src, path_settings['sed'])
     l_str ='\subsection{{{srcname}}}\n'.format(srcname=src['name'])
     try:
         fit_res = np.load(os.path.join(sed_path, 'llh.npy'))[()]
@@ -136,9 +148,15 @@ def source_summary(bpath, src):
     with open('source_summary.tex', 'r') as infile:
         fig_str = infile.read()       
     if os.path.exists(sed_path):
-        l_str += fig_str.format(path = sed_path, caption='SED for {}'.format(src['name']))
+        cap_str = 'SED for {}. The black SED points show the spectrum in a time window around the neutrino arrival \
+                   time. In different colors the fitted spectra and 1 sigma contours are shown for different energy thresholds.\
+                   The grey SED points show the spectrum as calculated for the entire Fermi mission.'
+        l_str += fig_str.format(width = 0.9, path = sed_path, caption=cap_str.format(src['name']))
     if os.path.exists(lc_path):
-        l_str += fig_str.format(path = lc_path, caption='Light curve for {}'.format(src['name']))
+        l_str += fig_str.format(width = 0.8, path = lc_path, caption='Light curve for {}'.format(src['name']))
+    gev_lc = os.path.join(lc_base+'_1GeV', 'lightcurve.pdf')
+    if os.path.exists(gev_lc):
+        l_str += fig_str.format(width = 0.8, path = gev_lc, caption='1GeV light curve for {}'.format(src['name']))
     l_str += '\\clearpage \n'
     return l_str
 
@@ -199,6 +217,7 @@ def src_path(bpath, src):
 args = parseArguments()
 rec = args['recovery']
 make_pdf = args['make_pdf']
+overwrite = args['overwrite']
 print('Run with args')
 print(args)
 if args['mjd'] is not None:
@@ -220,7 +239,6 @@ fermi_data = os.path.join(bpath, 'fermi_data')
 vou_out = os.path.join(bpath, 'vou_blazar')
 
 if not rec and not make_pdf:
-
     if not os.path.exists(vou_out):
         os.makedirs(vou_out)
     if os.path.exists(os.path.join(bpath,'run_info.npy')):
@@ -281,8 +299,11 @@ else:
     args = run_info['args']
     args['recovery'] = rec
     args['make_pdf'] = make_pdf
+    args['overwrite'] = overwrite
     src_dict = run_info['src_dict']
 print src_dict
+if not make_pdf:
+    args['overwrite'] = True
 
 # start the gamma-ray analysis
 
@@ -366,53 +387,67 @@ while not final_pdf:
     if (not mins % 60 == 1 or not len_jobs != prev_len_jobs) and not final_pdf:
         continue
     prev_len_jobs = len_jobs
-    try:
-        if final_pdf:
-            yaxis = False
-        else:
-            yaxis = True
-        plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
-                          os.path.join(vou_out, 'find_out_temp.txt'),
-                          mode='tsmap', yaxis=yaxis)
-    except Exception as inst:
-        warnings.warn("Couldn't create ts map...")
-        print(inst)
 
-    try:
-        plot.make_ts_plot(ts_map_short_path, os.path.join(vou_out, 'src_dict.npy'),
-                          os.path.join(vou_out, 'find_out_temp.txt'),
-                          mode='tsmap', legend=False)
-    except Exception as inst:
-        warnings.warn("Couldn't create residual map...")
-        print(inst)
-
-    try:
-        plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
-                          os.path.join(vou_out, 'find_out_temp.txt'),
-                          mode='residmap', legend=False)
-    except Exception as inst:
-        warnings.warn("Couldn't create residual map...")
-        print(inst)
-
-    for key in job_dict.keys():
-        print('Make Plots for Source {}'.format(key))
+    if args['overwrite']:
         try:
-            plot.make_lc_plot(job_dict[key]['lc'], args['mjd'])
+            if final_pdf:
+                yaxis = False
+            else:
+                yaxis = True
+            plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
+                              os.path.join(vou_out, 'find_out_temp.txt'),
+                              mode='tsmap', yaxis=yaxis)
         except Exception as inst:
-            warnings.warn("Couldn't create lightcurve for source {}".format(key))
+            warnings.warn("Couldn't create ts map...")
             print(inst)
+
         try:
-            plot.make_sed_plot(job_dict[key]['sed'])
+            plot.make_ts_plot(ts_map_short_path, os.path.join(vou_out, 'src_dict.npy'),
+                              os.path.join(vou_out, 'find_out_temp.txt'),
+                              mode='tsmap', legend=False)
         except Exception as inst:
-            warnings.warn("Couldn't create SED for source {}".format(key))
+            warnings.warn("Could't create residual map...")
             print(inst)
+
+        try:
+            plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
+                              os.path.join(vou_out, 'find_out_temp.txt'),
+                              mode='residmap', legend=False)
+        except Exception as inst:
+            warnings.warn("Couldn't create residual map...")
+            print(inst)
+
+        for key in job_dict.keys():
+            print('Make Plots for Source {}'.format(key))
+            try:
+                plot.make_lc_plot(job_dict[key]['lc'], args['mjd'])
+            except Exception as inst:
+                warnings.warn("Couldn't create lightcurve for source {}".format(key))
+                print(inst)
+            try:
+                plot.make_lc_plot(job_dict[key]['lc'] + '_1GeV', args['mjd'])
+            except Exception as inst:
+                warnings.warn("Couldn't create lightcurve for source {}".format(key))
+                print(inst)
+            folders = [fold for fold in os.listdir(job_dict[key]['lc']) if
+                       os.path.isdir(os.path.join(job_dict[key]['lc'],fold))]
+            for fold in folders:
+                try:
+                    seds_list = [(os.path.join(job_dict[key]['lc'], fold), 'k', 'red' , True, True, True),(job_dict[key]['sed'], 'grey',
+                                'grey', False, False, True)]
+                    if os.path.exists(os.path.join(job_dict[key]['lc']+'_1GeV', fold)):
+                        seds_list.append((os.path.join(job_dict[key]['lc'] + '_1GeV', fold), 'k', 'blue' , True, True, False))
+                    plot.make_sed_plot(seds_list)
+                except Exception as inst:
+                    warnings.warn("Couldn't create SED for source {}".format(key))
+                    print(inst)
 
     src_latex = ''
     for src in src_dict:
         if src['dist'] > 1.5:
             print('Source exceeds distance of 1.5. No source summary')
             continue
-        src_latex += source_summary(bpath, src)
+        src_latex += source_summary(bpath, src, args['mjd'])
     with open(os.path.join(bpath, 'vou_blazar/full_output'), 'r') as f:
         full_out = f.read().encode('utf8').\
             replace('\x1b', '').replace('nu_p', 'nu peak')
@@ -454,7 +489,7 @@ while not final_pdf:
                           mjd1=MJD[0],
                           mjd2=MJD[1],
                           energy=args['emin']/1000.,
-                          tsemin = ts_emin)
+                          tsemin = ts_emin/1e3)
     latex_path = os.path.join(bpath,ev_str + '.tex')
     if os.path.exists(latex_path):
         os.remove(latex_path)

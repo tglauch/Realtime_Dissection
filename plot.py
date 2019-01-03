@@ -12,9 +12,11 @@ import warnings
 from matplotlib.colors import LinearSegmentedColormap
 from astropy.visualization.wcsaxes import SphericalCircle
 import astropy.units as u
+from collections import OrderedDict
 ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'])
 re_cmap = LinearSegmentedColormap.from_list('mycmap2', ['#67a9cf', '#f7f7f7', '#ef8a62'])
 MeV_to_erg = 1.60218e-6
+ul_ts_threshold = 4
 
 def make_lc_plot(basepath, mjd, **kwargs):
     lc_dict = dict()
@@ -93,77 +95,97 @@ def make_lc_plot(basepath, mjd, **kwargs):
                 bbox_inches='tight')
     return
 
-def make_sed_plot(basepath):
-    try:
-        sed = np.load(os.path.join(basepath, 'sed.npy'))[()]
-        bowtie = np.load(os.path.join(basepath, 'bowtie.npy'))[()]
-        llh = np.load(os.path.join(basepath, 'llh.npy'))[()]
-    except Exception as inst:
-        warnings.warn('SED files not found')
-        print(inst)
-        return
-    source = llh['config']['selection']['target']
-    ts = llh['sources'][source]['ts']
+def make_sed_plot(seds_list):
     fig, ax = newfig(0.9)
+    y_vals = []
+    for i, sed_list in enumerate(seds_list):
+        basepath = sed_list[0]
+        try:
+            sed = np.load(os.path.join(basepath, 'sed.npy'))[()]
+        except Exception as inst:
+            continue
+        m = sed['ts'] < ul_ts_threshold
+        y_vals.extend(sed['e2dnde'][~m])
+        y_vals.extend(sed['e2dnde_ul95'][m])
+    print y_vals
+    factor = np.log10(np.max(y_vals)) - np.log10(np.min(y_vals)) 
+    for i, sed_list in enumerate(seds_list):
+        print sed_list
+        basepath = sed_list[0]
+        sed_col = sed_list[1]
+        bowtie_col = sed_list[2]
+        bowtie_fill = sed_list[3]
+        bowtie_bool = sed_list[4]
+        sed_bool = sed_list[5]
+        try:
+            sed = np.load(os.path.join(basepath, 'sed.npy'))[()]
+            bowtie = np.load(os.path.join(basepath, 'bowtie.npy'))[()]
+            llh = np.load(os.path.join(basepath, 'llh.npy'))[()]
+        except Exception as inst:
+            warnings.warn('SED files not found')
+            print(inst)
+            continue
+        print('Files loaded..')
+        source = llh['config']['selection']['target']
+        ts = llh['sources'][source]['ts']
+        e2 = 10 ** (2 * bowtie['log_energies'])
+        energies = np.array(10 ** bowtie['log_energies'])/1e3
+        m = sed['ts'] < ul_ts_threshold
+        x = sed['e_ctr']/1e3
+        y = sed['e2dnde']*MeV_to_erg
+        yerr = sed['e2dnde_err']*MeV_to_erg
+        yerr_lo = sed['e2dnde_err_lo']*MeV_to_erg
+        yerr_hi = sed['e2dnde_err_hi']*MeV_to_erg
+        yul = sed['e2dnde_ul95']*MeV_to_erg
+        delo = (sed['e_ctr'] - sed['e_min'])/1e3
+        dehi = (sed['e_max'] - sed['e_ctr'])/1e3
+        xerr0 = np.vstack((delo[m], dehi[m]))
+        xerr1 = np.vstack((delo[~m], dehi[~m]))
+        if ts > 4 and bowtie_bool:
+            ax.plot(energies,
+                    bowtie['dnde'] * e2 * MeV_to_erg, color=bowtie_col, zorder=1)
+
+            ax.plot(energies,
+                    bowtie['dnde_lo'] * e2 * MeV_to_erg, color=bowtie_col,
+                    linestyle='--', zorder=1)
+            ax.plot(energies,
+                    bowtie['dnde_hi'] * e2 * MeV_to_erg, color=bowtie_col,
+                    linestyle='--', zorder=1)
+            if bowtie_fill:
+                ax.fill_between(energies,
+                                bowtie['dnde_lo'] * e2 * MeV_to_erg,
+                                bowtie['dnde_hi'] * e2 * MeV_to_erg,
+                                alpha=0.5, color=bowtie_col, zorder=-1)
+        if sed_bool:
+            ax.errorbar(x[~m], y[~m], xerr=xerr1,
+                        yerr=(yerr_lo[~m], yerr_hi[~m]),
+                        linestyle='', color=sed_col, fmt='o', zorder=2)
+            serr = 10**np.log10(yul[m]) - 10**(np.log10(yul[m])-0.2/4.*factor)
+            ax.errorbar(x[m], yul[m], xerr=xerr0,
+                        yerr=serr,  uplims=True,
+                        color=sed_col, fmt='o', zorder=2)
+
+
+        tmin = llh['config']['selection']['tmin']
+        tmax = llh['config']['selection']['tmax']
+        if i == 0:
+            ax.text(0.2, 1.02, source,
+                    horizontalalignment='center',
+                    verticalalignment='center', transform=ax.transAxes)
+            ax.text(0.5, 1.02, 'TS: {:.1f}'.format(llh['sources'][source]['ts']),
+                    horizontalalignment='center',
+                    verticalalignment='center', transform=ax.transAxes)
+            ax.text(0.8, 1.02, 'MJD: {:.1f} - {:.1f}'.format(MET_to_MJD(tmin), MET_to_MJD(tmax)),
+                    horizontalalignment='center',
+                    verticalalignment='center', transform=ax.transAxes)
+
     ax.set_xscale('log')
     ax.set_yscale('log')   
-    color='red'
-    e2 = 10 ** (2 * bowtie['log_energies'])
-    energies = np.array(10 ** bowtie['log_energies'])/1e3
-    ul_ts_threshold = 4
-    m = sed['ts'] < ul_ts_threshold
-    x = sed['e_ctr']/1e3
-    y = sed['e2dnde']*MeV_to_erg
-    yerr = sed['e2dnde_err']*MeV_to_erg
-    yerr_lo = sed['e2dnde_err_lo']*MeV_to_erg
-    yerr_hi = sed['e2dnde_err_hi']*MeV_to_erg
-    yul = sed['e2dnde_ul95']*MeV_to_erg
-    delo = (sed['e_ctr'] - sed['e_min'])/1e3
-    dehi = (sed['e_max'] - sed['e_ctr'])/1e3
-    xerr0 = np.vstack((delo[m], dehi[m]))
-    xerr1 = np.vstack((delo[~m], dehi[~m]))
-
-    if ts>4:
-        ax.plot(energies,
-                bowtie['dnde'] * e2 * MeV_to_erg, color=color, zorder=1)
-
-        ax.plot(energies,
-                bowtie['dnde_lo'] * e2 * MeV_to_erg, color=color,
-                linestyle='--', zorder=1)
-        ax.plot(energies,
-                bowtie['dnde_hi'] * e2 * MeV_to_erg, color=color,
-                linestyle='--', zorder=1)
-
-        ax.fill_between(energies,
-                        bowtie['dnde_lo'] * e2 * MeV_to_erg,
-                        bowtie['dnde_hi'] * e2 * MeV_to_erg,
-                        alpha=0.5, color=color, zorder=-1)
-    ax.errorbar(x[~m], y[~m], xerr=xerr1,
-                yerr=(yerr_lo[~m], yerr_hi[~m]),
-                linestyle='', color='k', fmt='o', zorder=2)
-    factor = np.log10(ax.get_ylim()[1]) - np.log10(ax.get_ylim()[0])
-    serr = 10**np.log10(yul[m]) - 10**(np.log10(yul[m])-0.2/4.*factor)
-    ax.errorbar(x[m], yul[m], xerr=xerr0,
-                yerr=serr,  uplims=True,
-                color='k', fmt='o', zorder=2)
-
-
     ax.set_xlabel('Energy [GeV]')
     ax.set_ylabel(r'$\nu f(\nu)$ [erg cm$^{-2}$ s$^{-1}$]')
-    tmin = llh['config']['selection']['tmin']
-    tmax = llh['config']['selection']['tmax']
-    ax.text(0.2, 1.02, source,
-            horizontalalignment='center',
-            verticalalignment='center', transform=ax.transAxes)
-    ax.text(0.5, 1.02, 'TS: {:.1f}'.format(llh['sources'][source]['ts']),
-            horizontalalignment='center',
-            verticalalignment='center', transform=ax.transAxes)
-    ax.text(0.8, 1.02, 'MJD: {:.1f} - {:.1f}'.format(MET_to_MJD(tmin), MET_to_MJD(tmax)),
-            horizontalalignment='center',
-            verticalalignment='center', transform=ax.transAxes)
     plt.grid(True)
     plt.tight_layout()
-    fig.savefig(os.path.join(basepath, 'sed.pdf'),
+    fig.savefig(os.path.join(seds_list[0][0], 'sed.pdf'),
                 bbox_inches='tight')
 
 def make_edges(data_f):
@@ -211,7 +233,7 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
     xs, ys = np.meshgrid(X,Y)
     if mode == 'tsmap':
         Z=pval_to_sigma(ts_to_pval(inp[2].data,1.))
-        minmax = (0,6)
+        minmax = (0,8)
         ticks = 2
         cmap = ts_cmap
     elif mode == 'residmap':
