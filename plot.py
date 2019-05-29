@@ -241,6 +241,7 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
         minmax = (-6, 6)
         ticks = 2 
         cmap = re_cmap
+
     cbar = ax.contourf(X,Y,Z,
                        levels=np.linspace(minmax[0], minmax[1], 500),
                        cmap=cmap)
@@ -253,19 +254,40 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
     else:
         ax.set_yticklabels([])
     plt.gca().invert_xaxis()
-    ax.plot(inp[0].header['CRVAL1'], inp[0].header['CRVAL2'],
-            marker='o', color='blue', ms=3, fillstyle='none')
-    vertex = (inp[0].header['CRVAL1']*u.degree,inp[0].header['CRVAL2']*u.degree) #long, lat
-    x =  SphericalCircle(vertex,1.5*u.degree) 
-    xy = x.get_xy()
-    print('Use new circle')
-    ax.plot(xy[:,0], xy[:,1], color='b', linewidth=0.5)
+    bfpath = os.path.join(basepath, '../bf.txt')
+    if os.path.exists(bfpath):
+        print(bfpath)
+        bfdata = np.genfromtxt(bfpath, delimiter=',')
+        bf_ra = bfdata[0]
+        bf_dec = bfdata[1]
+    else:
+        bf_ra = inp[0].header['CRVAL1']
+        bf_dec = inp[0].header['CRVAL2']
+    max_inds =np.squeeze(np.dstack(np.unravel_index(np.argsort(Z.ravel()), np.shape(Z))))[::-1]
+    for ind in max_inds:
+        if GreatCircleDistance(X[ind[0]], Y[ind[1]], bf_ra, bf_dec, unit='deg') < np.radians(1.5):
+            print('ra: {}, dec {}, sigma {}'.format(X[ind[0]], Y[ind[1]], Z[ind[0], ind[1]]))
+            break
+    ax.plot(bf_ra, bf_dec,
+             marker='o', color='blue', ms=3, fillstyle='none')
+    cpath = os.path.join(basepath, '../contour.txt')
+    print(cpath)
+    if os.path.exists(cpath):
+        cdata = np.genfromtxt(cpath, delimiter=',')
+        ax.plot(cdata[:,0], cdata[:,1], linewidth=0.5, color='b')
+    else:
+        vertex = (inp[0].header['CRVAL1']*u.degree,inp[0].header['CRVAL2']*u.degree) #long, lat
+        x =  SphericalCircle(vertex,1.5*u.degree) 
+        xy = x.get_xy()
+        print('Use new circle')
+        ax.plot(xy[:,0], xy[:,1], color='b', linewidth=0.5)
     for i, src in enumerate(srcs):
-        ax.plot(src['ra'], src['dec'],
-                marker=markers[i],
-                linestyle = '',
-                label=src['name'],
-                color='k', ms=4) 
+        if GreatCircleDistance(src['ra'], src['dec'], bf_ra, bf_dec, unit='deg') < np.radians(2.):
+            ax.plot(src['ra'], src['dec'],
+                    marker=markers[i],
+                    linestyle = '',
+                    label=src['name'],
+                    color='k', ms=4) 
     if len(cand['ra'])>0:
         ax.plot(cand['ra'], cand['dec'], color='#a8a8a8', ms=4, marker="8",
                 linestyle = '', fillstyle='none', label='VOU Sources', mew=1)

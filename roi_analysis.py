@@ -100,18 +100,19 @@ def parseArguments():
     return args.__dict__
 
 
-def source_summary(bpath, src, mjd):
-    print src['name']
+def source_summary(bpath, src, mjd, mode='mid'):
     bpath_src = src_path(bpath, src['name'])
     lc_base = os.path.join(bpath_src, path_settings['lc'])
     lc_path = os.path.join(lc_base, 'lightcurve.pdf')
     folders = [fold for fold in os.listdir(lc_base) if os.path.isdir(os.path.join(lc_base, fold))]
-    for fold in folders:
-        if (mjd < float(fold.split('_')[1])) and (mjd > float(fold.split('_')[0])):
-            sed_path = os.path.join(lc_base,fold)
-            break
-    print sed_path
-    #sed_path = os.path.join(bpath_src, path_settings['sed'])
+    if mode == 'end':
+        print sorted(folders)
+        sed_path = os.path.join(lc_base,sorted(folders)[-1])
+    else:
+        for fold in folders:
+            if (mjd <= float(fold.split('_')[1])) and (mjd > float(fold.split('_')[0])):
+                sed_path = os.path.join(lc_base,fold)
+                break
     l_str ='\subsection{{{srcname}}}\n'.format(srcname=src['name'])
     try:
         fit_res = np.load(os.path.join(sed_path, 'llh.npy'))[()]
@@ -149,11 +150,11 @@ def source_summary(bpath, src, mjd):
         fig_str = infile.read()       
     if os.path.exists(sed_path):
         cap_str = 'SED for {}. The black SED points show the spectrum in a time window around the neutrino arrival \
-                   time. In different colors the fitted spectra and 1 sigma contours are shown for different energy thresholds.\
-                   The grey SED points show the spectrum as calculated for the entire Fermi mission.'
-        l_str += fig_str.format(width = 0.9, path = sed_path, caption=cap_str.format(src['name']))
+                   time. Colored bands indicate the correspdoning spectral fit at different energy thresholds (if available).\
+                   Grey SED points and bowties are showing the spectrum over the entire Fermi Mission.'
+        l_str += fig_str.format(width = 0.7, path = sed_path, caption=cap_str.format(src['name']))
     if os.path.exists(lc_path):
-        l_str += fig_str.format(width = 0.8, path = lc_path, caption='Light curve for {}'.format(src['name']))
+        l_str += fig_str.format(width = 0.7, path = lc_path, caption='Light curve for {}'.format(src['name']))
     gev_lc = os.path.join(lc_base+'_1GeV', 'lightcurve.pdf')
     if os.path.exists(gev_lc):
         l_str += fig_str.format(width = 0.8, path = gev_lc, caption='1GeV light curve for {}'.format(src['name']))
@@ -231,7 +232,7 @@ else:
     ev_str = 'IC{}{:02d}{:02d}'.format(str(t.datetime.year)[-2:],
                                        t.datetime.month, t.datetime.day)
 bpath = os.path.join(args['basepath'], ev_str)
-if os.path.exists(bpath) and not rec and not args['only_vou']:
+if os.path.exists(os.path.join(bpath, 'run_info.npy')) and not rec and not args['only_vou']:
     print('Folder already exist....exit. Only create PDF')
     make_pdf=True
 this_path = os.path.dirname(os.path.abspath(__file__))
@@ -351,8 +352,17 @@ for src in src_dict:
         dt_lc = get_lc_time(src['name'], emin=1e3 ) ### be careful -- hardcoded
     else:
         dt_lc = 200 #args['dt_lc']
-    time_windows = [[k - dt_lc, k] for k in
-                     np.abs(np.arange(-MJD[1], -MJD[0], dt_lc))]
+
+    if args['mode'] == 'end':
+        time_windows = [[k - dt_lc, k] for k in
+                         np.abs(np.arange(-MJD[1], -MJD[0], dt_lc))]
+    elif args['mode'] == 'mid':
+        time_windows = [[k - dt_lc, k] for k in
+                         np.abs(np.arange(args['mjd']+3*dt_lc/2, MJD[1], dt_lc))]
+        time_windows2 = [[k - dt_lc, k] for k in
+                         np.abs(np.arange(-args['mjd']-dt_lc/2, -MJD[0], dt_lc))]
+        time_windows.extend(time_windows2) 
+
     if (time_windows[-1][1] - MJD[0]) < dt_lc:
         del time_windows[-1]
     time_windows.append('')
@@ -434,7 +444,7 @@ while not final_pdf:
             for fold in folders:
                 try:
                     seds_list = [(os.path.join(job_dict[key]['lc'], fold), 'k', 'red' , True, True, True),(job_dict[key]['sed'], 'grey',
-                                'grey', False, False, True)]
+                                'grey', True, True, True)]
                     if os.path.exists(os.path.join(job_dict[key]['lc']+'_1GeV', fold)):
                         seds_list.append((os.path.join(job_dict[key]['lc'] + '_1GeV', fold), 'k', 'blue' , True, True, False))
                     plot.make_sed_plot(seds_list)
@@ -447,7 +457,7 @@ while not final_pdf:
         if src['dist'] > 1.5:
             print('Source exceeds distance of 1.5. No source summary')
             continue
-        src_latex += source_summary(bpath, src, args['mjd'])
+        src_latex += source_summary(bpath, src, args['mjd'], mode=args['mode'])
     with open(os.path.join(bpath, 'vou_blazar/full_output'), 'r') as f:
         full_out = f.read().encode('utf8').\
             replace('\x1b', '').replace('nu_p', 'nu peak')
