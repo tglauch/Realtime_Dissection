@@ -27,7 +27,7 @@ path_settings = {'sed': 'all_year/sed',
                  'lc': 'lightcurve'}
 
 partition_t = {'kta':'2:30:00', 'long':'2-00:00:00', 'xtralong': '7-00:00:00'}
-
+vou_path = '/scratch9/tglauch/Software/VOU_Blazars/v2/bin/vou-blazars'
 
 
 def parseArguments():
@@ -105,6 +105,8 @@ def source_summary(bpath, src, mjd, mode='mid'):
     lc_base = os.path.join(bpath_src, path_settings['lc'])
     lc_path = os.path.join(lc_base, 'lightcurve.pdf')
     folders = [fold for fold in os.listdir(lc_base) if os.path.isdir(os.path.join(lc_base, fold))]
+    if len(folders) == 0:
+        return ''
     if mode == 'end':
         print sorted(folders)
         sed_path = os.path.join(lc_base,sorted(folders)[-1])
@@ -247,7 +249,7 @@ if not rec and not make_pdf:
         args['ra'] = run_info['args']['ra']
         args['dec'] = run_info['args']['dec']
     os.chdir(vou_out)
-    cmd = [os.path.realpath('/scratch9/tglauch/VOU_Blazars/bin/vou-blazars'),
+    cmd = [vou_path,
            str(args['ra']), str(args['dec']), args['radius'], str(30), str(90)]
     subprocess.call(cmd)
 
@@ -345,13 +347,25 @@ for src in src_dict:
     if os.path.exists(bpath_src) and (not args['recovery']) and (not args['make_pdf']):
         print('Remove Path: {}'.format(bpath_src))
         shutil.rmtree(bpath_src)
+    job_dict[src['name']] = {'sed': os.path.join(bpath_src, path_settings['sed']),
+                             'lc': os.path.join(bpath_src, path_settings['lc']),
+                             'mw_data': os.path.join(bpath_src, 'sed.txt')}
+    print job_dict
+    if make_pdf:
+        continue
+    os.makedirs(bpath_src)
+    os.makedirs(job_dict[src['name']]['sed'])
+    os.makedirs(job_dict[src['name']]['lc'])
+    os.system('{vou_path} {ra} {dec} 1 -s ; cat Sed.txt > {bpath}'.format(vou_path=vou_path, ra=src['ra'], dec=src['dec'], bpath=os.path.join(bpath_src, 'sed.txt')))
+    print('Saved SED to {}'.format(os.path.join(bpath_src, 'sed.txt')))
+    continue
     sargs = '--target_src {} --free_radius 2 --data_path {} --use_3FGL --emin {} '
     sub_args = sargs.format(src['name'].replace(' ', '_'), fermi_data, args['emin'])
     tsub_args = sargs.format(src['name'].replace(' ', '_'), fermi_data, 1e3)
     if '3FGL' in src['name']:
         dt_lc = get_lc_time(src['name'], emin=1e3 ) ### be careful -- hardcoded
     else:
-        dt_lc = 200 #args['dt_lc']
+        dt_lc = args['dt_lc']
 
     if args['mode'] == 'end':
         time_windows = [[k - dt_lc, k] for k in
@@ -366,8 +380,7 @@ for src in src_dict:
     if (time_windows[-1][1] - MJD[0]) < dt_lc:
         del time_windows[-1]
     time_windows.append('')
-    job_dict[src['name']] = {'sed': os.path.join(bpath_src, path_settings['sed']),
-                             'lc': os.path.join(bpath_src, path_settings['lc'])}
+
     for t_window in time_windows:
         if t_window == '':
             opath = job_dict[src['name']]['sed']
@@ -447,11 +460,18 @@ while not final_pdf:
                                 'grey', True, True, True)]
                     if os.path.exists(os.path.join(job_dict[key]['lc']+'_1GeV', fold)):
                         seds_list.append((os.path.join(job_dict[key]['lc'] + '_1GeV', fold), 'k', 'blue' , True, True, False))
-                    plot.make_sed_plot(seds_list)
+                    plot.make_sed_plot(seds_list, mw_data=job_dict[key]['mw_data'])
                 except Exception as inst:
                     warnings.warn("Couldn't create SED for source {}".format(key))
                     print(inst)
-
+                    pass
+            try:
+                plot.make_sed_plot([(job_dict[key]['sed'], 'grey', 'grey', True, True, True)], mw_data=job_dict[key]['mw_data'])
+            except Exception as inst:
+                    warnings.warn("Couldn't create all year SED")
+                    print(inst)
+                    pass
+    sys.exit(1)
     src_latex = ''
     for src in src_dict:
         if src['dist'] > 1.5:

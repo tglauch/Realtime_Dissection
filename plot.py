@@ -15,8 +15,28 @@ import astropy.units as u
 from collections import OrderedDict
 ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'])
 re_cmap = LinearSegmentedColormap.from_list('mycmap2', ['#67a9cf', '#f7f7f7', '#ef8a62'])
+mw_map= LinearSegmentedColormap.from_list('mycmap3', ['#bdbdbd','#939393' ,'red'])
+hz_to_gev = 4.135*10**(-24)
 MeV_to_erg = 1.60218e-6
 ul_ts_threshold = 4
+
+
+def time2color(ts, tmin = -1, tmax = -1):
+    if tmin == -1:
+        tmin = np.min(ts[ts>0])
+    if tmax == -1:
+        tmax = np.max(ts)
+    delta_t = tmax - tmin
+    c = []
+    for t in ts:
+        if t<tmin:
+            col = 0.
+        elif t> tmax:
+            col =1.
+        else:
+            col = ((t-tmin)/delta_t)
+        c.append(mw_map(col))
+    return c
 
 def make_lc_plot(basepath, mjd, **kwargs):
     lc_dict = dict()
@@ -95,22 +115,31 @@ def make_lc_plot(basepath, mjd, **kwargs):
                 bbox_inches='tight')
     return
 
-def make_sed_plot(seds_list):
+def make_sed_plot(seds_list, mw_data=None):
     fig, ax = newfig(0.9)
+    ax.set_xscale('log')
+    ax.set_yscale('log') 
     y_vals = []
+    if mw_data is not None:
+        mw_idata = np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4))
+        c = np.array(time2color(mw_idata[:,4], tmin=54500, tmax=59000))
+        inds = mw_idata[:,1] > 0
+        ax.scatter(mw_idata[:,0][inds] * hz_to_gev, mw_idata[:,1][inds], c=c[inds], s=8)
     for i, sed_list in enumerate(seds_list):
         basepath = sed_list[0]
-        try:
+        if os.path.exists(os.path.join(basepath, 'sed.npy')):
             sed = np.load(os.path.join(basepath, 'sed.npy'))[()]
-        except Exception as inst:
+        else:
             continue
         m = sed['ts'] < ul_ts_threshold
         y_vals.extend(sed['e2dnde'][~m])
         y_vals.extend(sed['e2dnde_ul95'][m])
-    print y_vals
-    factor = np.log10(np.max(y_vals)) - np.log10(np.min(y_vals)) 
+    if len(y_vals) ==0:
+        factor = 1.
+    else:
+        factor = np.log10(np.max(y_vals)) - np.log10(np.min(y_vals))
+    print('SED list {}'.format(seds_list)) 
     for i, sed_list in enumerate(seds_list):
-        print sed_list
         basepath = sed_list[0]
         sed_col = sed_list[1]
         bowtie_col = sed_list[2]
@@ -123,7 +152,6 @@ def make_sed_plot(seds_list):
             llh = np.load(os.path.join(basepath, 'llh.npy'))[()]
         except Exception as inst:
             warnings.warn('SED files not found')
-            print(inst)
             continue
         print('Files loaded..')
         source = llh['config']['selection']['target']
@@ -179,14 +207,13 @@ def make_sed_plot(seds_list):
                     horizontalalignment='center',
                     verticalalignment='center', transform=ax.transAxes)
 
-    ax.set_xscale('log')
-    ax.set_yscale('log')   
+    ax.set_xlim(1e-15, 1e6)
     ax.set_xlabel('Energy [GeV]')
     ax.set_ylabel(r'$\nu f(\nu)$ [erg cm$^{-2}$ s$^{-1}$]')
-    plt.grid(True)
     plt.tight_layout()
-    fig.savefig(os.path.join(seds_list[0][0], 'sed.pdf'),
-                bbox_inches='tight')
+    spath = os.path.join(seds_list[0][0], 'sed.pdf')
+    print('Save SED to {}'.format(spath))
+    fig.savefig(spath, bbox_inches='tight')
 
 def make_edges(data_f):
     header = data_f[0].header
