@@ -8,7 +8,7 @@ from get_fermi_data import get_data
 import subprocess
 import argparse
 import os
-from roi_functions import get_sources, get_lc_time
+from roi_functions import get_sources, get_lc_time3fgl, get_lc_time4fgl
 import shutil
 import datetime
 from slack_lib import print_to_slack
@@ -55,7 +55,7 @@ def parseArguments():
     parser.add_argument(
         "--dt_lc",
         help="time lenght of bins in the light curve",
-        type=float, default=100)
+        type=float, default=200)
     parser.add_argument(
         "--dt",
         help="length of time window to analyze",
@@ -115,15 +115,20 @@ def source_summary(bpath, src, mjd, mode='mid'):
             if (mjd <= float(fold.split('_')[1])) and (mjd > float(fold.split('_')[0])):
                 sed_path = os.path.join(lc_base,fold)
                 break
-    l_str ='\subsection{{{srcname}}}\n'.format(srcname=src['name'])
+    l_str ='\subsection{{{srcinfo}}}'
     try:
-        fit_res = np.load(os.path.join(sed_path, 'llh.npy'))[()]
+        fit_res = np.load(os.path.join(sed_path, 'llh.npy'), allow_pickle=True)[()]
         sed_path = os.path.join(sed_path, 'sed.pdf')
         ts = fit_res['sources'][src['name']]['ts']
         ra = fit_res['sources'][src['name']]['RAJ2000']
         dec = fit_res['sources'][src['name']]['DEJ2000']
-        t_str = 'ra = {ra:.2f}$^\circ$ , dec = {dec:.2f}$^\circ$ , p-value = {ts:.2e}, distance = {dist:.2f}$^\circ$ \n'
-        l_str += t_str.format(ts=ts_to_pval(ts,1), ra=ra, dec=dec, dist=src['dist'])
+        t_str = '{src_name} $|$ \\small\\textnormal{{{src_info}}}'
+        t_str_info = 'ra = {ra:.2f}$^\circ$, dec = {dec:.2f}$^\circ$, p-val = {ts:.2e}, $\Delta\psi$ = {dist:.2f}$^\circ$'
+        t_str_info = t_str_info.format(ts=ts_to_pval(ts,1), ra=ra, dec=dec, dist=src['dist'])
+        t_str = t_str.format(src_name = src['name'], src_info=t_str_info)
+        print('TSTR {}'.format(t_str))
+        l_str = l_str.format(srcinfo=t_str) # srcname=src['name'], srcinfo=t_str)
+        print('LSTR {}'.format(l_str))
     except Exception as inst:
         warnings.warn("Can not find fit result for {}".format(src['name']))
         print(inst)
@@ -151,15 +156,17 @@ def source_summary(bpath, src, mjd, mode='mid'):
     with open('source_summary.tex', 'r') as infile:
         fig_str = infile.read()       
     if os.path.exists(sed_path):
-        cap_str = 'SED for {}. The black SED points show the spectrum in a time window around the neutrino arrival \
-                   time. Colored bands indicate the correspdoning spectral fit at different energy thresholds (if available).\
-                   Grey SED points and bowties are showing the spectrum over the entire Fermi Mission.'
+        cap_str = 'SED for {}. See the description in section \\ref{{sec:sed}} for more details.'
         l_str += fig_str.format(width = 0.7, path = sed_path, caption=cap_str.format(src['name']))
     if os.path.exists(lc_path):
         l_str += fig_str.format(width = 0.7, path = lc_path, caption='Light curve for {}'.format(src['name']))
     gev_lc = os.path.join(lc_base+'_1GeV', 'lightcurve.pdf')
     if os.path.exists(gev_lc):
         l_str += fig_str.format(width = 0.8, path = gev_lc, caption='1GeV light curve for {}'.format(src['name']))
+    if ('4FGL' in src['name']) | ('3FGL' in src['name']):
+        cp_candidate_path = os.path.join(bpath_src, 'vou_counterpart', src['name'].replace(' ', '_') + '.eps') 
+        if os.path.exists(cp_candidate_path):
+            l_str += fig_str.format(width = 0.7, path = cp_candidate_path, caption='Possible couterparts for {}'.format(src['name']))
     l_str += '\\clearpage \n'
     return l_str
 
@@ -178,7 +185,7 @@ def submit_fit(args, opath, src_arr=None, trange='', sub_file='fermi.sub',  ana_
             src_arr=dict_to_nparray(src_arr, dtype=odtype)
         src_arr = np.atleast_1d(src_arr)
 
-        mask = np.array(['3FGL' not in sname for sname in src_arr['name']])
+        mask = np.array(['4FGL' not in sname for sname in src_arr['name']])
         if len(src_arr[mask])>0:
             xml_path = os.path.join(opath, 'add_source.xml')
             generate_src_xml(src_arr[mask], xml_path)
@@ -245,7 +252,7 @@ if not rec and not make_pdf:
     if not os.path.exists(vou_out):
         os.makedirs(vou_out)
     if os.path.exists(os.path.join(bpath,'run_info.npy')):
-        run_info = np.load(os.path.join(bpath,'run_info.npy'))[()]
+        run_info = np.load(os.path.join(bpath,'run_info.npy'), allow_pickle=True)[()]
         args['ra'] = run_info['args']['ra']
         args['dec'] = run_info['args']['dec']
     os.chdir(vou_out)
@@ -268,7 +275,7 @@ if not rec and not make_pdf:
 
     #Create VOU Source Summary
     with open('./short_output', 'w+') as ofile:
-        ofile.write(sum_text.replace('\n' ,'\\\ \n'))
+        ofile.write(out_str.replace('\n' ,'\\\ \n'))
     with open('./phase1', 'r') as ifile:
         lines = ifile.read().split('Gamma-ray Counterparts')[0]
         lines = re.sub('\\[..?;.?m', ' ', lines)
@@ -297,7 +304,7 @@ if not rec and not make_pdf:
                 'src_dict' : src_dict}
     np.save(os.path.join(bpath,'run_info.npy'), run_info)
 else:
-    run_info = np.load(os.path.join(bpath,'run_info.npy'))[()]
+    run_info = np.load(os.path.join(bpath,'run_info.npy'), allow_pickle=True)[()]
     MJD = run_info['MJD']
     args = run_info['args']
     args['recovery'] = rec
@@ -312,12 +319,12 @@ if not make_pdf:
 
 #TS maps
 ts_emin = np.max([1000, args['emin']])
-sargs = ' --free_radius 2 --data_path {} --use_3FGL --emin {} --ra {} --dec {}'
+sargs = ' --free_radius 2 --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
 sargs = sargs.format(fermi_data, ts_emin, args['ra'], args['dec'])
 ts_map_path = os.path.join(bpath, 'ts_map')
 submit_fit(sargs, ts_map_path, sub_file=ev_str+'.sub', ana_type='TS_Map', partition='xtralong', **args)
 
-sargs = ' --free_radius 2 --data_path {} --use_3FGL --emin {} --ra {} --dec {} --time_range {} {}'
+sargs = ' --free_radius 2 --data_path {} --use_4FGL --emin {} --ra {} --dec {} --time_range {} {}'
 if args['mode'] == 'end':
     tsmjd1 = args['mjd']-200
     tsmjd2 = args['mjd']
@@ -331,7 +338,7 @@ ts_map_short_path = os.path.join(bpath, 'ts_map_short')
 submit_fit(sargs, ts_map_short_path, sub_file=ev_str+'.sub', ana_type='TS_Map', partition='xtralong', **args)
 
 #getsrcprob
-sargs = ' --free_radius 2 --data_path {} --use_3FGL --emin {} --ra {} --dec {}'
+sargs = ' --free_radius 2 --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
 sargs = sargs.format(fermi_data, 5000, args['ra'], args['dec'])
 srcprob_path = os.path.join(bpath, 'srcprob')
 submit_fit(sargs, srcprob_path, src_dict,sub_file=ev_str+'.sub', ana_type='srcprob', partition='xtralong', **args)
@@ -349,21 +356,58 @@ for src in src_dict:
         shutil.rmtree(bpath_src)
     job_dict[src['name']] = {'sed': os.path.join(bpath_src, path_settings['sed']),
                              'lc': os.path.join(bpath_src, path_settings['lc']),
-                             'mw_data': os.path.join(bpath_src, 'sed.txt')}
-    print job_dict
+                             'mw_data': os.path.join(bpath_src, 'sed.txt'),
+                             'dec': src['dec']}
+#    if make_pdf:
+#        continue
+    #os.makedirs(bpath_src)
+    #os.makedirs(job_dict[src['name']]['sed'])
+    #os.makedirs(job_dict[src['name']]['lc'])
+    if '4FGL' in src['name']:
+        data = fits.open('gll_psc_v19.fit')[1].data
+        ind = np.where(data['Source_Name']==src['name'])[0]
+        m_ax = float(data[ind]['Conf_95_SemiMajor']) * 60
+        min_ax = float(data[ind]['Conf_95_SemiMinor']) * 60  
+        loc_str= '{} {} {} {}'.format(2 * np.max([m_ax, min_ax]), m_ax, min_ax,
+                                      float(data[ind]['Conf_95_PosAng']))
+        ofolder = os.path.join(bpath_src, 'vou_counterpart')
+        if os.path.exists(ofolder):
+            shutil.rmtree(ofolder)
+        os.makedirs(ofolder)
+        os.chdir(ofolder)
+        os.system('{vou_path} {ra} {dec} {loc_str}'.format(vou_path=vou_path, ra=src['ra'],
+                                                           dec=src['dec'],loc_str=loc_str))
+        fname_new = os.path.join(ofolder, src['name'].replace(' ', '_') + '.ps') 
+        print fname_new
+        cand_ps = os.path.join(ofolder, 'candidates.ps')
+        print cand_ps
+        os.rename(cand_ps, fname_new)
+        os.system('ps2eps -B ' + fname_new)
+        os.chdir(this_path)
+        cp_info = np.array(np.genfromtxt(os.path.join(ofolder, 'candidates_posix.txt'), dtype=float), ndmin=2)
+        print cp_info
+        if len(cp_info) == 0:
+            cp_ra = src['ra']
+            cp_dec = src['dec']
+        else:
+            cp_ra = cp_info[:,0][0]
+            cp_dec = cp_info[:,1][0]
+            print('Found Counterpart at ra {}, dec {}'.format(cp_ra, cp_dec))
+    else:
+        cp_ra = src['ra']
+        cp_dec = src['dec']
+    os.system('{vou_path} {ra} {dec} {loc_str} -s ; cat Sed.txt > {bpath}'.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec, 
+                                                                                  bpath=os.path.join(bpath_src,'sed.txt'), loc_str=2))
+    print('Saved SED to {}'.format(os.path.join(bpath_src, 'sed.txt')))
     if make_pdf:
         continue
-    os.makedirs(bpath_src)
-    os.makedirs(job_dict[src['name']]['sed'])
-    os.makedirs(job_dict[src['name']]['lc'])
-    os.system('{vou_path} {ra} {dec} 1 -s ; cat Sed.txt > {bpath}'.format(vou_path=vou_path, ra=src['ra'], dec=src['dec'], bpath=os.path.join(bpath_src, 'sed.txt')))
-    print('Saved SED to {}'.format(os.path.join(bpath_src, 'sed.txt')))
-    continue
-    sargs = '--target_src {} --free_radius 2 --data_path {} --use_3FGL --emin {} '
+    sargs = '--target_src {} --free_radius 2 --data_path {} --use_4FGL --emin {} '
     sub_args = sargs.format(src['name'].replace(' ', '_'), fermi_data, args['emin'])
     tsub_args = sargs.format(src['name'].replace(' ', '_'), fermi_data, 1e3)
     if '3FGL' in src['name']:
-        dt_lc = get_lc_time(src['name'], emin=1e3 ) ### be careful -- hardcoded
+        dt_lc = get_lc_time3fgl(src['name'], emin=args['emin'] ) 
+    elif '4FGL' in src['name']:
+        dt_lc = get_lc_time4fgl(src['name'], emin=args['emin'] ) 
     else:
         dt_lc = args['dt_lc']
 
@@ -460,18 +504,18 @@ while not final_pdf:
                                 'grey', True, True, True)]
                     if os.path.exists(os.path.join(job_dict[key]['lc']+'_1GeV', fold)):
                         seds_list.append((os.path.join(job_dict[key]['lc'] + '_1GeV', fold), 'k', 'blue' , True, True, False))
-                    plot.make_sed_plot(seds_list, mw_data=job_dict[key]['mw_data'])
+                    plot.make_sed_plot(seds_list, mw_data=job_dict[key]['mw_data'], dec=job_dict[key]['dec'])
                 except Exception as inst:
                     warnings.warn("Couldn't create SED for source {}".format(key))
                     print(inst)
                     pass
             try:
-                plot.make_sed_plot([(job_dict[key]['sed'], 'grey', 'grey', True, True, True)], mw_data=job_dict[key]['mw_data'])
+                plot.make_sed_plot([(job_dict[key]['sed'], 'grey', 'grey', True, True, True)],
+                                   mw_data=job_dict[key]['mw_data'], dec=job_dict[key]['dec'])
             except Exception as inst:
                     warnings.warn("Couldn't create all year SED")
                     print(inst)
                     pass
-    sys.exit(1)
     src_latex = ''
     for src in src_dict:
         if src['dist'] > 1.5:

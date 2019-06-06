@@ -13,6 +13,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from astropy.visualization.wcsaxes import SphericalCircle
 import astropy.units as u
 from collections import OrderedDict
+import scipy.interpolate
 ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'])
 re_cmap = LinearSegmentedColormap.from_list('mycmap2', ['#67a9cf', '#f7f7f7', '#ef8a62'])
 mw_map= LinearSegmentedColormap.from_list('mycmap3', ['#bdbdbd','#939393' ,'red'])
@@ -48,7 +49,7 @@ def make_lc_plot(basepath, mjd, **kwargs):
     for folder in os.listdir(basepath):
         path = os.path.join(basepath,folder,'llh.npy')
         if os.path.exists(path):
-            inp = np.load(path)[()]
+            inp = np.load(path, allow_pickle=True)[()]
             source = inp['config']['selection']['target']
             print(source)
             flux_dict = inp['sources'][source]
@@ -104,7 +105,7 @@ def make_lc_plot(basepath, mjd, **kwargs):
                  yerr=lc_arr['dgamma'][mask&gam_mask],
                  xerr=lc_arr['bin_len'][mask&gam_mask]/2., linestyle='')
     ax2.set_ylabel('Index', labelpad=5)
-    ax2.set_ylim(1.1,5)
+    ax2.set_ylim(0.5,5)
     ax2.set_xticks([])
     ax2.axvline(mjd, color='#696969', linestyle='--')
     ax2.set_xlim(ax1.get_xlim()[0], ax1.get_xlim()[1])
@@ -115,7 +116,7 @@ def make_lc_plot(basepath, mjd, **kwargs):
                 bbox_inches='tight')
     return
 
-def make_sed_plot(seds_list, mw_data=None):
+def make_sed_plot(seds_list, mw_data=None, dec = None):
     fig, ax = newfig(0.9)
     ax.set_xscale('log')
     ax.set_yscale('log') 
@@ -123,22 +124,23 @@ def make_sed_plot(seds_list, mw_data=None):
     if mw_data is not None:
         mw_idata = np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4))
         c = np.array(time2color(mw_idata[:,4], tmin=54500, tmax=59000))
-        inds = mw_idata[:,1] > 0
-        ax.scatter(mw_idata[:,0][inds] * hz_to_gev, mw_idata[:,1][inds], c=c[inds], s=8)
+        inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
+        ax.scatter(mw_idata[:,0][inds] * hz_to_gev, mw_idata[:,1][inds], c=c[inds], s=15)
+        y_vals.extend(mw_idata[:,1][inds])
     for i, sed_list in enumerate(seds_list):
         basepath = sed_list[0]
         if os.path.exists(os.path.join(basepath, 'sed.npy')):
-            sed = np.load(os.path.join(basepath, 'sed.npy'))[()]
+            sed = np.load(os.path.join(basepath, 'sed.npy'), allow_pickle=True)[()]
         else:
             continue
-        m = sed['ts'] < ul_ts_threshold
-        y_vals.extend(sed['e2dnde'][~m])
-        y_vals.extend(sed['e2dnde_ul95'][m])
+        y_vals.extend(sed['e2dnde'])
+        y_vals.extend(sed['e2dnde_ul95'])
+    print np.min(y_vals)
+    print np.max(y_vals)
     if len(y_vals) ==0:
         factor = 1.
     else:
         factor = np.log10(np.max(y_vals)) - np.log10(np.min(y_vals))
-    print('SED list {}'.format(seds_list)) 
     for i, sed_list in enumerate(seds_list):
         basepath = sed_list[0]
         sed_col = sed_list[1]
@@ -147,13 +149,12 @@ def make_sed_plot(seds_list, mw_data=None):
         bowtie_bool = sed_list[4]
         sed_bool = sed_list[5]
         try:
-            sed = np.load(os.path.join(basepath, 'sed.npy'))[()]
-            bowtie = np.load(os.path.join(basepath, 'bowtie.npy'))[()]
-            llh = np.load(os.path.join(basepath, 'llh.npy'))[()]
+            sed = np.load(os.path.join(basepath, 'sed.npy'), allow_pickle=True)[()]
+            bowtie = np.load(os.path.join(basepath, 'bowtie.npy'),allow_pickle=True)[()]
+            llh = np.load(os.path.join(basepath, 'llh.npy'), allow_pickle=True)[()]
         except Exception as inst:
             warnings.warn('SED files not found')
             continue
-        print('Files loaded..')
         source = llh['config']['selection']['target']
         ts = llh['sources'][source]['ts']
         e2 = 10 ** (2 * bowtie['log_energies'])
@@ -169,29 +170,31 @@ def make_sed_plot(seds_list, mw_data=None):
         dehi = (sed['e_max'] - sed['e_ctr'])/1e3
         xerr0 = np.vstack((delo[m], dehi[m]))
         xerr1 = np.vstack((delo[~m], dehi[~m]))
-        if ts > 4 and bowtie_bool:
+        if ts > 9 and bowtie_bool:
             ax.plot(energies,
-                    bowtie['dnde'] * e2 * MeV_to_erg, color=bowtie_col, zorder=1)
-
+                    bowtie['dnde'] * e2 * MeV_to_erg, color=bowtie_col,
+                    zorder=10-i)
             ax.plot(energies,
                     bowtie['dnde_lo'] * e2 * MeV_to_erg, color=bowtie_col,
-                    linestyle='--', zorder=1)
+                    linestyle='--', zorder=10-i)
             ax.plot(energies,
                     bowtie['dnde_hi'] * e2 * MeV_to_erg, color=bowtie_col,
-                    linestyle='--', zorder=1)
+                    linestyle='--', zorder=10-i)
             if bowtie_fill:
                 ax.fill_between(energies,
                                 bowtie['dnde_lo'] * e2 * MeV_to_erg,
                                 bowtie['dnde_hi'] * e2 * MeV_to_erg,
-                                alpha=0.5, color=bowtie_col, zorder=-1)
+                                alpha=0.5, color=bowtie_col, zorder=10-i)
         if sed_bool:
             ax.errorbar(x[~m], y[~m], xerr=xerr1,
                         yerr=(yerr_lo[~m], yerr_hi[~m]),
-                        linestyle='', color=sed_col, fmt='o', zorder=2)
-            serr = 10**np.log10(yul[m]) - 10**(np.log10(yul[m])-0.2/4.*factor)
+                        linestyle='', color=sed_col, fmt='o', zorder=100-i,
+                        markersize=3)
+            serr = 10**np.log10(yul[m]) - 10**(np.log10(yul[m])-0.1/8.*factor)
             ax.errorbar(x[m], yul[m], xerr=xerr0,
                         yerr=serr,  uplims=True,
-                        color=sed_col, fmt='o', zorder=2)
+                        color=sed_col, fmt='o', zorder=100-i,
+                        markersize=3)
 
 
         tmin = llh['config']['selection']['tmin']
@@ -206,8 +209,17 @@ def make_sed_plot(seds_list, mw_data=None):
             ax.text(0.8, 1.02, 'MJD: {:.1f} - {:.1f}'.format(MET_to_MJD(tmin), MET_to_MJD(tmax)),
                     horizontalalignment='center',
                     verticalalignment='center', transform=ax.transAxes)
-
-    ax.set_xlim(1e-15, 1e6)
+    if dec is not None:
+        IC_sens = np.genfromtxt('IC_sens.txt', delimiter=',')
+        inter = scipy.interpolate.interp1d(IC_sens[:,0], IC_sens[:, 1])
+        flux = inter(np.sin(np.radians(dec))) * MeV_to_erg * 1e6
+        ax.plot([5e3, 1e6], [flux, flux], color='green', linestyle='--')
+        IC_disc = np.genfromtxt('IC_disc.txt', delimiter=',')
+        inter = scipy.interpolate.interp1d(IC_disc[:,0], IC_disc[:, 1])
+        flux = inter(np.sin(np.radians(dec))) * MeV_to_erg * 1e6
+        ax.plot([5e3, 1e6], [flux, flux], color='green', linestyle='-')
+    ax.set_ylim(0.8*np.min(y_vals),)
+    ax.set_xlim(1e-15, 1e7)
     ax.set_xlabel('Energy [GeV]')
     ax.set_ylabel(r'$\nu f(\nu)$ [erg cm$^{-2}$ s$^{-1}$]')
     plt.tight_layout()
@@ -236,7 +248,7 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
         warnings.warn('Files for {} not found'.format(mode))
         print(inst)
         return
-    srcs = np.load(srcs)
+    srcs = np.load(srcs, allow_pickle=True)
     cand_pos = np.genfromtxt(vou_cand)
     cand = {'ra': cand_pos[:,0], 'dec': cand_pos[:,1]}
     if len(cand['ra'])>0 and len(srcs['ra']>0):

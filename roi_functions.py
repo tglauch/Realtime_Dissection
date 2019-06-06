@@ -14,19 +14,21 @@ fields = ['name', 'ra', 'dec', 'alt_name']
 odtype = np.dtype([('name', np.unicode, 32), ('ra', np.float32), ('dec', np.float32), ('dist', np.float32)]) 
 
 
-files = collections.OrderedDict(
-    {'3fgl': {'file': '3fgl.1.csv',
-              'keys': ['name', 'ra', 'dec']},
-     '3fhl': {'file': '3fhl.1.csv',
-              'keys': ['name', 'ra', 'dec']},
-     '5bzcat': {'file': '5bzcat.1.csv',
-                'keys': ['Name', 'RAJ2000', 'DEJ2000']},
-     '3hsp': {'file': '3hsp.1.csv',
-              'keys': ['Name', 'ra', 'dec']},
-     'fermi8yr': {'file': 'fermi8yr.1.csv',
-                  'keys': ['Source_Name', 'RAJ2000', 'DEJ2000']},
-     'crates': {'file': 'crates.1.csv',
-                'keys': ['name', 'ra', 'dec']}})
+files = collections.OrderedDict([
+     ('4fgl', {'file': '4fgl.1.csv',
+              'keys': ['name', 'ra', 'dec']}),
+     ('3fgl', {'file': '3fgl.1.csv',
+              'keys': ['name', 'ra', 'dec']}),
+     ('3fhl', {'file': '3fhl.1.csv',
+              'keys': ['name', 'ra', 'dec']}),
+     ('5bzcat', {'file': '5bzcat.1.csv',
+                'keys': ['Name', 'RAJ2000', 'DEJ2000']}),
+     ('3hsp', {'file': '3hsp.1.csv',
+              'keys': ['Name', 'ra', 'dec']}),
+     ('fermi8yr', {'file': 'fermi8yr.1.csv',
+                  'keys': ['Source_Name', 'RAJ2000', 'DEJ2000']}),
+     ('crates', {'file': 'crates.1.csv',
+                'keys': ['name', 'ra', 'dec']})])
 
 #def get_lc_time(src_of_interest):
 #    catalog = fits.open('./gll_psc_v16.fit')
@@ -40,7 +42,7 @@ files = collections.OrderedDict(
 #    return  28. * (nph0/nph)**(0.6)
 
 
-def get_lc_time(src_of_interest, emin=1e3):
+def get_lc_time3fgl(src_of_interest, emin=1e3):
     data = fits.open('gll_psc_v16.fit')
     src_ind = np.where(data[1].data['Source_Name']==src_of_interest)[0][0]
     
@@ -70,25 +72,51 @@ def get_lc_time(src_of_interest, emin=1e3):
             return 28.
     return t_sens
 
-def get_spectrum(src):
-    '''
-    src is a row from the 3FGL catalog
-    '''
-    print('Create Spectrum for {}'.format(src['Source_Name']))
-    if src['SpectrumType'] == 'PowerLaw':
-        print('{}*(E/{})^-{}'.format(src['Flux_Density'],
-                                     src['Pivot_Energy'],
-                                     src['Spectral_Index']))
-        return lambda x: src['Flux_Density']*(x/src['Pivot_Energy'])**(-src['Spectral_Index'])
-    elif src['SpectrumType'] == 'LogParabola':
-        eq_str='{N}*(E/{piv:.2f})^-({a:.2f}+{b:.2f}*log(E/{piv:.2f})'
-        print eq_str.format(N=src['Flux_Density'], piv=src['Pivot_Energy'],
-                            a=src['Spectral_Index'],b=src['beta'])
-        return lambda x: src['Flux_Density']*(x/src['Pivot_Energy'])**(-(src['Spectral_Index']+src['beta']*np.log(x/src['Pivot_Energy'])))
-    else:
-        print('Unkown Spectrum Type: Fall back to Powerlaw')
-        return lambda x: src['Flux_Density']*(x/src['Pivot_Energy'])**(-src['Spectral_Index'])
+# Thanks to the improved statistics, the source photon fluxes in 4FGL are reported in seven energybands (1: 50 to 100
+# MeV; 2: 100 to 300 MeV; 3: 300 MeV to 1 GeV; 4: 1 to 3 GeV; 5: 3 to 10 GeV; 6:10 to 30 GeV; 7:  30 to 300 GeV)
 
+def get_lc_time4fgl(src_of_interest, emin=1e3):
+    data = fits.open('gll_psc_v19.fit')
+    src_ind = np.where(data[1].data['Source_Name']==src_of_interest)[0][0]
+
+    E_bins = [50,100,300,1000,3000,10000,30000,300000]
+
+    for i in range(len(E_bins)):
+        if E_bins[i] >= emin:
+            E_bins[i] = 1
+        elif E_bins[i] < emin and E_bins[i+1] > emin:
+            E_bins[i] = 1.*(E_bins[i+1]-emin)/(E_bins[i+1] - E_bins[i])
+        else:
+            E_bins[i] = 0
+    ts_sum = np.sum([data[1].data[src_ind]['Sqrt_TS_Band'][i]**2*E_bins[i]
+                     for i in range(len(E_bins)-1)])
+    t_sens = (9/ts_sum)*(365*8)
+    print t_sens
+    if t_sens < 100:
+        t_disc = (25/ts_sum)*(365*8)
+        return np.max([t_disc, 56])
+    return t_sens
+
+#Deprecated
+#def get_spectrum(src):
+#    '''
+#    src is a row from the 3FGL catalog
+#    '''
+#    print('Create Spectrum for {}'.format(src['Source_Name']))
+#    if src['SpectrumType'] == 'PowerLaw':
+#        print('{}*(E/{})^-{}'.format(src['Flux_Density'],
+#                                     src['Pivot_Energy'],
+#                                     src['Spectral_Index']))
+#        return lambda x: src['Flux_Density']*(x/src['Pivot_Energy'])**(-src['Spectral_Index'])
+#    elif src['SpectrumType'] == 'LogParabola':
+#        eq_str='{N}*(E/{piv:.2f})^-({a:.2f}+{b:.2f}*log(E/{piv:.2f})'
+#        print eq_str.format(N=src['Flux_Density'], piv=src['Pivot_Energy'],
+#                            a=src['Spectral_Index'],b=src['beta'])
+#        return lambda x: src['Flux_Density']*(x/src['Pivot_Energy'])**(-(src['Spectral_Index']+src['beta']*np.log(x/src['Pivot_Energy'])))
+#    else:
+#        print('Unkown Spectrum Type: Fall back to Powerlaw')
+#        return lambda x: src['Flux_Density']*(x/src['Pivot_Energy'])**(-src['Spectral_Index'])
+#
 
 def GreatCircleDistance(ra_1, dec_1, ra_2, dec_2):
     '''Compute the great circle distance between two events'''
@@ -100,7 +128,7 @@ def GreatCircleDistance(ra_1, dec_1, ra_2, dec_2):
     return 2. * np.arcsin(np.sqrt(x))
 
 def get_add_info(src_of_interest):
-    data = fits.open('/scratch9/tglauch/realtime_service/main/gll_psc_v16.fit')
+    data = fits.open('/scratch9/tglauch/realtime_service/main/gll_psc_v19.fit')
     eflux = data[1].data['Energy_Flux100']
     inds = np.argsort(eflux)[::-1]
     eflux = eflux[inds]
@@ -108,14 +136,14 @@ def get_add_info(src_of_interest):
     if len(np.where(src_names==src_of_interest)[0]) == 0:
         return ''
     src_ind = np.where(src_names==src_of_interest)[0][0]
-    ostr = ' | Energy flux (E $\geq$ 100MeV): {:.2e} erg/cm$^2$/s [Top {:.1f}\% in 3FGL]'
+    ostr = ' | Energy flux (E $\geq$ 100MeV): {:.2e} erg/cm$^2$/s [Top {:.1f}\% in 4FGL]'
     return ostr.format(eflux[src_ind], 1.*src_ind/len(eflux)*100)
 
 def get_sources(ra, dec):
     src_dict = {}
     for key in fields:
         src_dict[key] = []
-    for key in files.keys():
+    for key in list(files):
         if not os.path.exists(files[key]['file']):
             continue
         temp = np.genfromtxt(files[key]['file'], dtype=None,
@@ -152,7 +180,7 @@ def get_sources(ra, dec):
                     for j in range(i + 1, len(src_dict['dec']))]
         to_delete = []
         for j, diff in enumerate(ang_diff):
-            if diff < 0.1:
+            if diff < 0.2:
                 if not src_dict['name'][i + j + 1] in src_dict['alt_name'][i] \
                     and src_dict['name'][i + j + 1] != src_dict['name'][i]:
                         src_dict['alt_name'][i].append(src_dict['name'][i + j + 1])
@@ -179,7 +207,7 @@ def get_sources(ra, dec):
                              src_dict['ra'][i] - ra,
                              src_dict['dec'][i] - dec)
         if len(src_dict['alt_name'][i]) > 0:
-            ostr +=  '\n Alt Names: {}'.format(', '.join(src_dict['alt_name'][i]))
+            ostr +=  '\n Associations: {}'.format(', '.join(src_dict['alt_name'][i]))
         print(ostr)
         out_str += ostr + '\n\n'
     return dict_to_nparray(src_dict, dtype=odtype), out_str

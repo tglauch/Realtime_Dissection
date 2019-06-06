@@ -29,36 +29,55 @@ the corresponding electromagnetic counterpart we report here on the muli-wavenle
 \end{{abstract}}
 
 \section{{Identifying Counterpart Candidates}}
-The search for possible counterparts is based on the VOU-Blazar Tool \cite{{voublazar}} and follows closely the pipeline
-developed in \cite{{Padovani:2018acg}}.  VOU-Blazar compares 32 multi-wavelengths catalogs\footnote{{List of the 32 catalogs used in this
+The search for possible counterparts is based on the \textit{{VOU-Blazars}} tool \cite{{voublazar}} and follows closely the pipeline
+developed in \cite{{Padovani:2018acg}}. \textit{{VOU-Blazars}} compares 32 multi-wavelength catalogs\footnote{{List of the 32 catalogs used in this
 analysis: SDS82 , 3HSP , Fermi8YR ,1BIGB, MST9Y, FIRST, SUMSS, WGACAT, IPC2E, ZWCLUSTERS,
 PSZ2, ABELL , SDSSWHL, CRATES, NVSS, SXPS, RASS, XMMSL, BMW , IPCSL, CHANDRA, MCXC,  5BZCat, SWXCS, PULSAR, F2PSR,
 3FHL, 3FGL, 3XMM, MAXI, FermiMEV, AGILE}}
-to find all positions in the vicinity of the alert event with a \textit{{blazar-like}} radio
-to X-ray emission ratio. Each match is then checked against existing blazar catalogs to identify possible associations. \\
+to find all positions in the vicinity of the alert with a \textit{{blazar-like}} emission profile in radio, optical and
+X-ray. Each of these matches is then additionally checked against existing catalogs to identify the associated object if
+possible. \\
 
-In order to search for gamma-ray anomalies in the region we use Fermi-LAT data around the event time and run three different analysis
-pipelines. Firstly, TS and residual maps are generated to search for unknown gamma-ray emmitters, e.g. indication for
-emission from the previously identfied \textit{{VOU-Sources}} without gamma-ray association. At the same time the
-residual map gives information of the 
-the goodness of fit using the 3FGL model. Subsequently SEDs and light curves are produced for each identified catalog
-source. This allows as to search for specific features in flux and spectral shape around the neutrino arrival time. The
-analyses are based on the latest version of the FSSC Tools v11r5p3 and the fermipy package
-\cite{{fermipy}}. We use the the standart procedures as described in the Fermi-LAT Cicerone \cite{{fermi_ci}}. The
+In a second step a dedicated gamma-ray analysis is performed. In order to search for interesting emission features in the region we use \textit{{Fermi LAT}} data around the event time and run three different analysis
+pipelines. Firstly, test-statistic maps are generated to search for unknown gamma-ray emmitters, e.g. indication for
+gamma-ray emission from the previously identfied \textit{{VOU-Blazars}} source candidates. Subsequently SEDs and light curves are produced for each identified catalog
+source and interesting \textit{{VOU-Blazars}} candidate. Based on these results we can finally search for specific
+features in flux and spectral shape around the neutrino arrival time. \\
+
+The gamma-ray analyses are based on the latest version of the FSSC Tools v11r5p3 and the fermipy package
+\cite{{fermipy}}. We use the the standart procedures as described in the \textit{{Fermi LAT}} Cicerone \cite{{fermi_ci}}. The
 dataset for the analysis contains events with photon energy above {emin} GeV in a time window between {mjd1:.1f} and {mjd2:.1f}.
 
-\subsection{{Quick summary: Catalog Sources in the Region}}
-The following list gives a quick overview about the catalog blazars and flat-spectrum radio sources in the region. The
-full output of VOU-Blazar is given below. Sources are sorted by their angular distance to the neutrino direction.
+\subsection{{Catalog Sources in the Region around {event}}}
+The following list gives a quick overview about the catalog blazars in the region. Sources are sorted by their angular distance to the neutrino direction.
 \\ \\
 {cat_srcs}
 
+\clearpage
+
 \subsection{{Full Multi-Wavelength Study of the Region}}
-In this section we present the full multi-wavelength search for possible neutrino counterparts. Starting from 32
-multi-wavenlength catalogs the VOU-Blazar Tool \cite{{voublazar}} uses the radio to x-ray emission ratio in order to search for
-non-thermal counterparts candidates. In the following sources are sorted by their right ascension.
-\\ \\ \\
-{vou_output}
+In this section we present a full multi-wavelength search for possible neutrino counterparts. Starting from 32
+multi-wavenlength catalogs the VOU-Blazar tool \cite{{voublazar}} uses the all the available radio, optical and X-ray
+data in order to
+identify blazar-like counterparts candidates. The full output of the tool can be found in the appendix.\\
+The analysis pipeline consists of two parts: 1) The radio and x-ray data, as well as the resulting counterpart candidates are shown
+and compared to the \textit{{Fermi LAT}} gamma-ray emission in the region around the neutrino alert 2) For all known blazars with a angular distance of less
+than 1.5 degrees a multi-wavelength SED is constructed, including also a gamma-ray analysis that is started at the time of the
+neutrino alert. For each source we also calculated a fixed-binning light curve. For all sources that have a previously
+measured gamma-ray flux the bin-size is chosen in a way that each time bin has a ~5 sigma detection for the case of
+steady emission. For all sources with unkown gamma-ray emission we choose a generic time windows of 200 days. The choice of this
+time window is motivated a) by the expected faitness of the sources and b) the possible interested in time-dependent
+neutrino follow-ups with IceCube. In the latter case, even for a realtively large neutrino flux, IceCube would need O(100 days) of
+integration time in order to measure a reasonably significant signal.
+
+\subsubsection{{Detailed description of the multi-wavelength SED}}
+\label{{sec:sed}}
+The multi-wavelength SED collects and visualizes all the available multi-wavelength data, as well as the result of the
+gamma-ray analysis. The time evolution of the source is decoded in a color gradient from grey (old) to red (recent).
+Here the grey SEDs point and bowties represent the \textit{{Fermi-LAT}} gamma-ray spectrum integrated over the entire
+mission while the black SED points show the gamma-ray spectrum in a time window around the
+neutrino arrival time. Colored bands indicate the corresponing spectral fits at different (if available) energy
+thresholds if the significance of the measurement is above 3 $\sigma$. The green dashed and solid line show the sensitivity and discovery potential of the IceCube 7yr point-source analysis \cite{{psana}}, respectively.
 
 \clearpage
 \begin{{figure}}[h!]
@@ -98,8 +117,13 @@ center. The blue circle indicates a radius of 90 arcmin around the the event bes
 \end{{figure}}
 
 \clearpage
-\section{{The Closer Look: SEDs and Light Curves}}
+\section{{SEDs and Light Curves}}
 {src_latex}
+
+\clearpage
+\section{{Appendix}}
+{vou_output}
+
 
 {{\small\bibliographystyle{{unsrt}}
 \bibliography{{sample}}}}
