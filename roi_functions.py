@@ -9,9 +9,63 @@ import collections
 from myfunctions import dict_to_nparray
 import scipy.integrate
 import pyfits as fits 
+import imageio
+
  
 fields = ['name', 'ra', 'dec', 'alt_name']
 odtype = np.dtype([('name', np.unicode, 32), ('ra', np.float32), ('dec', np.float32), ('dist', np.float32)]) 
+path_settings = {'sed': 'all_year/sed',
+                 'lc': 'lightcurve'}
+vou_path = '/scratch9/tglauch/Software/VOU_Blazars/v2/bin/vou-blazars'
+partition_t = {'kta':'2:30:00', 'long':'2-00:00:00', 'xtralong': '7-00:00:00'}
+
+def submit_fit(args, opath, src_arr=None, trange='', sub_file='fermi.sub',  ana_type='SED', partition='kta', **kwargs):
+    if kwargs.get('make_pdf'):
+        return
+    if trange != '':
+        args += ' --time_range {} {} '.format(trange[0], trange[1])
+    if not os.path.exists(opath):
+        os.makedirs(opath)
+    args += ' --outfolder {} '.format(opath)
+    odtype = np.dtype([('name', np.unicode, 32), ('ra', np.float32), ('dec', np.float32)])
+    if src_arr is not None:
+        if isinstance(src_arr, dict):
+            src_arr=dict_to_nparray(src_arr, dtype=odtype)
+        src_arr = np.atleast_1d(src_arr)
+
+        mask = np.array(['4FGL' not in sname for sname in src_arr['name']])
+        if len(src_arr[mask])>0:
+            xml_path = os.path.join(opath, 'add_source.xml')
+            generate_src_xml(src_arr[mask], xml_path)
+            args += '--xml_path {}'.format(xml_path)
+    with open('./slurm_draft.xml', 'r') as f:
+        submit = (f.read()).format(bpath=opath, args=args,
+                                   ana_type=ana_type,
+                                   time=partition_t[partition],
+                                   partition=partition)
+    submitfile = os.path.join(opath, sub_file)
+    with open(submitfile, "w+") as file:
+        file.write(submit)
+    print('submit with args {}'.format(args))
+    os.system("sbatch {}".format(submitfile))
+    return opath
+
+
+def generate_src_xml(src_arr, xml_path):
+    xml_str =\
+'<?xml version="1.0" ?>\n\
+<source_library title="source library">\n\
+<!-- Point Sources -->\n'
+    with open('./src_xml_draft.xml', 'r') as f:
+        xml_temp = f.read()
+    for src in src_arr:
+        print('Generate Source {}'.format(src['name']))
+        xml_str += xml_temp.format(ra=src['ra'], dec=src['dec'], name=src['name'])
+        xml_str += '\n'
+    xml_str+='</source_library>'
+    with open(xml_path, 'w+') as f:
+        f.write(xml_str)
+    return
 
 
 files = collections.OrderedDict([
@@ -95,7 +149,7 @@ def get_lc_time4fgl(src_of_interest, emin=1e3):
     if t_sens < 100:
         t_disc = (25/ts_sum)*(365*8)
         return np.max([t_disc, 56])
-    return t_sens
+    return np.min([t_sens, 200])
 
 #Deprecated
 #def get_spectrum(src):
@@ -126,6 +180,23 @@ def GreatCircleDistance(ra_1, dec_1, ra_2, dec_2):
     x = (np.sin(delta_dec / 2.))**2. + np.cos(dec_1) *\
         np.cos(dec_2) * (np.sin(delta_ra / 2.))**2.
     return 2. * np.arcsin(np.sqrt(x))
+
+
+def make_gif(basepath):
+    images = []
+    filenames = sorted([os.path.join(basepath, i, 'sed.pdf') for i in os.listdir(basepath) if
+                        os.path.isdir(os.path.join(basepath, i))])
+    for filename in filenames:
+        if not os.path.exists(filename):
+            continue
+        if not os.path.exists(filename.replace('.pdf', '.png')):
+            os.system('convert -density 150 {} -quality 90 {}'.format(filename, filename.replace('.pdf', '.png')))
+        images.append(imageio.imread(filename.replace('.pdf', '.png')))
+    if len(images)>0:
+        imageio.mimsave(os.path.join(basepath,'movie.gif'), images)
+    return
+
+
 
 def get_add_info(src_of_interest):
     data = fits.open('/scratch9/tglauch/realtime_service/main/gll_psc_v19.fit')

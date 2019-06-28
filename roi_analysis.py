@@ -8,7 +8,8 @@ from get_fermi_data import get_data
 import subprocess
 import argparse
 import os
-from roi_functions import get_sources, get_lc_time3fgl, get_lc_time4fgl
+from roi_functions import get_sources, get_lc_time3fgl, get_lc_time4fgl, make_gif, submit_fit, generate_src_xml, \
+                          path_settings, vou_path, partition_t 
 import shutil
 import datetime
 from slack_lib import print_to_slack
@@ -23,11 +24,6 @@ from astropy.coordinates import SkyCoord
 from astropy.time import Time
 from collections import OrderedDict
 
-path_settings = {'sed': 'all_year/sed',
-                 'lc': 'lightcurve'}
-
-partition_t = {'kta':'2:30:00', 'long':'2-00:00:00', 'xtralong': '7-00:00:00'}
-vou_path = '/scratch9/tglauch/Software/VOU_Blazars/v2/bin/vou-blazars'
 
 
 def parseArguments():
@@ -116,9 +112,8 @@ def source_summary(bpath, src, mjd, mode='mid'):
                 sed_path = os.path.join(lc_base,fold)
                 break
     l_str ='\subsection{{{srcinfo}}}'
-    try:
+    if os.path.exists(os.path.join(sed_path, 'llh.npy')):
         fit_res = np.load(os.path.join(sed_path, 'llh.npy'), allow_pickle=True)[()]
-        sed_path = os.path.join(sed_path, 'sed.pdf')
         ts = fit_res['sources'][src['name']]['ts']
         ra = fit_res['sources'][src['name']]['RAJ2000']
         dec = fit_res['sources'][src['name']]['DEJ2000']
@@ -126,13 +121,14 @@ def source_summary(bpath, src, mjd, mode='mid'):
         t_str_info = 'ra = {ra:.2f}$^\circ$, dec = {dec:.2f}$^\circ$, p-val = {ts:.2e}, $\Delta\psi$ = {dist:.2f}$^\circ$'
         t_str_info = t_str_info.format(ts=ts_to_pval(ts,1), ra=ra, dec=dec, dist=src['dist'])
         t_str = t_str.format(src_name = src['name'], src_info=t_str_info)
-        print('TSTR {}'.format(t_str))
         l_str = l_str.format(srcinfo=t_str) # srcname=src['name'], srcinfo=t_str)
-        print('LSTR {}'.format(l_str))
-    except Exception as inst:
-        warnings.warn("Can not find fit result for {}".format(src['name']))
-        print(inst)
-
+    else:
+        t_str = '{src_name} $|$ \\small\\textnormal{{{src_info}}}'
+        t_str_info = 'ra = {ra:.2f}$^\circ$, dec = {dec:.2f}$^\circ$, $\Delta\psi$ = {dist:.2f}$^\circ$'
+        t_str_info = t_str_info.format(ra=src['ra'], dec=src['dec'], dist=src['dist'])
+        t_str = t_str.format(src_name = src['name'], src_info=t_str_info)
+        l_str = l_str.format(srcinfo=t_str)
+    sed_path = os.path.join(sed_path, 'sed.pdf')
     try:
         srcprob = fits.open(os.path.join(bpath,'srcprob/ft1_srcprob_00.fits'))
         energy = srcprob[1].data['ENERGY']
@@ -164,7 +160,7 @@ def source_summary(bpath, src, mjd, mode='mid'):
     if os.path.exists(gev_lc):
         l_str += fig_str.format(width = 0.8, path = gev_lc, caption='1GeV light curve for {}'.format(src['name']))
     if ('4FGL' in src['name']) | ('3FGL' in src['name']):
-        cp_candidate_path = os.path.join(bpath_src, 'vou_counterpart', src['name'].replace(' ', '_') + '.eps') 
+        cp_candidate_path = os.path.join(bpath_src, 'vou_counterpart', src['name'].replace(' ', '_').replace('.','_') + '.eps') 
         if os.path.exists(cp_candidate_path):
             l_str += fig_str.format(width = 0.7, path = cp_candidate_path, caption='Possible couterparts for {}'.format(src['name']))
     l_str += '\\clearpage \n'
@@ -348,7 +344,7 @@ job_dict = {}
 for src in src_dict:
     bpath_src = src_path(bpath, src['name'])
     print('{} is at a distance {}'.format(src['name'], src['dist']))
-    if src['dist'] > 1.5:
+    if src['dist'] > 2.0:
         print('Source exceeds distance of 1.5. No job will be submitted')
         continue
     if os.path.exists(bpath_src) and (not args['recovery']) and (not args['make_pdf']):
@@ -358,11 +354,14 @@ for src in src_dict:
                              'lc': os.path.join(bpath_src, path_settings['lc']),
                              'mw_data': os.path.join(bpath_src, 'sed.txt'),
                              'dec': src['dec']}
-#    if make_pdf:
-#        continue
-    #os.makedirs(bpath_src)
-    #os.makedirs(job_dict[src['name']]['sed'])
-    #os.makedirs(job_dict[src['name']]['lc'])
+    if make_pdf:
+        continue
+    if not os.path.exists(bpath_src):
+        os.makedirs(bpath_src)
+    if not os.path.exists(job_dict[src['name']]['lc']):
+        os.makedirs(job_dict[src['name']]['lc'])
+    if not os.path.exists(job_dict[src['name']]['sed']):
+        os.makedirs(job_dict[src['name']]['sed'])
     if '4FGL' in src['name']:
         data = fits.open('gll_psc_v19.fit')[1].data
         ind = np.where(data['Source_Name']==src['name'])[0]
@@ -377,12 +376,15 @@ for src in src_dict:
         os.chdir(ofolder)
         os.system('{vou_path} {ra} {dec} {loc_str}'.format(vou_path=vou_path, ra=src['ra'],
                                                            dec=src['dec'],loc_str=loc_str))
-        fname_new = os.path.join(ofolder, src['name'].replace(' ', '_') + '.ps') 
-        print fname_new
-        cand_ps = os.path.join(ofolder, 'candidates.ps')
-        print cand_ps
-        os.rename(cand_ps, fname_new)
-        os.system('ps2eps -B ' + fname_new)
+        if not os.path.exists('candidates.eps'):
+            fname_new = os.path.join(ofolder, src['name'].replace(' ', '_').replace('.','_') + '.ps') 
+            cand_ps = os.path.join(ofolder, 'candidates.ps')
+            os.rename(cand_ps, fname_new)
+            os.system('ps2eps -B ' + fname_new)
+        else:
+            cand_eps = os.path.join(ofolder, 'candidates.eps')
+            fname_new = os.path.join(ofolder, src['name'].replace(' ', '_').replace('.','_') + '.eps')
+            os.rename(cand_eps, fname_new)
         os.chdir(this_path)
         cp_info = np.array(np.genfromtxt(os.path.join(ofolder, 'candidates_posix.txt'), dtype=float), ndmin=2)
         print cp_info
@@ -390,9 +392,13 @@ for src in src_dict:
             cp_ra = src['ra']
             cp_dec = src['dec']
         else:
-            cp_ra = cp_info[:,0][0]
-            cp_dec = cp_info[:,1][0]
-            print('Found Counterpart at ra {}, dec {}'.format(cp_ra, cp_dec))
+            try:
+                cp_ra = cp_info[:,0][0]
+                cp_dec = cp_info[:,1][0]
+                print('Found Counterpart at ra {}, dec {}'.format(cp_ra, cp_dec))
+            except Exception as inst:
+                cp_ra = src['ra']
+                cp_dec = src['dec']
     else:
         cp_ra = src['ra']
         cp_dec = src['dec']
@@ -494,7 +500,12 @@ while not final_pdf:
             try:
                 plot.make_lc_plot(job_dict[key]['lc'] + '_1GeV', args['mjd'])
             except Exception as inst:
-                warnings.warn("Couldn't create lightcurve for source {}".format(key))
+                warnings.warn("Couldn't create additional 1GeV lightcurve for source {}".format(key))
+                print(inst)
+            try:
+                make_gif(job_dict[key]['lc'])
+            except Exception as inst:
+                warnings.warn("Couldn't create an animated light curve {}".format(key))
                 print(inst)
             folders = [fold for fold in os.listdir(job_dict[key]['lc']) if
                        os.path.isdir(os.path.join(job_dict[key]['lc'],fold))]
@@ -518,7 +529,7 @@ while not final_pdf:
                     pass
     src_latex = ''
     for src in src_dict:
-        if src['dist'] > 1.5:
+        if src['dist'] > 2.0:
             print('Source exceeds distance of 1.5. No source summary')
             continue
         src_latex += source_summary(bpath, src, args['mjd'], mode=args['mode'])

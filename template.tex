@@ -10,16 +10,30 @@
 \usepackage{{subcaption}}
 \usepackage[outdir=./converted]{{epstopdf}}
 \usepackage[left=30mm, right=30mm, bottom=30mm]{{geometry}}
+\usepackage{{fancyhdr}}
+\fancypagestyle{{firstpage}}{{
+\renewcommand{{\headrulewidth}}{{0pt}}
+\fancyhead[L]{{
+\includegraphics[width=3cm]{{/scratch9/tglauch/realtime_service/main/asi_logo.jpg}}
+}}
+\fancyhead[R]{{
+\includegraphics[width=3cm]{{/scratch9/tglauch/realtime_service/main/ias_logo.jpg}}
+}}
+}}
 \title{{Dissecting the Region around \textit{{{event}}}}}
 
-\author[1,$\dagger$]{{Theo Glauch}}
+\author[1,3,$\dagger$]{{Theo Glauch}}
+\author[2,3]{{Paolo Giommi}}
 \affil[1]{{Technical University Munich, Garching, Germany}}
+\affil[2]{{Agenzia Spaziale Italiana, ASI, via del Politecnico s.n.c., I-00133 Roma Italy}}
+\affil[3]{{Institute for Advanced Studies, Technical University Munich, Garching, Germany}}
 \affil[$\dagger$]{{theo.glauch@tum.de}}
 \date{{\today}}
 
 \begin{{document}}
+\setlength{{\headheight}}{{80pt}}
 \maketitle
-
+\thispagestyle{{firstpage}}
 \begin{{abstract}}
 {prelim}On MJD {date:.2f} the IceCube Neutrino Observatory  has reported the detection of a highly-energetic neutrino,
 \textit{{{event}}}, with direction ra: {ra:.2f}$^\circ$, dec: {dec:.2f}$^\circ$ in equatorial and l: {l:.2f}$^\circ$, b:
@@ -47,32 +61,29 @@ features in flux and spectral shape around the neutrino arrival time. \\
 The gamma-ray analyses are based on the latest version of the FSSC Tools v11r5p3 and the fermipy package
 \cite{{fermipy}}. We use the the standart procedures as described in the \textit{{Fermi LAT}} Cicerone \cite{{fermi_ci}}. The
 dataset for the analysis contains events with photon energy above {emin} GeV in a time window between {mjd1:.1f} and {mjd2:.1f}.
-
+\newpage
+\setlength{{\headheight}}{{0mm}}
+\thispagestyle{{plain}}
 \subsection{{Catalog Sources in the Region around {event}}}
 The following list gives a quick overview about the catalog blazars in the region. Sources are sorted by their angular distance to the neutrino direction.
 \\ \\
 {cat_srcs}
 
-\clearpage
-
-\subsection{{Full Multi-Wavelength Study of the Region}}
+\section{{Full Multi-Wavelength Study of the Region}}
+\subsection{{Description of the Analysis}}
 In this section we present a full multi-wavelength search for possible neutrino counterparts. Starting from 32
 multi-wavenlength catalogs the VOU-Blazar tool \cite{{voublazar}} uses the all the available radio, optical and X-ray
-data in order to
-identify blazar-like counterparts candidates. The full output of the tool can be found in the appendix.\\
+data in order to identify blazar-like counterparts candidates. The full output of the tool cand be found in the appendix.\\
+
 The analysis pipeline consists of two parts: 1) The radio and x-ray data, as well as the resulting counterpart candidates are shown
 and compared to the \textit{{Fermi LAT}} gamma-ray emission in the region around the neutrino alert 2) For all known blazars with a angular distance of less
 than 1.5 degrees a multi-wavelength SED is constructed, including also a gamma-ray analysis that is started at the time of the
-neutrino alert. For each source we also calculated a fixed-binning light curve. For all sources that have a previously
-measured gamma-ray flux the bin-size is chosen in a way that each time bin has a ~5 sigma detection for the case of
-steady emission. For all sources with unkown gamma-ray emission we choose a generic time windows of 200 days. The choice of this
-time window is motivated a) by the expected faitness of the sources and b) the possible interested in time-dependent
-neutrino follow-ups with IceCube. In the latter case, even for a realtively large neutrino flux, IceCube would need O(100 days) of
-integration time in order to measure a reasonably significant signal.
+neutrino alert. For each source we also calculated a fixed-binning light curve. For details about the analysis see the
+appendix. \\
 
-\subsubsection{{Detailed description of the multi-wavelength SED}}
+\subsection{{The Multi-Wavelength SED}}
 \label{{sec:sed}}
-The multi-wavelength SED collects and visualizes all the available multi-wavelength data, as well as the result of the
+The multi-wavelength SED collects and visualizes all the publicly available multi-wavelength data, as well as the result of the
 gamma-ray analysis. The time evolution of the source is decoded in a color gradient from grey (old) to red (recent).
 Here the grey SEDs point and bowties represent the \textit{{Fermi-LAT}} gamma-ray spectrum integrated over the entire
 mission while the black SED points show the gamma-ray spectrum in a time window around the
@@ -92,10 +103,10 @@ thresholds if the significance of the measurement is above 3 $\sigma$. The green
 \end{{subfigure}}
  \caption{{Left Plot: Radio and X-ray sources within 120 arc-minutes of the position of the neutrino event. Symbol
 diameters are proportional to source intensity. Radio sources appear as red filled circles, X-ray sources as open blue
-circles  Right Plot: Counterpart candidates in a 120 arc-minutes radius around the event direction. Dark blue circles represent LBL type candidates, that is sources with flux ratio in the range observed in the sample of LBL blazars of
+circles and gamma-ray sources as open triangles. Right Plot: Counterpart candidates in a 120 arc-minutes radius around the event direction. Dark blue circles represent LBL type candidates, that is sources with flux ratio in the range observed in the sample of LBL blazars of
 the latest edition of the BZCAT catalogue \cite{{Massaro:2015nia}}, cyan symbols are for IBL type candidates, and orange symbols are for
 HBL candidates. Known blazars are marked by a red diamond if they are included in the BZCAT catalogue or a star if
-they are part of the 2WHSP sample. The shaded area marks a circle of 90 arcmis around the events-best fit direction. }}
+they are part of the 2WHSP sample. The shaded area marks a circle of 90 arcmis around the events-best fit direction.}}
 \end{{figure}}
 
 
@@ -109,19 +120,89 @@ they are part of the 2WHSP sample. The shaded area marks a circle of 90 arcmis a
 \centering
   \includegraphics[height=7cm]{{{ts_map}}}
 \end{{subfigure}}
-\caption{{Left: The TS map of the region for a time window of 200 days (MJD {tsmjd1:.1f}, {tsmjd2:.1f}) around the
-neutrino arrival time. Right: The TS map of
-the region for the entire Fermi LAT mission (MJD {mjd1:.1f} to {mjd2:.1f}). Both plots are done for energies above
-{tsemin} GeV. The analysis model includes all known sources from the 3FGL catalog in a region of 8 degrees around the
-center. The blue circle indicates a radius of 90 arcmin around the the event best-fit direction. }}
+\caption{{Left: The residual test-statistic map of the region for a time window of 200 days (MJD {tsmjd1:.1f}, {tsmjd2:.1f}) around the
+neutrino arrival time. Right: The redsidual test-statistic map of
+the region for the entire \textit{{Fermi-LAT}} mission (MJD {mjd1:.1f} to {mjd2:.1f}). Both plots are done for energies above
+{tsemin} GeV and shown after substracting known sources from the 4FGL catalog. That being said, the map can be used to
+identify additional, yet, unkown gamma-ray emitters, that coincide with the multi-wavlength candidates. The blue circle indicates the 90\% error contouor from the neutrino alert. }}
 \end{{figure}}
 
 \clearpage
 \section{{SEDs and Light Curves}}
+\label{{source_sum}}
 {src_latex}
 
 \clearpage
 \section{{Appendix}}
+\subsection{{Analyis Details - Light Curve}}
+\subsubsection{{Ligh Curve Binning}}
+Since we want to avoid running an extremly time consuming adaptive binning algorithm for all sources we try to estimate
+reasonable time windows for each
+source based on the following criteria:
+\begin{{itemize}}
+\item a) If possible we want to have a significant detection in each time bin
+\item b) IceCube needs on an order of $\mathcal{{O}}$(100 days) integration time to detect a significant neutrino singal in a
+point-source analysis
+\item c) following from b) we don't care too much about extremly short time-windows, since they are experimental hard to
+access
+\item d) unkown gamma-ray emitters are not expected to have a large time-integrated signal, but can still have gamma-ray
+outburst/flares
+\end{{itemize}}
+As a result of this we adapt the following procedure:
+\begin{{itemize}}
+\item For unkown gamma-ray emitters we built a light curve with time windows of 100 days, starting from the time of the
+neutrino alert. In case of subsequent measurements close to the detection threshold, an adaptive binning light curve can
+be run as a follow-up
+\item For known gamma-ray emitters, i.e. sources listed in the 4FGL catalog, we calculate the time window need for a
+$5\sigma$ ($3 \sigma$) detection assuming a constant emission. This value is then used as time window, with the only
+limitation that we limit it to maximal 200 days in order to avoid missing interesting fluctuations around the neutrino
+arrival time.
+\end{{itemize}}
+The calculation of the time-windows for known-gamma ray emitters is based on the asymptotic behaviour of counting
+experiments combined with the information given in the 4FGL catalog. For a counting experiments with $\chi^{{2}}$
+background test-statistic distribution in the asymptotic limit the median test statistic value of a signal behaves as
+\cite{{Cowan:2010js}}
+\begin{{equation}}
+\mathcal{{TS}} = 2 \times\left[(s+b)\ln\left(1+\frac{{s}}{{b}}\right)-s\right].
+\end{{equation}}
+As Fermi-LAT has only limited background we consider this equation in the limit of $s>>b>>1$ and $s+b \rightarrow
+\infty$, hence we can simplify to
+\begin{{equation}}
+\mathcal{{TS}} \rightarrow 2\times s\,\left [\ln\left(\frac{{s}}{{b}}\right)\right]
+\end{{equation}}
+rewriting $s = s_0t$ and $b=b_0t$ we finally get
+\begin{{equation}}
+\mathcal{{TS}} \rightarrow 2\times s_0t\, \left[\ln\left(\frac{{s_0}}{{b_0}}\right)\right]
+\label{{eq:final}}
+\end{{equation}}
+which scales linearly in time. The 4FGL catalog provides the 8 year time-integrated test-statistic values for each
+source in 7
+energy bands. In order to calculate the total test-statistic value for our selection we sum up all the test-statistic
+values with energies larger than the minimimum (threshold) energy of this analysis. Finally we can calculate the
+integration time needed for $5\sigma$ ($\mathcal{{TS}} = 25$) and $3\sigma$ ($\mathcal{{TS}} = 9$) detection using
+equation \eqref{{eq:final}}
+\begin{{equation}}
+t(5\sigma) = \frac{{25}}{{\mathcal{{TS}}_{{8years}}}}\cdot 2920\,[\mathrm{{days}}]
+\end{{equation}}
+
+\subsection{{Analyis Details - SED}}
+The construction of the SED of the counterpart candiates is based on the \textit{{VOU-Blazars}} tool \cite{{voublazar}}.
+For a given source position it identifies all the corresponding measurements based on likelihood ratios test taking into
+account the specific point spread functions of the 32 respective experiments/catalogs taken into account in our
+analysis \footnote{{List of the 32 catalogs used in this
+analysis: SDS82 , 3HSP , Fermi8YR ,1BIGB, MST9Y, FIRST, SUMSS, WGACAT, IPC2E, ZWCLUSTERS,
+PSZ2, ABELL , SDSSWHL, CRATES, NVSS, SXPS, RASS, XMMSL, BMW , IPCSL, CHANDRA, MCXC,  5BZCat, SWXCS, PULSAR, F2PSR,
+3FHL, 3FGL, 3XMM, MAXI, FermiMEV, AGILE}}. This procedure works stable for multi-wavelength catalogs, as well as single band measurements except for
+gamma-ray catalogs where the point-spread function is comparably large. For the construction of the SED of Fermi-LAT
+counterparts the procedure is hence two-step. 1) We run a counterpart search in the given 95\% confidence region of the
+source position. In most cases there is only one (or no) possible multi-wavelength counterpart candidate, in all other cases we
+assume the strongest source to be the countepart. 2) We construct the SED using the location of the indentified
+counterpart. In all of these cases the skymap in the vicinity with all the possible multi-wavelength counterparts is
+additionally shown in the source summary in section \ref{{source_sum}}. Finally the IceCube point source sensitivity and
+discovery potential are taken from \cite{{psana}} and shown for reference.
+
+\clearpage
+\subsection{{Full VOU Output}}
 {vou_output}
 
 

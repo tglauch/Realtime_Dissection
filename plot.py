@@ -125,7 +125,10 @@ def make_sed_plot(seds_list, mw_data=None, dec = None):
         mw_idata = np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4))
         c = np.array(time2color(mw_idata[:,4], tmin=54500, tmax=59000))
         inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
-        ax.scatter(mw_idata[:,0][inds] * hz_to_gev, mw_idata[:,1][inds], c=c[inds], s=15)
+        yerr = (mw_idata[:,1][inds] - mw_idata[:,2][inds], mw_idata[:,3][inds] - mw_idata[:,1][inds])
+        ax.errorbar(mw_idata[:,0][inds] * hz_to_gev, mw_idata[:,1][inds],
+                    yerr=yerr, fmt='o', #color=c[inds],
+                    alpha=0.5, markersize=3,  linestyle='')
         y_vals.extend(mw_idata[:,1][inds])
     for i, sed_list in enumerate(seds_list):
         basepath = sed_list[0]
@@ -148,67 +151,66 @@ def make_sed_plot(seds_list, mw_data=None, dec = None):
         bowtie_fill = sed_list[3]
         bowtie_bool = sed_list[4]
         sed_bool = sed_list[5]
-        try:
+        if os.path.exists(os.path.join(basepath, 'sed.npy')) & \
+           os.path.exists(os.path.join(basepath, 'bowtie.npy')) & \
+           os.path.exists(os.path.join(basepath, 'llh.npy')): 
             sed = np.load(os.path.join(basepath, 'sed.npy'), allow_pickle=True)[()]
             bowtie = np.load(os.path.join(basepath, 'bowtie.npy'),allow_pickle=True)[()]
             llh = np.load(os.path.join(basepath, 'llh.npy'), allow_pickle=True)[()]
-        except Exception as inst:
-            warnings.warn('SED files not found')
-            continue
-        source = llh['config']['selection']['target']
-        ts = llh['sources'][source]['ts']
-        e2 = 10 ** (2 * bowtie['log_energies'])
-        energies = np.array(10 ** bowtie['log_energies'])/1e3
-        m = sed['ts'] < ul_ts_threshold
-        x = sed['e_ctr']/1e3
-        y = sed['e2dnde']*MeV_to_erg
-        yerr = sed['e2dnde_err']*MeV_to_erg
-        yerr_lo = sed['e2dnde_err_lo']*MeV_to_erg
-        yerr_hi = sed['e2dnde_err_hi']*MeV_to_erg
-        yul = sed['e2dnde_ul95']*MeV_to_erg
-        delo = (sed['e_ctr'] - sed['e_min'])/1e3
-        dehi = (sed['e_max'] - sed['e_ctr'])/1e3
-        xerr0 = np.vstack((delo[m], dehi[m]))
-        xerr1 = np.vstack((delo[~m], dehi[~m]))
-        if ts > 9 and bowtie_bool:
-            ax.plot(energies,
-                    bowtie['dnde'] * e2 * MeV_to_erg, color=bowtie_col,
-                    zorder=10-i)
-            ax.plot(energies,
-                    bowtie['dnde_lo'] * e2 * MeV_to_erg, color=bowtie_col,
-                    linestyle='--', zorder=10-i)
-            ax.plot(energies,
-                    bowtie['dnde_hi'] * e2 * MeV_to_erg, color=bowtie_col,
-                    linestyle='--', zorder=10-i)
-            if bowtie_fill:
-                ax.fill_between(energies,
-                                bowtie['dnde_lo'] * e2 * MeV_to_erg,
-                                bowtie['dnde_hi'] * e2 * MeV_to_erg,
-                                alpha=0.5, color=bowtie_col, zorder=10-i)
-        if sed_bool:
-            ax.errorbar(x[~m], y[~m], xerr=xerr1,
-                        yerr=(yerr_lo[~m], yerr_hi[~m]),
-                        linestyle='', color=sed_col, fmt='o', zorder=100-i,
-                        markersize=3)
-            serr = 10**np.log10(yul[m]) - 10**(np.log10(yul[m])-0.1/8.*factor)
-            ax.errorbar(x[m], yul[m], xerr=xerr0,
-                        yerr=serr,  uplims=True,
-                        color=sed_col, fmt='o', zorder=100-i,
-                        markersize=3)
+            source = llh['config']['selection']['target']
+            ts = llh['sources'][source]['ts']
+            e2 = 10 ** (2 * bowtie['log_energies'])
+            energies = np.array(10 ** bowtie['log_energies'])/1e3
+            m = sed['ts'] < ul_ts_threshold
+            x = sed['e_ctr']/1e3
+            y = sed['e2dnde']*MeV_to_erg
+            yerr = sed['e2dnde_err']*MeV_to_erg
+            yerr_lo = sed['e2dnde_err_lo']*MeV_to_erg
+            yerr_hi = sed['e2dnde_err_hi']*MeV_to_erg
+            yul = sed['e2dnde_ul95']*MeV_to_erg
+            delo = (sed['e_ctr'] - sed['e_min'])/1e3
+            dehi = (sed['e_max'] - sed['e_ctr'])/1e3
+            xerr0 = np.vstack((delo[m], dehi[m]))
+            xerr1 = np.vstack((delo[~m], dehi[~m]))
+            if ts > 9 and bowtie_bool:
+                ax.plot(energies,
+                        bowtie['dnde'] * e2 * MeV_to_erg, color=bowtie_col,
+                        zorder=10-i)
+                ax.plot(energies,
+                        bowtie['dnde_lo'] * e2 * MeV_to_erg, color=bowtie_col,
+                        linestyle='--', zorder=10-i)
+                ax.plot(energies,
+                        bowtie['dnde_hi'] * e2 * MeV_to_erg, color=bowtie_col,
+                        linestyle='--', zorder=10-i)
+                if bowtie_fill:
+                    ax.fill_between(energies,
+                                    bowtie['dnde_lo'] * e2 * MeV_to_erg,
+                                    bowtie['dnde_hi'] * e2 * MeV_to_erg,
+                                    alpha=0.5, color=bowtie_col, zorder=10-i)
+            if sed_bool:
+                ax.errorbar(x[~m], y[~m], xerr=xerr1,
+                            yerr=(yerr_lo[~m], yerr_hi[~m]),
+                            linestyle='', color=sed_col, fmt='o', zorder=100-i,
+                            markersize=3)
+                serr = 10**np.log10(yul[m]) - 10**(np.log10(yul[m])-0.1/8.*factor)
+                ax.errorbar(x[m], yul[m], xerr=xerr0,
+                            yerr=serr,  uplims=True,
+                            color=sed_col, fmt='o', zorder=100-i,
+                            markersize=3)
 
 
-        tmin = llh['config']['selection']['tmin']
-        tmax = llh['config']['selection']['tmax']
-        if i == 0:
-            ax.text(0.2, 1.02, source,
-                    horizontalalignment='center',
-                    verticalalignment='center', transform=ax.transAxes)
-            ax.text(0.5, 1.02, 'TS: {:.1f}'.format(llh['sources'][source]['ts']),
-                    horizontalalignment='center',
-                    verticalalignment='center', transform=ax.transAxes)
-            ax.text(0.8, 1.02, 'MJD: {:.1f} - {:.1f}'.format(MET_to_MJD(tmin), MET_to_MJD(tmax)),
-                    horizontalalignment='center',
-                    verticalalignment='center', transform=ax.transAxes)
+            tmin = llh['config']['selection']['tmin']
+            tmax = llh['config']['selection']['tmax']
+            if i == 0:
+                ax.text(0.2, 1.02, source,
+                        horizontalalignment='center',
+                        verticalalignment='center', transform=ax.transAxes)
+                ax.text(0.5, 1.02, 'TS: {:.1f}'.format(llh['sources'][source]['ts']),
+                        horizontalalignment='center',
+                        verticalalignment='center', transform=ax.transAxes)
+                ax.text(0.8, 1.02, 'MJD: {:.1f} - {:.1f}'.format(MET_to_MJD(tmin), MET_to_MJD(tmax)),
+                        horizontalalignment='center',
+                        verticalalignment='center', transform=ax.transAxes)
     if dec is not None:
         IC_sens = np.genfromtxt('IC_sens.txt', delimiter=',')
         inter = scipy.interpolate.interp1d(IC_sens[:,0], IC_sens[:, 1])
@@ -313,6 +315,7 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
     print(cpath)
     if os.path.exists(cpath):
         cdata = np.genfromtxt(cpath, delimiter=',')
+        cdata = np.vstack([cdata,cdata[0]])
         ax.plot(cdata[:,0], cdata[:,1], linewidth=0.5, color='b')
     else:
         vertex = (inp[0].header['CRVAL1']*u.degree,inp[0].header['CRVAL2']*u.degree) #long, lat
