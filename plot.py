@@ -123,12 +123,7 @@ def make_sed_plot(seds_list, mw_data=None, dec = None):
     y_vals = []
     if mw_data is not None:
         mw_idata = np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4))
-        c = np.array(time2color(mw_idata[:,4], tmin=54500, tmax=59000))
         inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
-        yerr = (mw_idata[:,1][inds] - mw_idata[:,2][inds], mw_idata[:,3][inds] - mw_idata[:,1][inds])
-        ax.errorbar(mw_idata[:,0][inds] * hz_to_gev, mw_idata[:,1][inds],
-                    yerr=yerr, fmt='o', #color=c[inds],
-                    alpha=0.5, markersize=3,  linestyle='')
         y_vals.extend(mw_idata[:,1][inds])
     for i, sed_list in enumerate(seds_list):
         basepath = sed_list[0]
@@ -144,6 +139,23 @@ def make_sed_plot(seds_list, mw_data=None, dec = None):
         factor = 1.
     else:
         factor = np.log10(np.max(y_vals)) - np.log10(np.min(y_vals))
+    if mw_data is not None:
+        mw_idata = np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4))
+        c = np.array(time2color(mw_idata[:,4], tmin=54500, tmax=59000))
+        ulim_mask = (mw_idata[:,2] == mw_idata[:,3])
+        inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
+        yerr = (mw_idata[:,1][inds & ~ulim_mask] - mw_idata[:,2][inds & ~ulim_mask],
+                mw_idata[:,3][inds & ~ulim_mask] - mw_idata[:,1][inds & ~ulim_mask])
+        ax.errorbar(mw_idata[:,0][inds & ~ulim_mask] * hz_to_gev, mw_idata[:,1][inds & ~ulim_mask],
+                    yerr=yerr, fmt='o', color='grey',#color=c[inds],
+                    alpha=0.5, markersize=3,  linestyle='')
+
+        yerr = 10**np.log10(mw_idata[:,1][inds & ulim_mask]) - 10**(np.log10(mw_idata[:,1][inds & ulim_mask])-0.1/8.*factor) 
+        ax.errorbar(mw_idata[:,0][inds & ulim_mask] * hz_to_gev, mw_idata[:,1][inds & ulim_mask],
+                    yerr=yerr, fmt='o', uplims=True, color='grey',
+                    alpha=0.5, markersize=3,  linestyle='')
+        y_vals.extend(mw_idata[:,1][inds])
+ 
     for i, sed_list in enumerate(seds_list):
         basepath = sed_list[0]
         sed_col = sed_list[1]

@@ -92,6 +92,10 @@ def parseArguments():
         "--basepath",
         help = 'basepath for the output',
         type=str, default = '/scratch9/tglauch/realtime_service/output/')
+    parser.add_argument(
+        "--max_dist",
+        help = 'maximum distance for the fermi analysis',
+        type=float, default=1.5) 
     args = parser.parse_args()
     return args.__dict__
 
@@ -344,8 +348,8 @@ job_dict = {}
 for src in src_dict:
     bpath_src = src_path(bpath, src['name'])
     print('{} is at a distance {}'.format(src['name'], src['dist']))
-    if src['dist'] > 2.0:
-        print('Source exceeds distance of 1.5. No job will be submitted')
+    if src['dist'] > args['max_dist']:
+        print('Source exceeds distance of {} deg. No job will be submitted'.format(args['max_dist']))
         continue
     if os.path.exists(bpath_src) and (not args['recovery']) and (not args['make_pdf']):
         print('Remove Path: {}'.format(bpath_src))
@@ -529,8 +533,8 @@ while not final_pdf:
                     pass
     src_latex = ''
     for src in src_dict:
-        if src['dist'] > 2.0:
-            print('Source exceeds distance of 1.5. No source summary')
+        if src['dist'] > args['max_dist']:
+            print('Source exceeds distance of {} deg. No summary information will be added'.format(args['max_dist']))
             continue
         src_latex += source_summary(bpath, src, args['mjd'], mode=args['mode'])
     with open(os.path.join(bpath, 'vou_blazar/full_output'), 'r') as f:

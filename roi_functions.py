@@ -186,14 +186,16 @@ def make_gif(basepath):
     images = []
     filenames = sorted([os.path.join(basepath, i, 'sed.pdf') for i in os.listdir(basepath) if
                         os.path.isdir(os.path.join(basepath, i))])
+    opath = os.path.join(basepath,'movie.gif')
+    if os.path.exists(opath):
+        os.remove(opath)
     for filename in filenames:
         if not os.path.exists(filename):
             continue
-        if not os.path.exists(filename.replace('.pdf', '.png')):
-            os.system('convert -density 150 {} -quality 90 {}'.format(filename, filename.replace('.pdf', '.png')))
+        os.system('convert -density 150 {} -quality 90 {}'.format(filename, filename.replace('.pdf', '.png')))
         images.append(imageio.imread(filename.replace('.pdf', '.png')))
     if len(images)>0:
-        imageio.mimsave(os.path.join(basepath,'movie.gif'), images)
+        imageio.mimsave(opath, images)
     return
 
 
