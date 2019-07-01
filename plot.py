@@ -14,6 +14,7 @@ from astropy.visualization.wcsaxes import SphericalCircle
 import astropy.units as u
 from collections import OrderedDict
 import scipy.interpolate
+from astropy.wcs import WCS
 ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'])
 re_cmap = LinearSegmentedColormap.from_list('mycmap2', ['#67a9cf', '#f7f7f7', '#ef8a62'])
 mw_map= LinearSegmentedColormap.from_list('mycmap3', ['#bdbdbd','#939393' ,'red'])
@@ -51,7 +52,6 @@ def make_lc_plot(basepath, mjd, **kwargs):
         if os.path.exists(path):
             inp = np.load(path, allow_pickle=True)[()]
             source = inp['config']['selection']['target']
-            print(source)
             flux_dict = inp['sources'][source]
         else:
             continue
@@ -123,8 +123,9 @@ def make_sed_plot(seds_list, mw_data=None, dec = None):
     y_vals = []
     if mw_data is not None:
         mw_idata = np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4))
-        inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
-        y_vals.extend(mw_idata[:,1][inds])
+        if len(mw_idata) > 0:
+            inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
+            y_vals.extend(mw_idata[:,1][inds])
     for i, sed_list in enumerate(seds_list):
         basepath = sed_list[0]
         if os.path.exists(os.path.join(basepath, 'sed.npy')):
@@ -133,29 +134,28 @@ def make_sed_plot(seds_list, mw_data=None, dec = None):
             continue
         y_vals.extend(sed['e2dnde'])
         y_vals.extend(sed['e2dnde_ul95'])
-    print np.min(y_vals)
-    print np.max(y_vals)
     if len(y_vals) ==0:
         factor = 1.
     else:
         factor = np.log10(np.max(y_vals)) - np.log10(np.min(y_vals))
     if mw_data is not None:
         mw_idata = np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4))
-        c = np.array(time2color(mw_idata[:,4], tmin=54500, tmax=59000))
-        ulim_mask = (mw_idata[:,2] == mw_idata[:,3])
-        inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
-        yerr = (mw_idata[:,1][inds & ~ulim_mask] - mw_idata[:,2][inds & ~ulim_mask],
-                mw_idata[:,3][inds & ~ulim_mask] - mw_idata[:,1][inds & ~ulim_mask])
-        ax.errorbar(mw_idata[:,0][inds & ~ulim_mask] * hz_to_gev, mw_idata[:,1][inds & ~ulim_mask],
-                    yerr=yerr, fmt='o', color='grey',#color=c[inds],
-                    alpha=0.5, markersize=3,  linestyle='')
+        if len(mw_idata) > 0:
+            c = np.array(time2color(mw_idata[:,4], tmin=54500, tmax=59000))
+            ulim_mask = (mw_idata[:,2] == mw_idata[:,3])
+            inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
+            yerr = (mw_idata[:,1][inds & ~ulim_mask] - mw_idata[:,2][inds & ~ulim_mask],
+                    mw_idata[:,3][inds & ~ulim_mask] - mw_idata[:,1][inds & ~ulim_mask])
+            ax.errorbar(mw_idata[:,0][inds & ~ulim_mask] * hz_to_gev, mw_idata[:,1][inds & ~ulim_mask],
+                        yerr=yerr, fmt='o', color='grey',#color=c[inds],
+                        alpha=0.5, markersize=3,  linestyle='')
 
-        yerr = 10**np.log10(mw_idata[:,1][inds & ulim_mask]) - 10**(np.log10(mw_idata[:,1][inds & ulim_mask])-0.1/8.*factor) 
-        ax.errorbar(mw_idata[:,0][inds & ulim_mask] * hz_to_gev, mw_idata[:,1][inds & ulim_mask],
-                    yerr=yerr, fmt='o', uplims=True, color='grey',
-                    alpha=0.5, markersize=3,  linestyle='')
-        y_vals.extend(mw_idata[:,1][inds])
- 
+            yerr = 10**np.log10(mw_idata[:,1][inds & ulim_mask]) - 10**(np.log10(mw_idata[:,1][inds & ulim_mask])-0.1/8.*factor) 
+            ax.errorbar(mw_idata[:,0][inds & ulim_mask] * hz_to_gev, mw_idata[:,1][inds & ulim_mask],
+                        yerr=yerr, fmt='o', uplims=True, color='grey',
+                        alpha=0.5, markersize=3,  linestyle='')
+            y_vals.extend(mw_idata[:,1][inds])
+     
     for i, sed_list in enumerate(seds_list):
         basepath = sed_list[0]
         sed_col = sed_list[1]
@@ -225,11 +225,11 @@ def make_sed_plot(seds_list, mw_data=None, dec = None):
                         verticalalignment='center', transform=ax.transAxes)
     if dec is not None:
         IC_sens = np.genfromtxt('IC_sens.txt', delimiter=',')
-        inter = scipy.interpolate.interp1d(IC_sens[:,0], IC_sens[:, 1])
+        inter = scipy.interpolate.UnivariateSpline(IC_sens[:,0], IC_sens[:,1], k=1,s=0)
         flux = inter(np.sin(np.radians(dec))) * MeV_to_erg * 1e6
         ax.plot([5e3, 1e6], [flux, flux], color='green', linestyle='--')
         IC_disc = np.genfromtxt('IC_disc.txt', delimiter=',')
-        inter = scipy.interpolate.interp1d(IC_disc[:,0], IC_disc[:, 1])
+        inter = scipy.interpolate.UnivariateSpline(IC_disc[:,0], IC_disc[:,1], k=1, s=0)
         flux = inter(np.sin(np.radians(dec))) * MeV_to_erg * 1e6
         ax.plot([5e3, 1e6], [flux, flux], color='green', linestyle='-')
     ax.set_ylim(0.8*np.min(y_vals),)
@@ -251,6 +251,12 @@ def make_edges(data_f):
     ybins = header['NAXIS2']
     return xmin, xmax, ymin, ymax, xbins, ybins
 
+def get_pix_pos(wcs, ra, dec):
+    pix = wcs.wcs_world2pix(np.array(zip(np.atleast_1d(ra), np.atleast_1d(dec))),
+                            1)
+    return pix[:,0], pix[:,1]
+
+
 
 def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True):
     markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7, 'H','d', 'v' ,'^', '<', '>', 1, 2, 3 ,8]
@@ -262,6 +268,7 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
         warnings.warn('Files for {} not found'.format(mode))
         print(inst)
         return
+    wcs = WCS(inp[2].header)
     srcs = np.load(srcs, allow_pickle=True)
     cand_pos = np.genfromtxt(vou_cand)
     cand = {'ra': cand_pos[:,0], 'dec': cand_pos[:,1]}
@@ -279,11 +286,27 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
   
     fig = plt.figure(figsize=figsize(0.4, 1.))
     plt.clf()
-    ax=fig.add_axes((.0, .0,0.7,.7))
-    xmin, xmax, ymin, ymax, xbins, ybins = make_edges(inp)
-    X=np.linspace(xmin, xmax, xbins)[::-1]
-    Y=np.linspace(ymin, ymax, ybins)
-    xs, ys = np.meshgrid(X,Y)
+    ax=fig.add_axes((.0, .0,0.7,.7), projection=wcs)
+    cpath = os.path.join(basepath, '../contour.txt')
+    print(cpath)
+    if os.path.exists(cpath):
+        cdata = np.genfromtxt(cpath, delimiter=',')
+        cdata = np.vstack([cdata,cdata[0]])
+    else:
+        vertex = (inp[0].header['CRVAL1']*u.degree,inp[0].header['CRVAL2']*u.degree) #long, lat
+        x =  SphericalCircle(vertex,1.5*u.degree) 
+        cdata = x.get_xy()
+        print('Use new circle')
+    pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
+    ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
+    lon = ax.coords[0]
+    lat = ax.coords[1]
+    lat.set_ticks_position('l')
+    lat.set_ticklabel_position('l')
+    lat.set_axislabel_position('l')
+    lon.set_ticks_position('bt')
+    lon.set_ticklabel_position('bt')
+    lon.set_axislabel_position('b') 
     if mode == 'tsmap':
         Z=pval_to_sigma(ts_to_pval(inp[2].data,1.))
         minmax = (0,8)
@@ -295,60 +318,44 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
         ticks = 2 
         cmap = re_cmap
 
-    cbar = ax.contourf(X,Y,Z,
-                       levels=np.linspace(minmax[0], minmax[1], 500),
+    cbar = ax.contourf(Z, levels=np.linspace(minmax[0], minmax[1], 500),
                        cmap=cmap)
     levels=np.array([2,3,4,5])
-    CS = ax.contour(X,Y,Z, levels=levels,
+    CS = ax.contour(Z, levels=levels,
                     colors='black', linewidths=(0.3,))
     ax.set_xlabel(r'R.A. (degrees)')
     if  yaxis:
         ax.set_ylabel(r'Dec. (degrees)')
     else:
         ax.set_yticklabels([])
-    plt.gca().invert_xaxis()
     bfpath = os.path.join(basepath, '../bf.txt')
     if os.path.exists(bfpath):
-        print(bfpath)
         bfdata = np.genfromtxt(bfpath, delimiter=',')
         bf_ra = bfdata[0]
         bf_dec = bfdata[1]
     else:
         bf_ra = inp[0].header['CRVAL1']
         bf_dec = inp[0].header['CRVAL2']
-    max_inds =np.squeeze(np.dstack(np.unravel_index(np.argsort(Z.ravel()), np.shape(Z))))[::-1]
-    for ind in max_inds:
-        if GreatCircleDistance(X[ind[0]], Y[ind[1]], bf_ra, bf_dec, unit='deg') < np.radians(1.5):
-            print('ra: {}, dec {}, sigma {}'.format(X[ind[0]], Y[ind[1]], Z[ind[0], ind[1]]))
-            break
-    ax.plot(bf_ra, bf_dec,
-             marker='o', color='blue', ms=3, fillstyle='none')
-    cpath = os.path.join(basepath, '../contour.txt')
-    print(cpath)
-    if os.path.exists(cpath):
-        cdata = np.genfromtxt(cpath, delimiter=',')
-        cdata = np.vstack([cdata,cdata[0]])
-        ax.plot(cdata[:,0], cdata[:,1], linewidth=0.5, color='b')
-    else:
-        vertex = (inp[0].header['CRVAL1']*u.degree,inp[0].header['CRVAL2']*u.degree) #long, lat
-        x =  SphericalCircle(vertex,1.5*u.degree) 
-        xy = x.get_xy()
-        print('Use new circle')
-        ax.plot(xy[:,0], xy[:,1], color='b', linewidth=0.5)
+    pix = get_pix_pos(wcs, bf_ra, bf_dec) 
+    ax.plot(pix[0], pix[1],
+            marker='o', color='blue',
+            ms=3, fillstyle='none')
+   
+
     for i, src in enumerate(srcs):
         if GreatCircleDistance(src['ra'], src['dec'], bf_ra, bf_dec, unit='deg') < np.radians(2.):
-            ax.plot(src['ra'], src['dec'],
+            pix = get_pix_pos(wcs, src['ra'], src['dec'])
+            ax.plot(pix[0], pix[1],
                     marker=markers[i],
                     linestyle = '',
                     label=src['name'],
                     color='k', ms=4) 
     if len(cand['ra'])>0:
-        ax.plot(cand['ra'], cand['dec'], color='#a8a8a8', ms=4, marker="8",
+        pix = get_pix_pos(wcs, cand['ra'], cand['dec'])
+        ax.plot(pix[0], pix[1], color='#a8a8a8', ms=4, marker="8",
                 linestyle = '', fillstyle='none', label='VOU Sources', mew=1)
-    ax.set_xlim(inp[0].header['CRVAL1']+ROI, inp[0].header['CRVAL1']-ROI)
-    ax.set_ylim(inp[0].header['CRVAL2']-ROI, inp[0].header['CRVAL2']+ROI)
 
-    ax2=fig.add_axes((.0, .73,0.7,.05))
+    ax2=fig.add_axes((.0, .80,0.7, 0.05))
     plt_cbar = fig.colorbar(cbar, orientation="horizontal", cax=ax2,
                             ticks=np.arange(minmax[0], minmax[1] , ticks))
     if mode == 'tsmap':
@@ -361,6 +368,7 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
     if legend:
         ax.legend(bbox_to_anchor=(1.1, 0.5), loc='center left', prop={'size': 9})
 
+    ax.grid(color='k', ls='--')
     plt.tight_layout()
     plt.savefig(os.path.join(basepath,'{}.png'.format(mode)),
                 bbox_inches='tight', dpi=300)
