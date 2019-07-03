@@ -15,6 +15,7 @@ import astropy.units as u
 from collections import OrderedDict
 import scipy.interpolate
 from astropy.wcs import WCS
+import yaml
 ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'])
 re_cmap = LinearSegmentedColormap.from_list('mycmap2', ['#67a9cf', '#f7f7f7', '#ef8a62'])
 mw_map= LinearSegmentedColormap.from_list('mycmap3', ['#bdbdbd','#939393' ,'red'])
@@ -39,6 +40,7 @@ def time2color(ts, tmin = -1, tmax = -1):
             col = ((t-tmin)/delta_t)
         c.append(mw_map(col))
     return c
+
 
 def make_lc_plot(basepath, mjd, **kwargs):
     lc_dict = dict()
@@ -90,12 +92,12 @@ def make_lc_plot(basepath, mjd, **kwargs):
 
     ## Spectral Index Axis
     ax2=fig.add_axes((.0, .6,1.,.4))
-    if '3FGL' in source:
-        if kwargs.get('3fgl_average', True):
-            catalog = fits.open('./gll_psc_v16.fit')
+    if '4FGL' in source:
+        if kwargs.get('4fgl_average', True):
+            catalog = fits.open('./gll_psc_v19.fit')
             names = catalog[1].data['Source_Name']
             ind = np.where(names == source)[0][0]
-            av_gamma = catalog[1].data[ind]['Spectral_Index']
+            av_gamma = catalog[1].data[ind]['PL_Index']
         else:
             av_gamma, _ = weighted_avg_and_std(lc_arr['gamma'],
                                                weights=1./lc_arr['dgamma'])
@@ -105,8 +107,9 @@ def make_lc_plot(basepath, mjd, **kwargs):
                  yerr=lc_arr['dgamma'][mask&gam_mask],
                  xerr=lc_arr['bin_len'][mask&gam_mask]/2., linestyle='')
     ax2.set_ylabel('Index', labelpad=5)
-    ax2.set_ylim(0.5,5)
+    ax2.set_ylim(0.0,6)
     ax2.set_xticks([])
+    ax2.set_yticks([2,4])
     ax2.axvline(mjd, color='#696969', linestyle='--')
     ax2.set_xlim(ax1.get_xlim()[0], ax1.get_xlim()[1])
     ax2.text(0.8, 1.1, source,
@@ -116,13 +119,14 @@ def make_lc_plot(basepath, mjd, **kwargs):
                 bbox_inches='tight')
     return
 
+
 def make_sed_plot(seds_list, mw_data=None, dec = None):
     fig, ax = newfig(0.9)
     ax.set_xscale('log')
     ax.set_yscale('log') 
     y_vals = []
     if mw_data is not None:
-        mw_idata = np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4))
+        mw_idata = np.atleast_2d(np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4)))
         if len(mw_idata) > 0:
             inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
             y_vals.extend(mw_idata[:,1][inds])
@@ -132,14 +136,15 @@ def make_sed_plot(seds_list, mw_data=None, dec = None):
             sed = np.load(os.path.join(basepath, 'sed.npy'), allow_pickle=True)[()]
         else:
             continue
-        y_vals.extend(sed['e2dnde'])
-        y_vals.extend(sed['e2dnde_ul95'])
+        m = sed['ts'] < ul_ts_threshold
+        y_vals.extend(sed['e2dnde'][~m])
+        y_vals.extend(sed['e2dnde_ul95'][m])
     if len(y_vals) ==0:
         factor = 1.
     else:
         factor = np.log10(np.max(y_vals)) - np.log10(np.min(y_vals))
     if mw_data is not None:
-        mw_idata = np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4))
+        mw_idata = np.atleast_2d(np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4)))
         if len(mw_idata) > 0:
             c = np.array(time2color(mw_idata[:,4], tmin=54500, tmax=59000))
             ulim_mask = (mw_idata[:,2] == mw_idata[:,3])
@@ -232,7 +237,7 @@ def make_sed_plot(seds_list, mw_data=None, dec = None):
         inter = scipy.interpolate.UnivariateSpline(IC_disc[:,0], IC_disc[:,1], k=1, s=0)
         flux = inter(np.sin(np.radians(dec))) * MeV_to_erg * 1e6
         ax.plot([5e3, 1e6], [flux, flux], color='green', linestyle='-')
-    ax.set_ylim(0.8*np.min(y_vals),)
+    ax.set_ylim(0.8*np.min(y_vals),np.min([1e-10, 1.2 * np.max(y_vals)]))
     ax.set_xlim(1e-15, 1e7)
     ax.set_xlabel('Energy [GeV]')
     ax.set_ylabel(r'$\nu f(\nu)$ [erg cm$^{-2}$ s$^{-1}$]')
@@ -240,6 +245,7 @@ def make_sed_plot(seds_list, mw_data=None, dec = None):
     spath = os.path.join(seds_list[0][0], 'sed.pdf')
     print('Save SED to {}'.format(spath))
     fig.savefig(spath, bbox_inches='tight')
+
 
 def make_edges(data_f):
     header = data_f[0].header
@@ -251,6 +257,7 @@ def make_edges(data_f):
     ybins = header['NAXIS2']
     return xmin, xmax, ymin, ymax, xbins, ybins
 
+
 def get_pix_pos(wcs, ra, dec):
     pix = wcs.wcs_world2pix(np.array(zip(np.atleast_1d(ra), np.atleast_1d(dec))),
                             1)
@@ -260,13 +267,20 @@ def get_pix_pos(wcs, ra, dec):
 
 def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True):
     markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7, 'H','d', 'v' ,'^', '<', '>', 1, 2, 3 ,8]
-    ROI = 150./60.
     fname = 'fit1_pointsource_powerlaw_2.00_{}.fits'.format(mode)
-    try:
-        inp = fits.open(os.path.join(basepath, fname))
-    except Exception as inst:
-        warnings.warn('Files for {} not found'.format(mode))
-        print(inst)
+    fits_path = os.path.join(basepath, fname)
+    if os.path.exists(fits_path):
+        inp = fits.open(fits_path)
+        try:
+            with open(os.path.join(basepath, 'config.yaml'), 'r') as f:
+                yml = yaml.safe_load(f)
+            binning = yml['binning']
+            delta_pix = (binning[ 'roiwidth']/binning['binsz'] - 6./binning['binsz']) / 2. ## Assume radius of 3 deg (total width 6 deg)
+        except Exception as inst:
+            delta_pix = 10 # random default value
+            print inst
+    else:
+        print('{} not yet ready'.format(fits_path))
         return
     wcs = WCS(inp[2].header)
     srcs = np.load(srcs, allow_pickle=True)
@@ -283,7 +297,28 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
         inds =  np.argsort(distances)[len(srcs['ra']):]
         cand['ra'] = cand['ra'][mask]
         cand['dec'] =cand['dec'][mask]
-  
+ 
+    if mode == 'tsmap':
+        hdu = inp[2]
+        Z=pval_to_sigma(ts_to_pval(hdu.data,1.))
+        minmax = (0,8)
+        ticks = 2
+        cmap = ts_cmap
+    elif mode == 'residmap':
+        hdu = inp[0]
+        Z=hdu.data
+        minmax = (-6, 6)
+        ticks = 2 
+        cmap = re_cmap
+
+    bfpath = os.path.join(basepath, '../bf.txt')
+    if os.path.exists(bfpath):
+        bfdata = np.genfromtxt(bfpath, delimiter=',')
+        bf_ra = bfdata[0]
+        bf_dec = bfdata[1]
+    else:
+        bf_ra = hdu.header['CRVAL1']
+        bf_dec = hdu.header['CRVAL2']
     fig = plt.figure(figsize=figsize(0.4, 1.))
     plt.clf()
     ax=fig.add_axes((.0, .0,0.7,.7), projection=wcs)
@@ -293,12 +328,24 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
         cdata = np.genfromtxt(cpath, delimiter=',')
         cdata = np.vstack([cdata,cdata[0]])
     else:
-        vertex = (inp[0].header['CRVAL1']*u.degree,inp[0].header['CRVAL2']*u.degree) #long, lat
+        vertex = (hdu.header['CRVAL1']*u.degree,hdu.header['CRVAL2']*u.degree) #long, lat
         x =  SphericalCircle(vertex,1.5*u.degree) 
         cdata = x.get_xy()
         print('Use new circle')
     pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
     ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
+    for i, src in enumerate(srcs):
+        if GreatCircleDistance(src['ra'], src['dec'], bf_ra, bf_dec, unit='deg') < np.radians(2.):
+            pix = get_pix_pos(wcs, src['ra'], src['dec'])
+            ax.plot(pix[0], pix[1],
+                    marker=markers[i],
+                    linestyle = '',
+                    label=src['name'],
+                    color='k', ms=4, zorder=3) 
+    if len(cand['ra'])>0:
+        pix = get_pix_pos(wcs, cand['ra'], cand['dec'])
+        ax.plot(pix[0], pix[1], color='#a8a8a8', ms=4, marker="8", zorder=1,
+                linestyle = '', fillstyle='none', label='VOU Sources', mew=1)
     lon = ax.coords[0]
     lat = ax.coords[1]
     lat.set_ticks_position('l')
@@ -306,18 +353,9 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
     lat.set_axislabel_position('l')
     lon.set_ticks_position('bt')
     lon.set_ticklabel_position('bt')
-    lon.set_axislabel_position('b') 
-    if mode == 'tsmap':
-        Z=pval_to_sigma(ts_to_pval(inp[2].data,1.))
-        minmax = (0,8)
-        ticks = 2
-        cmap = ts_cmap
-    elif mode == 'residmap':
-        Z=inp[0].data
-        minmax = (-6, 6)
-        ticks = 2 
-        cmap = re_cmap
-
+    lon.set_axislabel_position('b')
+    lon.set_major_formatter('d.d')
+    lat.set_major_formatter('d.d') 
     cbar = ax.contourf(Z, levels=np.linspace(minmax[0], minmax[1], 500),
                        cmap=cmap)
     levels=np.array([2,3,4,5])
@@ -328,33 +366,16 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
         ax.set_ylabel(r'Dec. (degrees)')
     else:
         ax.set_yticklabels([])
-    bfpath = os.path.join(basepath, '../bf.txt')
-    if os.path.exists(bfpath):
-        bfdata = np.genfromtxt(bfpath, delimiter=',')
-        bf_ra = bfdata[0]
-        bf_dec = bfdata[1]
-    else:
-        bf_ra = inp[0].header['CRVAL1']
-        bf_dec = inp[0].header['CRVAL2']
+
     pix = get_pix_pos(wcs, bf_ra, bf_dec) 
     ax.plot(pix[0], pix[1],
             marker='o', color='blue',
-            ms=3, fillstyle='none')
-   
-
-    for i, src in enumerate(srcs):
-        if GreatCircleDistance(src['ra'], src['dec'], bf_ra, bf_dec, unit='deg') < np.radians(2.):
-            pix = get_pix_pos(wcs, src['ra'], src['dec'])
-            ax.plot(pix[0], pix[1],
-                    marker=markers[i],
-                    linestyle = '',
-                    label=src['name'],
-                    color='k', ms=4) 
-    if len(cand['ra'])>0:
-        pix = get_pix_pos(wcs, cand['ra'], cand['dec'])
-        ax.plot(pix[0], pix[1], color='#a8a8a8', ms=4, marker="8",
-                linestyle = '', fillstyle='none', label='VOU Sources', mew=1)
-
+            ms=3, fillstyle='none', zorder=2)
+    
+    edge_bl = get_pix_pos(wcs,hdu.header['CRVAL1'] - 3. ,hdu.header['CRVAL2'] - 3.)
+    edge_tr = get_pix_pos(wcs,hdu.header['CRVAL1'] + 3. ,hdu.header['CRVAL2'] + 3.)
+    ax.set_xlim(delta_pix, hdu.data.shape[1] - delta_pix)
+    ax.set_ylim(delta_pix, hdu.data.shape[0] - delta_pix) 
     ax2=fig.add_axes((.0, .80,0.7, 0.05))
     plt_cbar = fig.colorbar(cbar, orientation="horizontal", cax=ax2,
                             ticks=np.arange(minmax[0], minmax[1] , ticks))
@@ -385,7 +406,9 @@ def get_index_err(flux_dict):
         return flux_dict['spectral_pars']['Index']['error']
     if flux_dict['SpectrumType']=='LogParabola':
         print flux_dict['spectral_pars']
-        return flux_dict['spectral_pars']['alpha']['error'] 
+        return flux_dict['spectral_pars']['alpha']['error']
+
+ 
 def weighted_avg_and_std(values, weights):
     """
     Return the weighted average and standard deviation.

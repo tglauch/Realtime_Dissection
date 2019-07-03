@@ -171,54 +171,78 @@ def source_summary(bpath, src, mjd, mode='mid'):
     return l_str
 
 
-def submit_fit(args, opath, src_arr=None, trange='', sub_file='fermi.sub',  ana_type='SED', partition='kta', **kwargs):
-    if kwargs.get('make_pdf'):
-        return    
-    if trange != '':
-        args += ' --time_range {} {} '.format(trange[0], trange[1])
-    if not os.path.exists(opath):
-        os.makedirs(opath)
-    args += ' --outfolder {} '.format(opath)
-    odtype = np.dtype([('name', np.unicode, 32), ('ra', np.float32), ('dec', np.float32)])
-    if src_arr is not None:
-        if isinstance(src_arr, dict):
-            src_arr=dict_to_nparray(src_arr, dtype=odtype)
-        src_arr = np.atleast_1d(src_arr)
+#def submit_fit(args, opath, src_arr=None, trange='', sub_file='fermi.sub',  ana_type='SED', partition='kta', **kwargs):
+#    if kwargs.get('make_pdf'):
+#        return    
+#    if trange != '':
+#        args += ' --time_range {} {} '.format(trange[0], trange[1])
+#    if not os.path.exists(opath):
+#        os.makedirs(opath)
+#    args += ' --outfolder {} '.format(opath)
+#    odtype = np.dtype([('name', np.unicode, 32), ('ra', np.float32), ('dec', np.float32)])
+#    if src_arr is not None:
+#        if isinstance(src_arr, dict):
+#            src_arr=dict_to_nparray(src_arr, dtype=odtype)
+#        src_arr = np.atleast_1d(src_arr)
+#
+#        mask = np.array(['4FGL' not in sname for sname in src_arr['name']])
+#        if len(src_arr[mask])>0:
+#            xml_path = os.path.join(opath, 'add_source.xml')
+#            generate_src_xml(src_arr[mask], xml_path)
+#            args += '--xml_path {}'.format(xml_path)
+#    with open('./slurm_draft.xml', 'r') as f:
+#        submit = (f.read()).format(bpath=opath, args=args,
+#                                   ana_type=ana_type,
+#                                   time=partition_t[partition],
+#                                   partition=partition)
+#    submitfile = os.path.join(opath, sub_file)
+#    with open(submitfile, "w+") as file:
+#        file.write(submit)
+#    print('submit with args {}'.format(args))
+#    os.system("sbatch {}".format(submitfile))
+#    return opath
 
-        mask = np.array(['4FGL' not in sname for sname in src_arr['name']])
-        if len(src_arr[mask])>0:
-            xml_path = os.path.join(opath, 'add_source.xml')
-            generate_src_xml(src_arr[mask], xml_path)
-            args += '--xml_path {}'.format(xml_path)
-    with open('./slurm_draft.xml', 'r') as f:
-        submit = (f.read()).format(bpath=opath, args=args,
-                                   ana_type=ana_type,
-                                   time=partition_t[partition],
-                                   partition=partition)
-    submitfile = os.path.join(opath, sub_file)
-    with open(submitfile, "w+") as file:
-        file.write(submit)
-    print('submit with args {}'.format(args))
-    os.system("sbatch {}".format(submitfile))
-    return opath
 
+#def generate_src_xml(src_arr, xml_path):
+#    xml_str =\
+#'<?xml version="1.0" ?>\n\
+#<source_library title="source library">\n\
+#<!-- Point Sources -->\n'
+#    with open('./src_xml_draft.xml', 'r') as f:
+#        xml_temp = f.read()
+#    for src in src_arr:
+#        print('Generate Source {}'.format(src['name']))
+#        xml_str += xml_temp.format(ra=src['ra'], dec=src['dec'], name=src['name'])
+#        xml_str += '\n'
+#    xml_str+='</source_library>'
+#    with open(xml_path, 'w+') as f:
+#        f.write(xml_str)
+#    return
 
-def generate_src_xml(src_arr, xml_path):
-    xml_str =\
-'<?xml version="1.0" ?>\n\
-<source_library title="source library">\n\
-<!-- Point Sources -->\n'
-    with open('./src_xml_draft.xml', 'r') as f:
-        xml_temp = f.read()
-    for src in src_arr:
-        print('Generate Source {}'.format(src['name']))
-        xml_str += xml_temp.format(ra=src['ra'], dec=src['dec'], name=src['name'])
-        xml_str += '\n'
-    xml_str+='</source_library>'
-    with open(xml_path, 'w+') as f:
-        f.write(xml_str)
+def make_fixed_binning_lc(src, sub_args,  dt_lc, mjd_range, opath,
+                          sub_file='lc.sub', mjd_mid=None, mode='end', **args):
+    if args['mode'] == 'end':
+        time_windows = [[k - dt_lc, k] for k in
+                         np.abs(np.arange(-mjd_range[1], -mjd_range[0], dt_lc))]
+    elif args['mode'] == 'mid':
+        time_windows = [[k - dt_lc, k] for k in
+                         np.abs(np.arange(mjd_mid + 3 * dt_lc / 2, mjd_range[1], dt_lc))]
+        time_windows2 = [[k - dt_lc, k] for k in
+                         np.abs(np.arange(-mjd_mid - dt_lc / 2, -mjd_range[0], dt_lc))]
+        time_windows.extend(time_windows2)
+
+    if (time_windows[-1][1] - mjd_range[0]) < dt_lc:
+        del time_windows[-1]
+    time_windows.append('')
+
+    for t_window in time_windows:
+        if t_window == '':
+            partition='long'
+        else:
+            add_str = '{:.1f}_{:.1f}'.format(t_window[0], t_window[1])
+            partition='kta'
+        submit_fit(sub_args, opath, src, sub_file=sub_file, trange=t_window, partition=partition, **args)
     return
-
 
 def src_path(bpath, src):
     return os.path.join(bpath, src.replace(' ', '_'))
@@ -258,7 +282,8 @@ if not rec and not make_pdf:
     os.chdir(vou_out)
     cmd = [vou_path,
            str(args['ra']), str(args['dec']), args['radius'], str(30), str(90)]
-    subprocess.call(cmd)
+    for i in range(2):
+        subprocess.call(cmd)
 
     # Setup Variables
     src_dict, out_str = get_sources(args['ra'], args['dec'])
@@ -344,6 +369,8 @@ srcprob_path = os.path.join(bpath, 'srcprob')
 submit_fit(sargs, srcprob_path, src_dict,sub_file=ev_str+'.sub', ana_type='srcprob', partition='xtralong', **args)
 
 print('Submit_SEDs')
+if 'max_dist' not in args.keys():
+    args['max_dist'] = 1.5
 job_dict = {}
 for src in src_dict:
     bpath_src = src_path(bpath, src['name'])
@@ -378,8 +405,9 @@ for src in src_dict:
             shutil.rmtree(ofolder)
         os.makedirs(ofolder)
         os.chdir(ofolder)
-        os.system('{vou_path} {ra} {dec} {loc_str}'.format(vou_path=vou_path, ra=src['ra'],
-                                                           dec=src['dec'],loc_str=loc_str))
+        for i in range(2):
+            os.system('{vou_path} {ra} {dec} {loc_str}'.format(vou_path=vou_path, ra=src['ra'],
+                                                               dec=src['dec'],loc_str=loc_str))
         if not os.path.exists('candidates.eps'):
             fname_new = os.path.join(ofolder, src['name'].replace(' ', '_').replace('.','_') + '.ps') 
             cand_ps = os.path.join(ofolder, 'candidates.ps')
@@ -406,8 +434,9 @@ for src in src_dict:
     else:
         cp_ra = src['ra']
         cp_dec = src['dec']
-    os.system('{vou_path} {ra} {dec} {loc_str} -s ; cat Sed.txt > {bpath}'.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec, 
-                                                                                  bpath=os.path.join(bpath_src,'sed.txt'), loc_str=2))
+    for i in range(2):
+        os.system('{vou_path} {ra} {dec} {loc_str} -s ; cat Sed.txt > {bpath}'.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec, 
+                                                                                      bpath=os.path.join(bpath_src,'sed.txt'), loc_str=2))
     print('Saved SED to {}'.format(os.path.join(bpath_src, 'sed.txt')))
     if make_pdf:
         continue

@@ -192,10 +192,13 @@ def make_gif(basepath):
     for filename in filenames:
         if not os.path.exists(filename):
             continue
-        os.system('convert -density 150 {} -quality 90 {}'.format(filename, filename.replace('.pdf', '.png')))
+        filename_png = filename.replace('.pdf', '.png')
+        if os.path.exists(filename_png):
+            os.remove(filename_png)
+        os.system('convert -density 150 {} -quality 90 {}'.format(filename, filename_png))
         images.append(imageio.imread(filename.replace('.pdf', '.png')))
     if len(images)>0:
-        imageio.mimsave(opath, images)
+        imageio.mimsave(opath, images, duration=0.75)
     return
 
 
