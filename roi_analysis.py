@@ -14,7 +14,7 @@ import shutil
 import datetime
 from slack_lib import print_to_slack
 import numpy as np
-from myfunctions import MET_to_MJD, dict_to_nparray, ts_to_pval
+from myfunctions import MET_to_MJD, dict_to_nparray, ts_to_pval, pval_to_sigma
 import plot
 import warnings
 import re
@@ -23,7 +23,7 @@ from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 from collections import OrderedDict
-
+from scipy.interpolate import interp1d
 
 
 def parseArguments():
@@ -99,6 +99,11 @@ def parseArguments():
     args = parser.parse_args()
     return args.__dict__
 
+def get_68_psf(E):
+    x = np.genfromtxt('./lat_68_psf.txt', delimiter = ',')
+    return interp1d(x[:,0], x[:,1])(E)
+
+
 
 def source_summary(bpath, src, mjd, mode='mid'):
     bpath_src = src_path(bpath, src['name'])
@@ -115,15 +120,17 @@ def source_summary(bpath, src, mjd, mode='mid'):
             if (mjd <= float(fold.split('_')[1])) and (mjd > float(fold.split('_')[0])):
                 sed_path = os.path.join(lc_base,fold)
                 break
+    sed_full_res = np.load(os.path.join(bpath_src, path_settings['sed'], 'llh.npy'), allow_pickle=True)[()]
+    ts = sed_full_res['sources'][src['name']]['ts']
+    sigma = np.max([0, pval_to_sigma(ts_to_pval(ts, 1))])
     l_str ='\subsection{{{srcinfo}}}'
     if os.path.exists(os.path.join(sed_path, 'llh.npy')):
         fit_res = np.load(os.path.join(sed_path, 'llh.npy'), allow_pickle=True)[()]
-        ts = fit_res['sources'][src['name']]['ts']
         ra = fit_res['sources'][src['name']]['RAJ2000']
         dec = fit_res['sources'][src['name']]['DEJ2000']
         t_str = '{src_name} $|$ \\small\\textnormal{{{src_info}}}'
-        t_str_info = 'ra = {ra:.2f}$^\circ$, dec = {dec:.2f}$^\circ$, p-val = {ts:.2e}, $\Delta\psi$ = {dist:.2f}$^\circ$'
-        t_str_info = t_str_info.format(ts=ts_to_pval(ts,1), ra=ra, dec=dec, dist=src['dist'])
+        t_str_info = 'ra = {ra:.2f}$^\circ$, dec = {dec:.2f}$^\circ$, $\Sigma$= {sigma:.1f} $\sigma$, $\Delta\psi$ = {dist:.2f}$^\circ$'
+        t_str_info = t_str_info.format(sigma=sigma, ra=ra, dec=dec, dist=src['dist'])
         t_str = t_str.format(src_name = src['name'], src_info=t_str_info)
         l_str = l_str.format(srcinfo=t_str) # srcname=src['name'], srcinfo=t_str)
     else:
@@ -169,55 +176,6 @@ def source_summary(bpath, src, mjd, mode='mid'):
             l_str += fig_str.format(width = 0.7, path = cp_candidate_path, caption='Possible couterparts for {}'.format(src['name']))
     l_str += '\\clearpage \n'
     return l_str
-
-
-#def submit_fit(args, opath, src_arr=None, trange='', sub_file='fermi.sub',  ana_type='SED', partition='kta', **kwargs):
-#    if kwargs.get('make_pdf'):
-#        return    
-#    if trange != '':
-#        args += ' --time_range {} {} '.format(trange[0], trange[1])
-#    if not os.path.exists(opath):
-#        os.makedirs(opath)
-#    args += ' --outfolder {} '.format(opath)
-#    odtype = np.dtype([('name', np.unicode, 32), ('ra', np.float32), ('dec', np.float32)])
-#    if src_arr is not None:
-#        if isinstance(src_arr, dict):
-#            src_arr=dict_to_nparray(src_arr, dtype=odtype)
-#        src_arr = np.atleast_1d(src_arr)
-#
-#        mask = np.array(['4FGL' not in sname for sname in src_arr['name']])
-#        if len(src_arr[mask])>0:
-#            xml_path = os.path.join(opath, 'add_source.xml')
-#            generate_src_xml(src_arr[mask], xml_path)
-#            args += '--xml_path {}'.format(xml_path)
-#    with open('./slurm_draft.xml', 'r') as f:
-#        submit = (f.read()).format(bpath=opath, args=args,
-#                                   ana_type=ana_type,
-#                                   time=partition_t[partition],
-#                                   partition=partition)
-#    submitfile = os.path.join(opath, sub_file)
-#    with open(submitfile, "w+") as file:
-#        file.write(submit)
-#    print('submit with args {}'.format(args))
-#    os.system("sbatch {}".format(submitfile))
-#    return opath
-
-
-#def generate_src_xml(src_arr, xml_path):
-#    xml_str =\
-#'<?xml version="1.0" ?>\n\
-#<source_library title="source library">\n\
-#<!-- Point Sources -->\n'
-#    with open('./src_xml_draft.xml', 'r') as f:
-#        xml_temp = f.read()
-#    for src in src_arr:
-#        print('Generate Source {}'.format(src['name']))
-#        xml_str += xml_temp.format(ra=src['ra'], dec=src['dec'], name=src['name'])
-#        xml_str += '\n'
-#    xml_str+='</source_library>'
-#    with open(xml_path, 'w+') as f:
-#        f.write(xml_str)
-#    return
 
 def make_fixed_binning_lc(src, sub_args,  dt_lc, mjd_range, opath,
                           sub_file='lc.sub', mjd_mid=None, mode='end', **args):
@@ -344,12 +302,12 @@ if not make_pdf:
 
 #TS maps
 ts_emin = np.max([1000, args['emin']])
-sargs = ' --free_radius 2 --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
-sargs = sargs.format(fermi_data, ts_emin, args['ra'], args['dec'])
+sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
+sargs = sargs.format(get_68_psf(ts_emin), fermi_data, ts_emin, args['ra'], args['dec'])
 ts_map_path = os.path.join(bpath, 'ts_map')
 submit_fit(sargs, ts_map_path, sub_file=ev_str+'.sub', ana_type='TS_Map', partition='xtralong', **args)
 
-sargs = ' --free_radius 2 --data_path {} --use_4FGL --emin {} --ra {} --dec {} --time_range {} {}'
+sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {} --time_range {} {}'
 if args['mode'] == 'end':
     tsmjd1 = args['mjd']-200
     tsmjd2 = args['mjd']
@@ -357,14 +315,14 @@ if args['mode'] == 'end':
 else:
     tsmjd1 = args['mjd']-100
     tsmjd2 = args['mjd']+100
-sargs = sargs.format(fermi_data, ts_emin, args['ra'], args['dec'],
+sargs = sargs.format(get_68_psf(ts_emin), fermi_data, ts_emin, args['ra'], args['dec'],
                      tsmjd1, tsmjd2)
 ts_map_short_path = os.path.join(bpath, 'ts_map_short')
 submit_fit(sargs, ts_map_short_path, sub_file=ev_str+'.sub', ana_type='TS_Map', partition='xtralong', **args)
 
 #getsrcprob
-sargs = ' --free_radius 2 --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
-sargs = sargs.format(fermi_data, 5000, args['ra'], args['dec'])
+sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
+sargs = sargs.format(get_68_psf(5000),fermi_data, 5000, args['ra'], args['dec'])
 srcprob_path = os.path.join(bpath, 'srcprob')
 submit_fit(sargs, srcprob_path, src_dict,sub_file=ev_str+'.sub', ana_type='srcprob', partition='xtralong', **args)
 
@@ -440,9 +398,9 @@ for src in src_dict:
     print('Saved SED to {}'.format(os.path.join(bpath_src, 'sed.txt')))
     if make_pdf:
         continue
-    sargs = '--target_src {} --free_radius 2 --data_path {} --use_4FGL --emin {} '
-    sub_args = sargs.format(src['name'].replace(' ', '_'), fermi_data, args['emin'])
-    tsub_args = sargs.format(src['name'].replace(' ', '_'), fermi_data, 1e3)
+    sargs = '--target_src {} --free_radius {} --data_path {} --use_4FGL --emin {} '
+    sub_args = sargs.format(src['name'].replace(' ', '_'), get_68_psf(args['emin']), fermi_data, args['emin'])
+    tsub_args = sargs.format(src['name'].replace(' ', '_'), get_68_psf(1e3),  fermi_data, 1e3)
     if '3FGL' in src['name']:
         dt_lc = get_lc_time3fgl(src['name'], emin=args['emin'] ) 
     elif '4FGL' in src['name']:
@@ -535,11 +493,7 @@ while not final_pdf:
             except Exception as inst:
                 warnings.warn("Couldn't create additional 1GeV lightcurve for source {}".format(key))
                 print(inst)
-            try:
-                make_gif(job_dict[key]['lc'])
-            except Exception as inst:
-                warnings.warn("Couldn't create an animated light curve {}".format(key))
-                print(inst)
+
             folders = [fold for fold in os.listdir(job_dict[key]['lc']) if
                        os.path.isdir(os.path.join(job_dict[key]['lc'],fold))]
             for fold in folders:
@@ -560,8 +514,15 @@ while not final_pdf:
                     warnings.warn("Couldn't create all year SED")
                     print(inst)
                     pass
+            try:
+                make_gif(job_dict[key]['lc'])
+            except Exception as inst:
+                warnings.warn("Couldn't create an animated light curve {}".format(key))
+                print(inst)
     src_latex = ''
-    for src in src_dict:
+    dists = np.array([s['dist'] for s in src_dict])
+    sinds = np.argsort(dists)
+    for src in src_dict[sinds]:
         if src['dist'] > args['max_dist']:
             print('Source exceeds distance of {} deg. No summary information will be added'.format(args['max_dist']))
             continue

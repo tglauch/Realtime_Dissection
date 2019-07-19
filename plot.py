@@ -219,10 +219,11 @@ def make_sed_plot(seds_list, mw_data=None, dec = None):
             tmin = llh['config']['selection']['tmin']
             tmax = llh['config']['selection']['tmax']
             if i == 0:
+                sigma = np.max([0, pval_to_sigma(ts_to_pval(llh['sources'][source]['ts'], 1))])
                 ax.text(0.2, 1.02, source,
                         horizontalalignment='center',
                         verticalalignment='center', transform=ax.transAxes)
-                ax.text(0.5, 1.02, 'TS: {:.1f}'.format(llh['sources'][source]['ts']),
+                ax.text(0.5, 1.02, '$\Sigma$: {:.1f} $\sigma$'.format(sigma),
                         horizontalalignment='center',
                         verticalalignment='center', transform=ax.transAxes)
                 ax.text(0.8, 1.02, 'MJD: {:.1f} - {:.1f}'.format(MET_to_MJD(tmin), MET_to_MJD(tmax)),
@@ -323,7 +324,6 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
     plt.clf()
     ax=fig.add_axes((.0, .0,0.7,.7), projection=wcs)
     cpath = os.path.join(basepath, '../contour.txt')
-    print(cpath)
     if os.path.exists(cpath):
         cdata = np.genfromtxt(cpath, delimiter=',')
         cdata = np.vstack([cdata,cdata[0]])
@@ -334,14 +334,19 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
         print('Use new circle')
     pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
     ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
+    cpath = os.path.join(basepath, '../contour50.txt')
+    if os.path.exists(cpath):
+        cdata = np.genfromtxt(cpath, delimiter=',')
+        cdata = np.vstack([cdata,cdata[0]])
+        pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
+        ax.plot(pix[0], pix[1], color='k', linewidth=0.5)
     for i, src in enumerate(srcs):
-        if GreatCircleDistance(src['ra'], src['dec'], bf_ra, bf_dec, unit='deg') < np.radians(2.):
-            pix = get_pix_pos(wcs, src['ra'], src['dec'])
-            ax.plot(pix[0], pix[1],
-                    marker=markers[i],
-                    linestyle = '',
-                    label=src['name'],
-                    color='k', ms=4, zorder=3) 
+        pix = get_pix_pos(wcs, src['ra'], src['dec'])
+        ax.plot(pix[0], pix[1],
+                marker=markers[i],
+                linestyle = '',
+                label=src['name'],
+                color='k', ms=4, zorder=3) 
     if len(cand['ra'])>0:
         pix = get_pix_pos(wcs, cand['ra'], cand['dec'])
         ax.plot(pix[0], pix[1], color='#a8a8a8', ms=4, marker="8", zorder=1,
