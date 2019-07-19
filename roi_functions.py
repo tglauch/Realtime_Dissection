@@ -7,7 +7,6 @@ from astropy.coordinates import SkyCoord
 import os
 import collections
 from myfunctions import dict_to_nparray
-import scipy.integrate
 import pyfits as fits 
 import imageio
 
@@ -19,7 +18,7 @@ path_settings = {'sed': 'all_year/sed',
 vou_path = '/scratch9/tglauch/Software/VOU_Blazars/v2/bin/vou-blazars'
 partition_t = {'kta':'2:30:00', 'long':'2-00:00:00', 'xtralong': '7-00:00:00'}
 
-def submit_fit(args, opath, src_arr=None, trange='', sub_file='fermi.sub',  ana_type='SED', partition='kta', **kwargs):
+def submit_fit(args, opath, srcs=None, trange='', sub_file='fermi.sub',  ana_type='SED', partition='kta', **kwargs):
     if kwargs.get('make_pdf'):
         return
     if trange != '':
@@ -27,16 +26,11 @@ def submit_fit(args, opath, src_arr=None, trange='', sub_file='fermi.sub',  ana_
     if not os.path.exists(opath):
         os.makedirs(opath)
     args += ' --outfolder {} '.format(opath)
-    odtype = np.dtype([('name', np.unicode, 32), ('ra', np.float32), ('dec', np.float32)])
-    if src_arr is not None:
-        if isinstance(src_arr, dict):
-            src_arr=dict_to_nparray(src_arr, dtype=odtype)
-        src_arr = np.atleast_1d(src_arr)
-
-        mask = np.array(['4FGL' not in sname for sname in src_arr['name']])
-        if len(src_arr[mask])>0:
+    if srcs is not None:
+        non_fermi_srcs = [src for src in srcs if not '4FGL' in src.name]
+        if len(non_fermi_srcs)>0:
             xml_path = os.path.join(opath, 'add_source.xml')
-            generate_src_xml(src_arr[mask], xml_path)
+            generate_src_xml(non_fermi_srcs, xml_path)
             args += '--xml_path {}'.format(xml_path)
     with open('./slurm_draft.xml', 'r') as f:
         submit = (f.read()).format(bpath=opath, args=args,
@@ -51,49 +45,20 @@ def submit_fit(args, opath, src_arr=None, trange='', sub_file='fermi.sub',  ana_
     return opath
 
 
-def generate_src_xml(src_arr, xml_path):
+def generate_src_xml(srcs, xml_path):
     xml_str =\
 '<?xml version="1.0" ?>\n\
 <source_library title="source library">\n\
 <!-- Point Sources -->\n'
     with open('./src_xml_draft.xml', 'r') as f:
         xml_temp = f.read()
-    for src in src_arr:
-        print('Generate Source {}'.format(src['name']))
-        xml_str += xml_temp.format(ra=src['ra'], dec=src['dec'], name=src['name'])
+    for src in srcs:
+        xml_str += xml_temp.format(ra=src.ra, dec=src.dec, name=src.name)
         xml_str += '\n'
     xml_str+='</source_library>'
     with open(xml_path, 'w+') as f:
         f.write(xml_str)
     return
-
-
-files = collections.OrderedDict([
-     ('4fgl', {'file': '4fgl.1.csv',
-              'keys': ['name', 'ra', 'dec']}),
-     ('3fgl', {'file': '3fgl.1.csv',
-              'keys': ['name', 'ra', 'dec']}),
-     ('3fhl', {'file': '3fhl.1.csv',
-              'keys': ['name', 'ra', 'dec']}),
-     ('5bzcat', {'file': '5bzcat.1.csv',
-                'keys': ['Name', 'RAJ2000', 'DEJ2000']}),
-     ('3hsp', {'file': '3hsp.1.csv',
-              'keys': ['Name', 'ra', 'dec']}),
-     ('fermi8yr', {'file': 'fermi8yr.1.csv',
-                  'keys': ['Source_Name', 'RAJ2000', 'DEJ2000']}),
-     ('crates', {'file': 'crates.1.csv',
-                'keys': ['name', 'ra', 'dec']})])
-
-#def get_lc_time(src_of_interest):
-#    catalog = fits.open('./gll_psc_v16.fit')
-#    nph0 = 0.287966337957
-#    names = catalog[1].data['Source_Name']
-#    ind = np.where(names==src_of_interest)[0][0]
-#    src = catalog[1].data[ind]
-#    spec = get_spectrum(src)
-#    nph = scipy.integrate.quad(lambda E: spec(E)*E, 1e3, 1e5)[0]*1e4
-#    print nph
-#    return  28. * (nph0/nph)**(0.6)
 
 
 def get_lc_time3fgl(src_of_interest, emin=1e3):
@@ -151,27 +116,6 @@ def get_lc_time4fgl(src_of_interest, emin=1e3):
         return np.max([t_disc, 56])
     return np.min([t_sens, 200])
 
-#Deprecated
-#def get_spectrum(src):
-#    '''
-#    src is a row from the 3FGL catalog
-#    '''
-#    print('Create Spectrum for {}'.format(src['Source_Name']))
-#    if src['SpectrumType'] == 'PowerLaw':
-#        print('{}*(E/{})^-{}'.format(src['Flux_Density'],
-#                                     src['Pivot_Energy'],
-#                                     src['Spectral_Index']))
-#        return lambda x: src['Flux_Density']*(x/src['Pivot_Energy'])**(-src['Spectral_Index'])
-#    elif src['SpectrumType'] == 'LogParabola':
-#        eq_str='{N}*(E/{piv:.2f})^-({a:.2f}+{b:.2f}*log(E/{piv:.2f})'
-#        print eq_str.format(N=src['Flux_Density'], piv=src['Pivot_Energy'],
-#                            a=src['Spectral_Index'],b=src['beta'])
-#        return lambda x: src['Flux_Density']*(x/src['Pivot_Energy'])**(-(src['Spectral_Index']+src['beta']*np.log(x/src['Pivot_Energy'])))
-#    else:
-#        print('Unkown Spectrum Type: Fall back to Powerlaw')
-#        return lambda x: src['Flux_Density']*(x/src['Pivot_Energy'])**(-src['Spectral_Index'])
-#
-
 def GreatCircleDistance(ra_1, dec_1, ra_2, dec_2):
     '''Compute the great circle distance between two events'''
     '''All coordinates must be given in radians'''
@@ -214,6 +158,24 @@ def get_add_info(src_of_interest):
     src_ind = np.where(src_names==src_of_interest)[0][0]
     ostr = ' | Energy flux (E $\geq$ 100MeV): {:.2e} erg/cm$^2$/s [Top {:.1f}\% in 4FGL]'
     return ostr.format(eflux[src_ind], 1.*src_ind/len(eflux)*100)
+
+
+files = collections.OrderedDict([
+     ('4fgl', {'file': '4fgl.1.csv',
+              'keys': ['name', 'ra', 'dec']}),
+     ('3fgl', {'file': '3fgl.1.csv',
+              'keys': ['name', 'ra', 'dec']}),
+     ('3fhl', {'file': '3fhl.1.csv',
+              'keys': ['name', 'ra', 'dec']}),
+     ('5bzcat', {'file': '5bzcat.1.csv',
+                'keys': ['Name', 'RAJ2000', 'DEJ2000']}),
+     ('3hsp', {'file': '3hsp.1.csv',
+              'keys': ['Name', 'ra', 'dec']}),
+     ('fermi8yr', {'file': 'fermi8yr.1.csv',
+                  'keys': ['Source_Name', 'RAJ2000', 'DEJ2000']}),
+     ('crates', {'file': 'crates.1.csv',
+                'keys': ['name', 'ra', 'dec']})])
+
 
 def get_sources(ra, dec):
     src_dict = {}

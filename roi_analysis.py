@@ -25,6 +25,8 @@ from astropy.time import Time
 from collections import OrderedDict
 from scipy.interpolate import interp1d
 from gcn import read_gcn
+from analysis import Analysis
+import pickle
 
 def parseArguments():
     """Parse the command line arguments
@@ -103,10 +105,10 @@ def parseArguments():
     args = parser.parse_args()
     return args.__dict__
 
+
 def get_68_psf(E):
     x = np.genfromtxt('./lat_68_psf.txt', delimiter = ',')
     return interp1d(x[:,0], x[:,1])(E)
-
 
 
 def source_summary(bpath, src, mjd, mode='mid'):
@@ -143,6 +145,8 @@ def source_summary(bpath, src, mjd, mode='mid'):
         t_str_info = t_str_info.format(ra=src['ra'], dec=src['dec'], dist=src['dist'])
         t_str = t_str.format(src_name = src['name'], src_info=t_str_info)
         l_str = l_str.format(srcinfo=t_str)
+    print src
+    l_str += '{} \\'.format(src['alt_name'])
     sed_path = os.path.join(sed_path, 'sed.pdf')
     try:
         srcprob = fits.open(os.path.join(bpath,'srcprob/ft1_srcprob_00.fits'))
@@ -181,6 +185,7 @@ def source_summary(bpath, src, mjd, mode='mid'):
     l_str += '\\clearpage \n'
     return l_str
 
+
 def make_fixed_binning_lc(src, sub_args,  dt_lc, mjd_range, opath,
                           sub_file='lc.sub', mjd_mid=None, mode='end', **args):
     if args['mode'] == 'end':
@@ -206,13 +211,13 @@ def make_fixed_binning_lc(src, sub_args,  dt_lc, mjd_range, opath,
         submit_fit(sub_args, opath, src, sub_file=sub_file, trange=t_window, partition=partition, **args)
     return
 
+
 def src_path(bpath, src):
     return os.path.join(bpath, src.replace(' ', '_'))
 
 
 args = parseArguments()
 gcn_dict = None
-
 rec = args['recovery']
 make_pdf = args['make_pdf']
 overwrite = args['overwrite']
@@ -241,6 +246,8 @@ else:
     ev_str = 'IC{}{:02d}{:02d}'.format(str(t.datetime.year)[-2:],
                                        t.datetime.month, t.datetime.day)
 bpath = os.path.join(args['basepath'], ev_str)
+analysis = Analysis(ev_str, args['ra'], args['dec'])
+analysis.bpath = bpath
 if os.path.exists(os.path.join(bpath, 'run_info.npy')) and not rec and not args['only_vou']:
     print('Folder already exist....exit. Only create PDF')
     make_pdf=True
@@ -262,8 +269,7 @@ if not rec and not make_pdf:
         subprocess.call(cmd)
 
     # Setup Variables
-    src_dict, out_str = get_sources(args['ra'], args['dec'])
-    np.save('src_dict.npy', src_dict)
+    out_str = analysis.get_sources()
     headline = '*Result for {} *\n'.format(ev_str)
     sum_text = headline + out_str
     print_to_slack(sum_text)
@@ -300,10 +306,12 @@ if not rec and not make_pdf:
     print kwargs
     MET = get_data(args['ra'], args['dec'], **kwargs)
     MJD = [MET_to_MJD(float(i)) for i in MET]
-    run_info = {'MJD' : MJD,
-                'args' : args,
-                'src_dict' : src_dict}
-    np.save(os.path.join(bpath,'run_info.npy'), run_info)
+    #run_info = {'MJD' : MJD,
+    #            'args' : args,
+    #            'src_dict' : src_dict}
+    #np.save(os.path.join(bpath,'run_info.npy'), run_info)
+    with open(os.path.join(bpath,'analysis.pickle'), "wb") as f:
+        pickle.dump(analysis, f)
 else:
     run_info = np.load(os.path.join(bpath,'run_info.npy'), allow_pickle=True)[()]
     MJD = run_info['MJD']
@@ -318,8 +326,8 @@ else:
         args['dec'] = gcn_dict['SRC_DEC']
         args['err90'] = gcn_dict['SRC_ERROR']
         args['err50'] = gcn_dict['SRC_ERROR50']
-    src_dict = run_info['src_dict']
-print src_dict
+    #src_dict = run_info['src_dict']
+#print src_dict
 if not make_pdf:
     args['overwrite'] = True
 
@@ -349,78 +357,25 @@ submit_fit(sargs, ts_map_short_path, sub_file=ev_str+'.sub', ana_type='TS_Map', 
 sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
 sargs = sargs.format(get_68_psf(5000),fermi_data, 5000, args['ra'], args['dec'])
 srcprob_path = os.path.join(bpath, 'srcprob')
-submit_fit(sargs, srcprob_path, src_dict,sub_file=ev_str+'.sub', ana_type='srcprob', partition='xtralong', **args)
+submit_fit(sargs, srcprob_path, srcs=analysis.srcs, sub_file=ev_str+'.sub', ana_type='srcprob', partition='xtralong', **args)
 
 print('Submit_SEDs')
 if 'max_dist' not in args.keys():
     args['max_dist'] = 2.
-job_dict = {}
-for src in src_dict:
-    bpath_src = src_path(bpath, src['name'])
-    print('{} is at a distance {}'.format(src['name'], src['dist']))
-    if src['dist'] > args['max_dist']:
+
+for src in analysis.srcs:
+    bpath_src = src_path(analysis.bpath, src.name)
+    print('{} is at a distance {}'.format(src.name, src.dist))
+    if src.dist > args['max_dist']:
         print('Source exceeds distance of {} deg. No job will be submitted'.format(args['max_dist']))
         continue
+    src.setup_folders(bpath_src)
     if os.path.exists(bpath_src) and (not args['recovery']) and (not args['make_pdf']):
         print('Remove Path: {}'.format(bpath_src))
         shutil.rmtree(bpath_src)
-    job_dict[src['name']] = {'sed': os.path.join(bpath_src, path_settings['sed']),
-                             'lc': os.path.join(bpath_src, path_settings['lc']),
-                             'mw_data': os.path.join(bpath_src, 'sed.txt'),
-                             'dec': src['dec']}
     if make_pdf:
         continue
-    if not os.path.exists(bpath_src):
-        os.makedirs(bpath_src)
-    if not os.path.exists(job_dict[src['name']]['lc']):
-        os.makedirs(job_dict[src['name']]['lc'])
-    if not os.path.exists(job_dict[src['name']]['sed']):
-        os.makedirs(job_dict[src['name']]['sed'])
-    if '4FGL' in src['name']:
-        data = fits.open('gll_psc_v19.fit')[1].data
-        ind = np.where(data['Source_Name']==src['name'])[0]
-        m_ax = float(data[ind]['Conf_95_SemiMajor']) * 60
-        min_ax = float(data[ind]['Conf_95_SemiMinor']) * 60  
-        loc_str= '{} {} {} {}'.format(2 * np.max([m_ax, min_ax]), m_ax, min_ax,
-                                      float(data[ind]['Conf_95_PosAng']))
-        ofolder = os.path.join(bpath_src, 'vou_counterpart')
-        if os.path.exists(ofolder):
-            shutil.rmtree(ofolder)
-        os.makedirs(ofolder)
-        os.chdir(ofolder)
-        for i in range(2):
-            os.system('{vou_path} {ra} {dec} {loc_str}'.format(vou_path=vou_path, ra=src['ra'],
-                                                               dec=src['dec'],loc_str=loc_str))
-        if not os.path.exists('candidates.eps'):
-            fname_new = os.path.join(ofolder, src['name'].replace(' ', '_').replace('.','_') + '.ps') 
-            cand_ps = os.path.join(ofolder, 'candidates.ps')
-            os.rename(cand_ps, fname_new)
-            os.system('ps2eps -B ' + fname_new)
-        else:
-            cand_eps = os.path.join(ofolder, 'candidates.eps')
-            fname_new = os.path.join(ofolder, src['name'].replace(' ', '_').replace('.','_') + '.eps')
-            os.rename(cand_eps, fname_new)
-        os.chdir(this_path)
-        cp_info = np.array(np.genfromtxt(os.path.join(ofolder, 'candidates_posix.txt'), dtype=float), ndmin=2)
-        print cp_info
-        if len(cp_info) == 0:
-            cp_ra = src['ra']
-            cp_dec = src['dec']
-        else:
-            try:
-                cp_ra = cp_info[:,0][0]
-                cp_dec = cp_info[:,1][0]
-                print('Found Counterpart at ra {}, dec {}'.format(cp_ra, cp_dec))
-            except Exception as inst:
-                cp_ra = src['ra']
-                cp_dec = src['dec']
-    else:
-        cp_ra = src['ra']
-        cp_dec = src['dec']
-    for i in range(2):
-        os.system('{vou_path} {ra} {dec} {loc_str} -s ; cat Sed.txt > {bpath}'.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec, 
-                                                                                      bpath=os.path.join(bpath_src,'sed.txt'), loc_str=2))
-    print('Saved SED to {}'.format(os.path.join(bpath_src, 'sed.txt')))
+    src.get_mw_data()
     if make_pdf:
         continue
     sargs = '--target_src {} --free_radius {} --data_path {} --use_4FGL --emin {} '
@@ -449,17 +404,17 @@ for src in src_dict:
 
     for t_window in time_windows:
         if t_window == '':
-            opath = job_dict[src['name']]['sed']
+            opath = src.sed_path
             opath_1GeV = opath+'_1GeV'
             partition='long'
         else:
             add_str = '{:.1f}_{:.1f}'.format(t_window[0], t_window[1])
-            opath = os.path.join(job_dict[src['name']]['lc'], add_str)
-            opath_1GeV = os.path.join(job_dict[src['name']]['lc']+'_1GeV', add_str)
+            opath = os.path.join(src.lc_path, add_str)
+            opath_1GeV = os.path.join(src.lc_path+'_1GeV', add_str)
             partition='kta'
         submit_fit(sub_args, opath, src, sub_file=ev_str+'.sub', trange=t_window, partition=partition, **args)
         if args['emin'] < 1e3:
-            opath = os.path.join(job_dict[src['name']]['lc'], add_str)
+            opath = os.path.join(src.lc_path, add_str)
             submit_fit(tsub_args, opath_1GeV, src, sub_file=ev_str+'.sub', trange=t_window, partition=partition, **args)
 mins = 0
 final_pdf = False
@@ -506,41 +461,41 @@ while not final_pdf:
             warnings.warn("Couldn't create residual map...")
             print(inst)
 
-        for key in job_dict.keys():
+        for src in analysis.srcs:
             print('Make Plots for Source {}'.format(key))
             try:
-                plot.make_lc_plot(job_dict[key]['lc'], args['mjd'])
+                plot.make_lc_plot(src.lc_path, args['mjd'])
             except Exception as inst:
                 warnings.warn("Couldn't create lightcurve for source {}".format(key))
                 print(inst)
             try:
-                plot.make_lc_plot(job_dict[key]['lc'] + '_1GeV', args['mjd'])
+                plot.make_lc_plot(src.lc_path + '_1GeV', args['mjd'])
             except Exception as inst:
                 warnings.warn("Couldn't create additional 1GeV lightcurve for source {}".format(key))
                 print(inst)
 
-            folders = [fold for fold in os.listdir(job_dict[key]['lc']) if
-                       os.path.isdir(os.path.join(job_dict[key]['lc'],fold))]
+            folders = [fold for fold in os.listdir(src.lc_path) if
+                       os.path.isdir(os.path.join(src.lc_path,fold))]
             for fold in folders:
                 try:
-                    seds_list = [(os.path.join(job_dict[key]['lc'], fold), 'k', 'red' , True, True, True),(job_dict[key]['sed'], 'grey',
+                    seds_list = [(os.path.join(src.lc_path, fold), 'k', 'red' , True, True, True),(src.sed_path, 'grey',
                                 'grey', True, True, True)]
-                    if os.path.exists(os.path.join(job_dict[key]['lc']+'_1GeV', fold)):
-                        seds_list.append((os.path.join(job_dict[key]['lc'] + '_1GeV', fold), 'k', 'blue' , True, True, False))
-                    plot.make_sed_plot(seds_list, mw_data=job_dict[key]['mw_data'], dec=job_dict[key]['dec'])
+                    if os.path.exists(os.path.join(src.lc_path+'_1GeV', fold)):
+                        seds_list.append((os.path.join(src.lc_path + '_1GeV', fold), 'k', 'blue' , True, True, False))
+                    plot.make_sed_plot(seds_list, mw_data=src.mc_data_path, dec=src.dec)
                 except Exception as inst:
                     warnings.warn("Couldn't create SED for source {}".format(key))
                     print(inst)
                     pass
             try:
-                plot.make_sed_plot([(job_dict[key]['sed'], 'grey', 'grey', True, True, True)],
-                                   mw_data=job_dict[key]['mw_data'], dec=job_dict[key]['dec'])
+                plot.make_sed_plot([(src.sed_path, 'grey', 'grey', True, True, True)],
+                                   mw_data=src.mw_data_path, dec=src.dec)
             except Exception as inst:
                     warnings.warn("Couldn't create all year SED")
                     print(inst)
                     pass
             try:
-                make_gif(job_dict[key]['lc'])
+                make_gif(src.lc_path)
             except Exception as inst:
                 warnings.warn("Couldn't create an animated light curve {}".format(key))
                 print(inst)
