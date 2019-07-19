@@ -24,7 +24,7 @@ from astropy.coordinates import SkyCoord
 from astropy.time import Time
 from collections import OrderedDict
 from scipy.interpolate import interp1d
-
+from gcn import read_gcn
 
 def parseArguments():
     """Parse the command line arguments
@@ -73,6 +73,10 @@ def parseArguments():
         help="event name",
         action="store_true", default = False)
     parser.add_argument(
+        "--gcn",
+        help="pass a link to a gcn notice",
+        type=str)
+    parser.add_argument(
         "--mode",
         help="end if given mjd is at the end of the time window, mid if in the middle'",
         type=str, default='end')
@@ -95,7 +99,7 @@ def parseArguments():
     parser.add_argument(
         "--max_dist",
         help = 'maximum distance for the fermi analysis',
-        type=float, default=1.5) 
+        type=float, default=2.) 
     args = parser.parse_args()
     return args.__dict__
 
@@ -207,11 +211,25 @@ def src_path(bpath, src):
 
 
 args = parseArguments()
+gcn_dict = None
+
 rec = args['recovery']
 make_pdf = args['make_pdf']
 overwrite = args['overwrite']
 print('Run with args')
 print(args)
+if args['gcn'] is not None:
+    gcn_dict = read_gcn(args['gcn'])
+    args['ra'] = gcn_dict['SRC_RA']
+    args['dec'] = gcn_dict['SRC_DEC']
+    args['err90'] = gcn_dict['SRC_ERROR']
+    args['err50'] = gcn_dict['SRC_ERROR50']
+    args['mjd'] = gcn_dict['MJD']
+    t = Time.now()
+    if np.abs(args['mjd'] - t.mjd)<2:
+        args['mode']= 'end'
+    else:
+        args['mode'] = 'mid'
 if args['mjd'] is not None:
     t = Time(args['mjd'], format='mjd')
 else:
@@ -293,6 +311,13 @@ else:
     args['recovery'] = rec
     args['make_pdf'] = make_pdf
     args['overwrite'] = overwrite
+    if 'gcn' in args.keys():
+        print('Update GCN Info from {}'.format(args['gcn']))
+        read_gcn(args['gcn'], bpath)
+        args['ra'] = gcn_dict['SRC_RA']
+        args['dec'] = gcn_dict['SRC_DEC']
+        args['err90'] = gcn_dict['SRC_ERROR']
+        args['err50'] = gcn_dict['SRC_ERROR50']
     src_dict = run_info['src_dict']
 print src_dict
 if not make_pdf:
@@ -328,7 +353,7 @@ submit_fit(sargs, srcprob_path, src_dict,sub_file=ev_str+'.sub', ana_type='srcpr
 
 print('Submit_SEDs')
 if 'max_dist' not in args.keys():
-    args['max_dist'] = 1.5
+    args['max_dist'] = 2.
 job_dict = {}
 for src in src_dict:
     bpath_src = src_path(bpath, src['name'])
@@ -460,7 +485,7 @@ while not final_pdf:
                 yaxis = True
             plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
                               os.path.join(vou_out, 'find_out_temp.txt'),
-                              mode='tsmap', yaxis=yaxis)
+                              plt_mode='tsmap', yaxis=yaxis, **args)
         except Exception as inst:
             warnings.warn("Couldn't create ts map...")
             print(inst)
@@ -468,7 +493,7 @@ while not final_pdf:
         try:
             plot.make_ts_plot(ts_map_short_path, os.path.join(vou_out, 'src_dict.npy'),
                               os.path.join(vou_out, 'find_out_temp.txt'),
-                              mode='tsmap', legend=False)
+                              plt_mode='tsmap', legend=False, **args)
         except Exception as inst:
             warnings.warn("Could't create residual map...")
             print(inst)
@@ -476,7 +501,7 @@ while not final_pdf:
         try:
             plot.make_ts_plot(ts_map_path, os.path.join(vou_out, 'src_dict.npy'),
                               os.path.join(vou_out, 'find_out_temp.txt'),
-                              mode='residmap', legend=False)
+                              plt_mode='residmap', legend=False, **args)
         except Exception as inst:
             warnings.warn("Couldn't create residual map...")
             print(inst)
@@ -548,6 +573,11 @@ while not final_pdf:
         prelim = '{\color{red} Warning: The following results are all preliminary and will be continously updated whenever calculations are finished.}'
     else:
         prelim = ' '
+    gcnurl = 'not yet implemented'
+    if 'gcn' in args.keys():
+        gcnurl = args['keys']
+    t = Time.now()
+    t_now_str = t.iso
     out = template.format(prelim=prelim,
                           date=args['mjd'],
                           ra=args['ra'],
@@ -568,7 +598,9 @@ while not final_pdf:
                           mjd1=MJD[0],
                           mjd2=MJD[1],
                           energy=args['emin']/1000.,
-                          tsemin = ts_emin/1e3)
+                          tsemin = ts_emin/1e3,
+                          gcnurl = gcnurl,
+                          createdon=t_now_str)
     latex_path = os.path.join(bpath,ev_str + '.tex')
     if os.path.exists(latex_path):
         os.remove(latex_path)

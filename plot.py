@@ -266,14 +266,14 @@ def get_pix_pos(wcs, ra, dec):
 
 
 
-def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True):
+def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=True, yaxis=True, **kwargs):
     markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7, 'H','d', 'v' ,'^', '<', '>', 1, 2, 3 ,8]
-    fname = 'fit1_pointsource_powerlaw_2.00_{}.fits'.format(mode)
-    fits_path = os.path.join(basepath, fname)
+    fname = 'fit1_pointsource_powerlaw_2.00_{}.fits'.format(plt_mode)
+    fits_path = os.path.join(plt_basepath, fname)
     if os.path.exists(fits_path):
         inp = fits.open(fits_path)
         try:
-            with open(os.path.join(basepath, 'config.yaml'), 'r') as f:
+            with open(os.path.join(plt_basepath, 'config.yaml'), 'r') as f:
                 yml = yaml.safe_load(f)
             binning = yml['binning']
             delta_pix = (binning[ 'roiwidth']/binning['binsz'] - 6./binning['binsz']) / 2. ## Assume radius of 3 deg (total width 6 deg)
@@ -299,20 +299,20 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
         cand['ra'] = cand['ra'][mask]
         cand['dec'] =cand['dec'][mask]
  
-    if mode == 'tsmap':
+    if plt_mode == 'tsmap':
         hdu = inp[2]
         Z=pval_to_sigma(ts_to_pval(hdu.data,1.))
         minmax = (0,8)
         ticks = 2
         cmap = ts_cmap
-    elif mode == 'residmap':
+    elif plt_mode == 'residmap':
         hdu = inp[0]
         Z=hdu.data
         minmax = (-6, 6)
         ticks = 2 
         cmap = re_cmap
 
-    bfpath = os.path.join(basepath, '../bf.txt')
+    bfpath = os.path.join(plt_basepath, '../bf.txt')
     if os.path.exists(bfpath):
         bfdata = np.genfromtxt(bfpath, delimiter=',')
         bf_ra = bfdata[0]
@@ -323,10 +323,14 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
     fig = plt.figure(figsize=figsize(0.4, 1.))
     plt.clf()
     ax=fig.add_axes((.0, .0,0.7,.7), projection=wcs)
-    cpath = os.path.join(basepath, '../contour.txt')
+    cpath = os.path.join(plt_basepath, '../contour.txt')
     if os.path.exists(cpath):
         cdata = np.genfromtxt(cpath, delimiter=',')
         cdata = np.vstack([cdata,cdata[0]])
+    elif 'error90' in kwargs.keys():
+        vertex = (hdu.header['CRVAL1']*u.degree,hdu.header['CRVAL2']*u.degree) #long, lat
+        x =  SphericalCircle(vertex,kwargs['error90']*u.degree) 
+        cdata = x.get_xy()
     else:
         vertex = (hdu.header['CRVAL1']*u.degree,hdu.header['CRVAL2']*u.degree) #long, lat
         x =  SphericalCircle(vertex,1.5*u.degree) 
@@ -334,7 +338,7 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
         print('Use new circle')
     pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
     ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
-    cpath = os.path.join(basepath, '../contour50.txt')
+    cpath = os.path.join(plt_basepath, '../contour50.txt')
     if os.path.exists(cpath):
         cdata = np.genfromtxt(cpath, delimiter=',')
         cdata = np.vstack([cdata,cdata[0]])
@@ -384,9 +388,9 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
     ax2=fig.add_axes((.0, .80,0.7, 0.05))
     plt_cbar = fig.colorbar(cbar, orientation="horizontal", cax=ax2,
                             ticks=np.arange(minmax[0], minmax[1] , ticks))
-    if mode == 'tsmap':
+    if plt_mode == 'tsmap':
         plt_cbar.set_label(r'Significance [$\sigma$]', labelpad=8)
-    elif mode == 'residmap':
+    elif plt_mode == 'residmap':
         plt_cbar.set_label(r'Significance [$\sigma$]', labelpad=8)
     plt_cbar.ax.xaxis.set_ticks_position('top')
     plt_cbar.ax.xaxis.set_label_position('top')
@@ -396,7 +400,7 @@ def make_ts_plot(basepath, srcs, vou_cand, mode='tsmap', legend=True, yaxis=True
 
     ax.grid(color='k', ls='--')
     plt.tight_layout()
-    plt.savefig(os.path.join(basepath,'{}.png'.format(mode)),
+    plt.savefig(os.path.join(plt_basepath,'{}.png'.format(plt_mode)),
                 bbox_inches='tight', dpi=300)
 
 
