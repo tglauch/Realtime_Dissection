@@ -266,7 +266,7 @@ def get_pix_pos(wcs, ra, dec):
 
 
 
-def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=True, yaxis=True, **kwargs):
+def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=True, yaxis=True, error90=None):
     markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7, 'H','d', 'v' ,'^', '<', '>', 1, 2, 3 ,8]
     fname = 'fit1_pointsource_powerlaw_2.00_{}.fits'.format(plt_mode)
     fits_path = os.path.join(plt_basepath, fname)
@@ -286,7 +286,7 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=True, ya
     wcs = WCS(inp[2].header)
     cand_pos = np.genfromtxt(vou_cand)
     cand = {'ra': cand_pos[:,0], 'dec': cand_pos[:,1]}
-    if len(cand['ra'])>0 and len(srcs>0):
+    if (len(cand['ra'])>0) and (len(srcs) >0):
         distances = np.ones(len(cand['ra']))
         for i in range(len(cand['ra'])):
             tdist= [GreatCircleDistance(
@@ -344,11 +344,11 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=True, ya
         pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
         ax.plot(pix[0], pix[1], color='k', linewidth=0.5)
     for i, src in enumerate(srcs):
-        pix = get_pix_pos(wcs, src['ra'], src['dec'])
+        pix = get_pix_pos(wcs, src.ra, src.dec)
         ax.plot(pix[0], pix[1],
                 marker=markers[i],
                 linestyle = '',
-                label=src['name'],
+                label=src.name,
                 color='k', ms=4, zorder=3) 
     if len(cand['ra'])>0:
         pix = get_pix_pos(wcs, cand['ra'], cand['dec'])

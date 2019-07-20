@@ -29,7 +29,6 @@ class Source(object):
         
     def make_sed_lightcurve(self, lcs=['default']):
         print('Make SED lightcurve for {}'.format(self.name))
-        print self.lightcurves
         main_lc = self.lightcurves[lcs[0]]
         for i in range(len(main_lc.time_windows)):
             try:
@@ -154,15 +153,18 @@ class Source(object):
                 if (mjd <= float(fold.split('_')[1])) and (mjd > float(fold.split('_')[0])):
                     sed_path = os.path.join(lc_base,fold)
                     break
-        sed_full_res = np.load(os.path.join(self.sed_path, 'llh.npy'), allow_pickle=True)[()]
-        ts = sed_full_res['sources'][self.name]['ts']
-        sigma = np.max([0, pval_to_sigma(ts_to_pval(ts, 1))])
+        if os.path.exists(os.path.join(self.sed_path, 'llh.npy')):
+            sed_full_res = np.load(os.path.join(self.sed_path, 'llh.npy'), allow_pickle=True)[()]
+            ts = sed_full_res['sources'][self.name]['ts']
+            sigma = np.max([0, pval_to_sigma(ts_to_pval(ts, 1))])
+        else:
+            sigma = -1
         l_str ='\subsection{{{srcinfo}}}'
         if os.path.exists(os.path.join(sed_path, 'llh.npy')):
             fit_res = np.load(os.path.join(sed_path, 'llh.npy'), allow_pickle=True)[()]
             t_str = '{src_name} $|$ \\small\\textnormal{{{src_info}}}'
             t_str_info = 'ra = {ra:.2f}$^\circ$, dec = {dec:.2f}$^\circ$, $\Sigma$= {sigma:.1f} $\sigma$, $\Delta\psi$ = {dist:.2f}$^\circ$'
-            t_str_info = t_str_info.format(sigma=sigma, ra=self.ra, dec=self.dec, dist=src['dist'])
+            t_str_info = t_str_info.format(sigma=sigma, ra=self.ra, dec=self.dec, dist=self.dist)
             t_str = t_str.format(src_name = self.name, src_info=t_str_info)
             l_str = l_str.format(srcinfo=t_str) # srcname=src['name'], srcinfo=t_str)
         else:
@@ -171,9 +173,9 @@ class Source(object):
             t_str_info = t_str_info.format(ra=self.ra, dec=self.dec, dist=self.dist)
             t_str = t_str.format(src_name = self.name, src_info=t_str_info)
             l_str = l_str.format(srcinfo=t_str)
-        print src
-        l_str += '{} \\'.format(self.names)
-        sed_path = os.path.join(self.sed_path, 'sed.pdf')
+
+        l_str += 'Associations: {} \\\\ \n'.format(', '.join(self.names))
+        sed_pdf = os.path.join(self.sed_path, 'sed.pdf')
         try:
             srcprob = fits.open(os.path.join(bpath,'srcprob/ft1_srcprob_00.fits'))
             energy = srcprob[1].data['ENERGY']
@@ -193,12 +195,11 @@ class Source(object):
         except Exception as inst:
             warnings.warn("Could not find source probabilities")
             print(inst)
-        print l_str
         with open('source_summary.tex', 'r') as infile:
             fig_str = infile.read()
-        if os.path.exists(sed_path):
+        if os.path.exists(sed_pdf):
             cap_str = 'SED for {}. See the description in section \\ref{{sec:sed}} for more details.'
-            l_str += fig_str.format(width = 0.7, path = sed_path, caption=cap_str.format(self.name))
+            l_str += fig_str.format(width = 0.7, path = sed_pdf, caption=cap_str.format(self.name))
         if os.path.exists(lc_path):
             l_str += fig_str.format(width = 0.7, path = lc_path, caption='Light curve for {}'.format(self.name))
         gev_lc = os.path.join(lc_base+'_1GeV', 'lightcurve.pdf')

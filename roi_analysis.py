@@ -21,6 +21,8 @@ from astropy.time import Time
 from collections import OrderedDict
 from analysis import Analysis
 import pickle
+from slack_lib import print_to_slack
+
 
 def parseArguments():
     """Parse the command line arguments
@@ -159,14 +161,23 @@ if not rec and not make_pdf:
     with open(os.path.join(analysis.bpath,'analysis.pickle'), "wb") as f:
         pickle.dump(analysis, f)
 
-if not make_pdf:
-    args['overwrite'] = True
+
+if args['mode'] == 'end':
+    tsmjd1 = analysis.mjd-200
+    tsmjd2 = analysis.mjd
+
+else:
+    tsmjd1 = analysis.mjd-100
+    tsmjd2 = analysis.mjd+100
+
+ts_emin = np.max([1000, analysis.emin])
 
 # Start the gamma-ray analysis
 
-# TS maps
+if not make_pdf:
+    args['overwrite'] = True
 
-    ts_emin = np.max([1000, analysis.emin])
+    # TS maps
     sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
     sargs = sargs.format(get_68_psf(ts_emin), analysis.fermi_data, ts_emin, analysis.ra, analysis.dec)
     ts_map_path = os.path.join(analysis.bpath, 'ts_map')
@@ -174,13 +185,7 @@ if not make_pdf:
     submit_fit(sargs, ts_map_path, sub_file=analysis.id+'.sub', ana_type='TS_Map', partition='xtralong')
 
     sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {} --time_range {} {}'
-    if args['mode'] == 'end':
-        tsmjd1 = analysis.mjd-200
-        tsmjd2 = analysis.mjd
 
-    else:
-        tsmjd1 = analysis.mjd-100
-        tsmjd2 = analysis.mjd+100
     sargs = sargs.format(get_68_psf(ts_emin), analysis.fermi_data, ts_emin, analysis.ra, analysis.dec,
                          tsmjd1, tsmjd2)
     ts_map_short_path = os.path.join(analysis.bpath, 'ts_map_short')
@@ -261,7 +266,6 @@ while not final_pdf:
             except Exception as inst:
                 warnings.warn("Couldn't create residual map...")
                 print(inst)
-
         for src in analysis.srcs:
             if src.dist > args['max_dist']:
                 continue
@@ -300,7 +304,7 @@ while not final_pdf:
     t = Time.now()
     t_now_str = t.iso
     out = template.format(prelim=prelim,
-                          date=args['mjd'],
+                          date=analysis.mjd,
                           ra=analysis.ra,
                           dec=analysis.dec,
                           emin=1.*analysis.emin/1000.,
@@ -322,6 +326,7 @@ while not final_pdf:
                           tsemin = ts_emin/1e3,
                           gcnurl = analysis.gcn,
                           createdon=t_now_str)
+
     latex_path = os.path.join(analysis.bpath, analysis.event_name + '.tex')
     if os.path.exists(latex_path):
         os.remove(latex_path)
@@ -339,4 +344,4 @@ while not final_pdf:
     for c in cmds:
         subprocess.call(c)
     os.chdir(this_path)
-    print_to_slack('Fit Results', os.path.join(analysis.bpath, ev_str + '.pdf'))
+    print_to_slack('Fit Results', os.path.join(analysis.bpath, analysis.event_name + '.pdf'))
