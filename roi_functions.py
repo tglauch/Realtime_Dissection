@@ -9,7 +9,7 @@ import collections
 from myfunctions import dict_to_nparray
 import pyfits as fits 
 import imageio
-
+from scipy.interpolate import interp1d
  
 fields = ['name', 'ra', 'dec', 'alt_name']
 odtype = np.dtype([('name', np.unicode, 32), ('ra', np.float32), ('dec', np.float32), ('dist', np.float32)]) 
@@ -18,9 +18,12 @@ path_settings = {'sed': 'all_year/sed',
 vou_path = '/scratch9/tglauch/Software/VOU_Blazars/v2/bin/vou-blazars'
 partition_t = {'kta':'2:30:00', 'long':'2-00:00:00', 'xtralong': '7-00:00:00'}
 
-def submit_fit(args, opath, srcs=None, trange='', sub_file='fermi.sub',  ana_type='SED', partition='kta', **kwargs):
-    if kwargs.get('make_pdf'):
-        return
+def get_68_psf(E):
+    x = np.genfromtxt('./lat_68_psf.txt', delimiter = ',')
+    return interp1d(x[:,0], x[:,1])(E)
+
+
+def submit_fit(args, opath, srcs=None, trange='', sub_file='fermi.sub',  ana_type='SED', partition='kta'):
     if trange != '':
         args += ' --time_range {} {} '.format(trange[0], trange[1])
     if not os.path.exists(opath):

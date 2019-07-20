@@ -284,18 +284,17 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=True, ya
         print('{} not yet ready'.format(fits_path))
         return
     wcs = WCS(inp[2].header)
-    srcs = np.load(srcs, allow_pickle=True)
     cand_pos = np.genfromtxt(vou_cand)
     cand = {'ra': cand_pos[:,0], 'dec': cand_pos[:,1]}
-    if len(cand['ra'])>0 and len(srcs['ra']>0):
+    if len(cand['ra'])>0 and len(srcs>0):
         distances = np.ones(len(cand['ra']))
         for i in range(len(cand['ra'])):
             tdist= [GreatCircleDistance(
-                      cand['ra'][i], cand['dec'][i], srcs['ra'][j],
-                      srcs['dec'][j], unit='deg') for j in range(len(srcs['ra']))]
+                      cand['ra'][i], cand['dec'][i], srcs[j].ra,
+                      srcs[j].dec, unit='deg') for j in range(len(srcs))]
             distances[i] = np.degrees(np.min(tdist))
         mask = distances>0.1
-        inds =  np.argsort(distances)[len(srcs['ra']):]
+        inds =  np.argsort(distances)[len(srcs):]
         cand['ra'] = cand['ra'][mask]
         cand['dec'] =cand['dec'][mask]
  
@@ -327,9 +326,9 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=True, ya
     if os.path.exists(cpath):
         cdata = np.genfromtxt(cpath, delimiter=',')
         cdata = np.vstack([cdata,cdata[0]])
-    elif 'error90' in kwargs.keys():
+    elif error90 is not None:
         vertex = (hdu.header['CRVAL1']*u.degree,hdu.header['CRVAL2']*u.degree) #long, lat
-        x =  SphericalCircle(vertex,kwargs['error90']*u.degree) 
+        x =  SphericalCircle(vertex, error90*u.degree) 
         cdata = x.get_xy()
     else:
         vertex = (hdu.header['CRVAL1']*u.degree,hdu.header['CRVAL2']*u.degree) #long, lat

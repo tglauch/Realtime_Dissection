@@ -4,6 +4,8 @@ from source_class import Source
 import collections
 import os
 from astropy.coordinates import SkyCoord
+from gcn import read_gcn
+from astropy.time import Time
 
 files = collections.OrderedDict([
      ('4fgl', {'file': '4fgl.1.csv',
@@ -22,16 +24,33 @@ files = collections.OrderedDict([
                 'keys': ['name', 'ra', 'dec']})])
 
 class Analysis(object):
-    def __init__(self, ev_name, ra, dec):
-        self.event_name = ev_name
+    def __init__(self, mjd=None, ra=None, dec=None):
+        self.event_name = None
         self.ra = ra  
         self.dec = dec
         self.srcs = []
-        
+        self.err90 = 2.0
+        self.mode = 'end'
+        self.mjd = mjd
+
     def make_pdf(self):
         # To be implemented
+        return
+
+    def from_gcn(self, url):
+        gcn_dict = read_gcn(url)
+        self.ra = gcn_dict['SRC_RA']
+        self.dec = gcn_dict['SRC_DEC']
+        self.err90 = gcn_dict['SRC_ERROR']
+        self.err50 = gcn_dict['SRC_ERROR50']
+        self.mjd = gcn_dict['MJD']
+        t = Time.now()
+        if np.abs(self.mjd - t.mjd)<2:
+            self.mode = 'end'
+        else:
+            self.mode = 'mid'
         return 
-    
+        
     def calc_src_distances_to_bf(self):
         for src in self.srcs:
             src.dist = src.angular_distance(self.ra, self.dec)
