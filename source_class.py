@@ -1,10 +1,11 @@
 import numpy as np
 from roi_functions import GreatCircleDistance, vou_path, path_settings, get_lc_time3fgl, \
-                          get_lc_time4fgl,get_68_psf, submit_fit
+                          get_lc_time4fgl,get_68_psf, submit_fit, make_gif
 from astropy.io import fits
 from myfunctions import MET_to_MJD, dict_to_nparray, ts_to_pval, pval_to_sigma
 import os
 import plot
+import warnings
 
 
 class Lightcurve(object):
@@ -28,7 +29,7 @@ class Source(object):
         
     def make_sed_lightcurve(self, lcs=['default']):
         print('Make SED lightcurve for {}'.format(self.name))
-
+        print self.lightcurves
         main_lc = self.lightcurves[lcs[0]]
         for i in range(len(main_lc.time_windows)):
             try:
@@ -45,16 +46,16 @@ class Source(object):
         #Create all year SED
         try:
             plot.make_sed_plot([(self.seds['default'], 'grey', 'grey', True, True, True)],
-                               mw_data=self.mw_data_path, dec=src.dec)
+                               mw_data=self.mw_data_path, dec=self.dec)
         except Exception as inst:
                 warnings.warn("Couldn't create all year SED")
                 print(inst)
 
         # Create GIF
         try:
-            make_gif(path)
+            make_gif(main_lc.bpath)
         except Exception as inst:
-            warnings.warn("Couldn't create an animated light curve {}".format(src.name))
+            warnings.warn("Couldn't create an animated light curve {}".format(self.name))
             print(inst)
         return 
 
@@ -135,11 +136,11 @@ class Source(object):
             cp_dec = self.dec
         pre_str = '{vou_path} {ra} {dec} {loc_str} -s ; cat Sed.txt > {bpath}'
         for i in range(2):
-            os.system(pre_str.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec,  bpath=os.path.join(self.bpath,'sed.txt'), loc_str=2))
+            os.system(pre_str.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec,  bpath=self.mw_data_path, loc_str=2))
         return
 
 
-    def source_summary(bpath, src, mjd, mode='mid'):
+    def source_summary(self, bpath, mjd, mode='mid'):
         bpath_src = self.bpath
         lc_base = self.lc_path
         lc_path = os.path.join(lc_base, 'lightcurve.pdf')
@@ -212,7 +213,7 @@ class Source(object):
 
 
     def make_fixed_binning_lightcurve(self, emin, fermi_data_path, mjd_range, mjd=None, dt_lc=None, mode='end',
-                                      name='', add_srcs=None):
+                                      name='', add_srcs=None, job_id='fermi'):
         sargs = '--target_src {} --free_radius {} --data_path {} --use_4FGL --emin {} '
         sub_args = sargs.format(self.name.replace(' ', '_'), get_68_psf(emin), fermi_data_path, emin)
         if '3FGL' in self.name:
@@ -247,8 +248,8 @@ class Source(object):
         for t_window in time_windows:
             add_str = '{:.1f}_{:.1f}'.format(t_window[0], t_window[1])
             opath = os.path.join(ofolder, add_str)
-            this_lc.time_window.results.append(opath)
-            submit_fit(sub_args, opath, srcs=add_srcs, sub_file='fermi.sub',
+            this_lc.time_window_results.append(opath)
+            submit_fit(sub_args, opath, srcs=add_srcs, sub_file=job_id + '.sub',
                        trange=t_window, partition='kta')
         if name == '':
             self.lightcurves['default'] = this_lc
@@ -257,14 +258,14 @@ class Source(object):
         return
 
 
-    def make_sed(self, emin, fermi_data_path, name='', add_srcs=None):
+    def make_sed(self, emin, fermi_data_path, name='', add_srcs=None, job_id='fermi'):
         sargs = '--target_src {} --free_radius {} --data_path {} --use_4FGL --emin {} '
         if name != '':
             opath = self.sed_path + '_' + name
         else:
             opath = self.sed_path
         sub_args = sargs.format(self.name.replace(' ', '_'), get_68_psf(emin), fermi_data_path, emin)
-        submit_fit(sub_args, opath, srcs=add_srcs, sub_file='fermi.sub', trange='', partition='long')
+        submit_fit(sub_args, opath, srcs=add_srcs, sub_file=job_id + '.sub', trange='', partition='xtralong') 
         if name == '':
             self.seds['default'] = opath
         else:
