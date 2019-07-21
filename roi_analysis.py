@@ -106,17 +106,15 @@ def src_path(bpath, src):
 
 
 args = parseArguments()
-gcn_dict = None
-rec = args['recovery']
 make_pdf = args['make_pdf']
-overwrite = args['overwrite']
-print('Run with args')
-print(args)
+print('Run with args \n {}'.format(args))
 
+# Setup Analysis Class
 bpath = os.path.join(args['basepath'], args['event'])
-if os.path.exists(os.path.join(bpath, 'analysis.pickle')):
+analysis_object_path = os.path.join(bpath,'analysis.pickle')
+if os.path.exists(analysis_object_path):
     print('Folder {} already exist....exit. Only create PDF'.format(bpath))
-    with open(os.path.join(bpath,'analysis.pickle'), "rb") as f:
+    with open(analysis_object_path, "rb") as f:
         analysis = pickle.load(f)
     analysis.update_gcn()
     make_pdf=True
@@ -140,54 +138,54 @@ else:
         ev_str = 'IC{}{:02d}{:02d}'.format(str(t.datetime.year)[-2:],
                                            t.datetime.month, t.datetime.day)
     bpath = os.path.join(args['basepath'], ev_str)
+    analysis_object_path = os.path.join(bpath,'analysis.pickle')
     analysis.bpath = bpath
     analysis.emin = args['emin']
     analysis.event_name = ev_str
     if 'err90' in args.keys():
         analysis.err90 = args['err90']
-
-
 this_path = os.path.dirname(os.path.abspath(__file__))
+analysis.this_path = this_path
 
-if not rec and not make_pdf:
-
+if not args['recovery'] and not make_pdf:
     # Run VOU Tool
-    analysis.ROI_analysis(this_path, args['radius'])
+    analysis.ROI_analysis(args['radius'])
     if args['only_vou']:
         exit()
 
     # Download gamma-ray data
     analysis.get_fermi_data(days=args['dt'], mjd_range=args['mjd_range'])
-    with open(os.path.join(analysis.bpath,'analysis.pickle'), "wb") as f:
+    with open(analysis_object_path, "wb") as f:
         pickle.dump(analysis, f)
 
 
-if args['mode'] == 'end':
-    tsmjd1 = analysis.mjd-200
-    tsmjd2 = analysis.mjd
-
-else:
-    tsmjd1 = analysis.mjd-100
-    tsmjd2 = analysis.mjd+100
-
-ts_emin = np.max([1000, analysis.emin])
 
 # Start the gamma-ray analysis
 
 if not make_pdf:
     args['overwrite'] = True
+    if args['mode'] == 'end':
+        tsmjd1 = analysis.mjd-200
+        tsmjd2 = analysis.mjd
 
+    else:
+        tsmjd1 = analysis.mjd-100
+        tsmjd2 = analysis.mjd+100
+    analysis.tsmjd1 = tsmjd1
+    analysis.tsmjd2 = tsmjd2
+    ts_emin = np.max([1000, analysis.emin])
+    analysis.ts_emin = ts_emin
     # TS maps
     sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
-    sargs = sargs.format(get_68_psf(ts_emin), analysis.fermi_data, ts_emin, analysis.ra, analysis.dec)
+    sargs = sargs.format(get_68_psf(ts_emin), analysis.fermi_data, analysis.ts_emin, analysis.ra, analysis.dec)
     ts_map_path = os.path.join(analysis.bpath, 'ts_map')
     analysis.ts_maps.append(ts_map_path)
     submit_fit(sargs, ts_map_path, sub_file=analysis.id+'.sub', ana_type='TS_Map', partition='xtralong')
 
     sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {} --time_range {} {}'
 
-    sargs = sargs.format(get_68_psf(ts_emin), analysis.fermi_data, ts_emin, analysis.ra, analysis.dec,
-                         tsmjd1, tsmjd2)
+    sargs = sargs.format(get_68_psf(ts_emin), analysis.fermi_data, analysis.ts_emin, analysis.ra, analysis.dec,
+                         analysis.tsmjd1, analysis.tsmjd2)
     ts_map_short_path = os.path.join(analysis.bpath, 'ts_map_short')
     analysis.ts_maps.append(ts_map_short_path)
     submit_fit(sargs, ts_map_short_path, sub_file=analysis.id+'.sub', ana_type='TS_Map', partition='xtralong')
@@ -202,19 +200,17 @@ if not make_pdf:
 print('Submit_SEDs')
 
 for src in analysis.srcs:
+    if make_pdf:
+        continue
     bpath_src = src_path(analysis.bpath, src.name)
-    print('{} is at a distance {:.1f} deg'.format(src.name, src.dist))
+    print(' \n \n {} is at a distance {:.1f} deg'.format(src.name, src.dist))
     if src.dist > args['max_dist']:
         continue
-    if os.path.exists(bpath_src) and (not args['recovery']) and (not args['make_pdf']):
+    if os.path.exists(bpath_src) and (not args['recovery']):
         print('Remove Path: {}'.format(bpath_src))
         shutil.rmtree(bpath_src)
     src.setup_folders(bpath_src)
-    if make_pdf:
-        continue
     src.get_mw_data(this_path)
-    if make_pdf:
-        continue
     
     src.make_sed(analysis.emin, analysis.fermi_data, name='', add_srcs=analysis.srcs, job_id = analysis.id)
     if analysis.emin < 1e3:
@@ -229,13 +225,15 @@ for src in analysis.srcs:
                                           dt_lc=args['dt_lc'], mode=args['mode'], name='1GeV',
                                           add_srcs=analysis.srcs, job_id=analysis.id)
 
-if os.path.exists(os.path.join(analysis.bpath,'analysis.pickle')):
-    os.remove(os.path.join(analysis.bpath,'analysis.pickle'))
-with open(os.path.join(analysis.bpath,'analysis.pickle'), "wb") as f:
+if os.path.exists(analysis_object_path):
+    os.remove(analysis_object_path)
+with open(analysis_object_path, "wb") as f:
     pickle.dump(analysis, f)
 mins = 0
 final_pdf = False
 prev_len_jobs = -1
+
+# Wait for jobs to finish....
 while not final_pdf:
     if not make_pdf:
         time.sleep(60)
@@ -249,23 +247,9 @@ while not final_pdf:
         continue
     prev_len_jobs = len_jobs
 
+## Make Plots
     if args['overwrite']:
-        for tsm in analysis.ts_maps:
-            try:
-                plot.make_ts_plot(tsm, analysis.srcs,
-                                  os.path.join(analysis.vou_out, 'find_out_temp.txt'),
-                                  plt_mode='tsmap', error90 = analysis.err90)
-            except Exception as inst:
-                warnings.warn("Couldn't create ts map...")
-                print(inst)
-
-            try:
-                plot.make_ts_plot(tsm, analysis.srcs,
-                                  os.path.join(analysis.vou_out, 'find_out_temp.txt'),
-                                  plt_mode='residmap',  error90=analysis.err90)
-            except Exception as inst:
-                warnings.warn("Couldn't create residual map...")
-                print(inst)
+        analysis.make_ts_maps()
         for src in analysis.srcs:
             if src.dist > args['max_dist']:
                 continue
@@ -280,68 +264,5 @@ while not final_pdf:
         if src.dist > args['max_dist']:
             continue
         src_latex += src.source_summary(analysis.bpath, analysis.mjd, mode=args['mode'])
-    with open(os.path.join(analysis.bpath, 'vou_blazar/full_output'), 'r') as f:
-        full_out = f.read().encode('utf8').\
-            replace('\x1b', '').replace('nu_p', 'nu peak')
-        full_out = re.sub('\*([^\*]*)\*', r'\\textbf{\1}', full_out)
-        full_out = re.sub('(Match[^\\\\]*)', r'\\textbf{\1}', full_out)
-        full_out = re.sub('(Dist[^\\\\]*)', r'\\textbf{\1}', full_out)
-        full_out = [i.strip() + ' \n' for i in full_out.split('\n')]
-        full_out = [i if i != '\\\\ \n' else '\\\\\\\ \n' for i in full_out]
-        full_out = ' '.join(full_out)
-    with open(os.path.join(analysis.bpath, 'vou_blazar/short_output'), 'r') as f:
-        short_out = f.read().encode('utf8').replace('\x1b', '')
-        short_out = re.sub('\*([^\*]*)\*', r'\\textbf{\1}', short_out)
-    with open('./template.tex') as f:
-        template = f.read()
-
-    c = SkyCoord(analysis.ra, analysis.dec, frame='icrs', unit="deg")
-    gal = c.galactic
-    if not final_pdf:
-        prelim = '{\color{red} Warning: The following results are all preliminary and will be continously updated whenever calculations are finished.}'
-    else:
-        prelim = ' '
-    t = Time.now()
-    t_now_str = t.iso
-    out = template.format(prelim=prelim,
-                          date=analysis.mjd,
-                          ra=analysis.ra,
-                          dec=analysis.dec,
-                          emin=1.*analysis.emin/1000.,
-                          l=gal.l.deg,
-                          b=gal.b.deg,
-                          cat_srcs=short_out,
-                          rx_map=os.path.join(analysis.vou_out, 'RX_map.eps'),
-                          vou_pic=os.path.join(analysis.vou_out, 'candidates.eps'),
-                          ts_map=os.path.join(analysis.bpath, 'ts_map/tsmap.png'),
-                          ts_map_short=os.path.join(analysis.bpath, 'ts_map_short/tsmap.png'),
-                          vou_output=full_out,
-                          event=analysis.event_name,
-                          tsmjd1=tsmjd1,
-                          tsmjd2=tsmjd2,
-                          src_latex=src_latex,
-                          mjd1=analysis.mjd_range[0],
-                          mjd2=analysis.mjd_range[1],
-                          energy=analysis.emin/1000.,
-                          tsemin = ts_emin/1e3,
-                          gcnurl = analysis.gcn,
-                          createdon=t_now_str)
-
-    latex_path = os.path.join(analysis.bpath, analysis.event_name + '.tex')
-    if os.path.exists(latex_path):
-        os.remove(latex_path)
-    with open(latex_path, 'w+') as f:
-        f.write(out)
-    if not os.path.exists(os.path.join(analysis.bpath, 'sample.bib')):
-        shutil.copyfile('sample.bib', os.path.join(analysis.bpath, 'sample.bib'))
-    os.chdir(analysis.bpath)
-    cmds  = [
-        ['pdflatex', '-interaction', 'nonstopmode', analysis.event_name + '.tex'],
-        ['bibtex', analysis.event_name + '.aux'],
-        ['pdflatex', '-interaction', 'nonstopmode',  analysis.event_name + '.tex'],
-        ['pdflatex', '-interaction', 'nonstopmode',  analysis.event_name + '.tex'],
-    ]
-    for c in cmds:
-        subprocess.call(c)
-    os.chdir(this_path)
-    print_to_slack('Fit Results', os.path.join(analysis.bpath, analysis.event_name + '.pdf'))
+    analysis.make_pdf(src_latex, final_pdf = final_pdf)
+    print_to_slack('Fit Results', analysis.pdf_out_path)

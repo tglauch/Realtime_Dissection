@@ -8,6 +8,7 @@
 \usepackage{{authblk}}
 \usepackage{{caption}}
 \usepackage{{subcaption}}
+\usepackage{{hyperref}}
 \usepackage[outdir=./converted]{{epstopdf}}
 \usepackage[left=30mm, right=30mm, bottom=30mm]{{geometry}}
 \usepackage{{fancyhdr}}
@@ -36,12 +37,11 @@
 \thispagestyle{{firstpage}}
 \begin{{abstract}}
 {prelim}The IceCube Neutrino Observatory has recently reported the detection of a highly-energetic
-neutrino \footnote{{{gcnurl}}},
-\textit{{{event}}} (MJD: {date:.2f}), with direction ra: {ra:.2f}$^\circ$, dec: {dec:.2f}$^\circ$ in equatorial and l: {l:.2f}$^\circ$, b:
+neutrino, \textit{{{event}}} \footnote{{\protect\url{{{gcnurl}}}}} (MJD: {date:.2f}), with direction ra: {ra:.2f}$^\circ$, dec: {dec:.2f}$^\circ$ in equatorial and l: {l:.2f}$^\circ$, b:
 {b:.2f}$^\circ$ in galactic coordinates. Due to the high-energy and the track-like signature the event has a good
 pointing and is likely of astrophysical origin. With the goal of identifing
 the corresponding electromagnetic counterpart we report here on the muli-wavenlength dissection of the region around the
-event. This report was generated autmoatically on {createdon}.
+event. This report was generated autmoatically on {createdon} UTC.
 \end{{abstract}}
 
 \section{{Identifying Counterpart Candidates}}
