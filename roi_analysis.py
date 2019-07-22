@@ -23,7 +23,6 @@ from analysis import Analysis
 import pickle
 from slack_lib import print_to_slack
 
-
 def parseArguments():
     """Parse the command line arguments
     Returns:
@@ -31,83 +30,52 @@ def parseArguments():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--ra",
-        help="right ascension",
-        type=float,)
+        "--ra", help="right ascension",type=float)
     parser.add_argument(
-        "--dec",
-        help="declination",
-        type=float,)
+        "--dec", help="declination", type=float)
     parser.add_argument(
-        "--mjd",
-        help="The MJD time of the event",
-        type=float)
+        "--mjd", help="The MJD time of the event", type=float)
     parser.add_argument(
-        "--mjd_range",
-        help="The mjd range for the analysis",
-        type=float, nargs='+')
+        "--mjd_range", help="The mjd range for the analysis", type=float, nargs='+')
     parser.add_argument(
-        "--dt_lc",
-        help="time lenght of bins in the light curve",
-        type=float, default=200)
+        "--dt_lc", help="Time lenght of bins in the light curve", type=float, default=200)
     parser.add_argument(
-        "--dt",
-        help="length of time window to analyze",
-        type=float)
+        "--dt", help="Length of time window to analyze", type=float)
     parser.add_argument(
-        "--radius",
-        help="radius of the region to analyze",
-        type=str, default="180")
+        "--radius", help="Radius of the region to analyze", type=str, default="180")
     parser.add_argument(
-        "--emin",
-        help="lower energy bound for SED",
-        type=float, default=1000)
+        "--emin", help="Lower energy bound for SED", type=float, default=1000)
     parser.add_argument(
-        "--event",
-        help="event name",
-        default='None')
+        "--event", help="Name of the Event", default='None')
     parser.add_argument(
-        "--only_vou",
-        help="event name",
-        action="store_true", default = False)
+        "--only_vou", help="Only run VOU Blazar", action="store_true", default = False)
     parser.add_argument(
-        "--gcn",
-        help="pass a link to a gcn notice",
-        type=str)
+        "--gcn", help="Pass a link to a GCN notice", type=str)
     parser.add_argument(
-        "--mode",
-        help="end if given mjd is at the end of the time window, mid if in the middle'",
+        "--mode", help="end if given mjd is at the end of the time window, mid if in the middle'",
         type=str, default='end')
     parser.add_argument(
-        "--recovery",
-        help="Is this a run that recovers the previous processing?",
+        "--recovery", help="Is this a run that recovers the previous processing?",
         action="store_true", default = False)
     parser.add_argument(
-        "--make_pdf",
-        help="Only create the output pdf form a previous run ",
+        "--make_pdf", help="Only create the output PDF form a previous run ",
         action="store_true", default = False)
     parser.add_argument(
-        "--overwrite",
-        help="Only create the output pdf form a previous run ",
+        "--overwrite", help="Overwrite already existing Plots",
         action="store_true", default = False)
     parser.add_argument(
-        "--basepath",
-        help = 'basepath for the output',
+        "--basepath", help = 'Basepath for the Output',
         type=str, default = '/scratch9/tglauch/realtime_service/output/')
     parser.add_argument(
-        "--max_dist",
-        help = 'maximum distance for the fermi analysis',
-        type=float, default=2.) 
+        "--max_dist", help = 'Radius of sources to be included', type=float, default=2.5) 
     args = parser.parse_args()
     return args.__dict__
-
-def src_path(bpath, src):
-    return os.path.join(bpath, src.replace(' ', '_'))
 
 
 args = parseArguments()
 make_pdf = args['make_pdf']
 print('Run with args \n {}'.format(args))
+
 
 # Setup Analysis Class
 bpath = os.path.join(args['basepath'], args['event'])
@@ -117,7 +85,6 @@ if os.path.exists(analysis_object_path):
     with open(analysis_object_path, "rb") as f:
         analysis = pickle.load(f)
     analysis.update_gcn()
-    make_pdf=True
 else:
     ## read GCN
     if args['gcn'] is not None:
@@ -144,12 +111,14 @@ else:
     analysis.event_name = ev_str
     if 'err90' in args.keys():
         analysis.err90 = args['err90']
+    analysis.radius = args['radius']
 this_path = os.path.dirname(os.path.abspath(__file__))
 analysis.this_path = this_path
 
+
 if not args['recovery'] and not make_pdf:
     # Run VOU Tool
-    analysis.ROI_analysis(args['radius'])
+    analysis.ROI_analysis(analysis.radius)
     if args['only_vou']:
         exit()
 
@@ -159,9 +128,7 @@ if not args['recovery'] and not make_pdf:
         pickle.dump(analysis, f)
 
 
-
 # Start the gamma-ray analysis
-
 if not make_pdf:
     args['overwrite'] = True
     if args['mode'] == 'end':
@@ -175,65 +142,56 @@ if not make_pdf:
     analysis.tsmjd2 = tsmjd2
     ts_emin = np.max([1000, analysis.emin])
     analysis.ts_emin = ts_emin
+
     # TS maps
-    sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
-    sargs = sargs.format(get_68_psf(ts_emin), analysis.fermi_data, analysis.ts_emin, analysis.ra, analysis.dec)
-    ts_map_path = os.path.join(analysis.bpath, 'ts_map')
-    analysis.ts_maps.append(ts_map_path)
-    submit_fit(sargs, ts_map_path, sub_file=analysis.id+'.sub', ana_type='TS_Map', partition='xtralong')
-
-    sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {} --time_range {} {}'
-
-    sargs = sargs.format(get_68_psf(ts_emin), analysis.fermi_data, analysis.ts_emin, analysis.ra, analysis.dec,
-                         analysis.tsmjd1, analysis.tsmjd2)
-    ts_map_short_path = os.path.join(analysis.bpath, 'ts_map_short')
-    analysis.ts_maps.append(ts_map_short_path)
-    submit_fit(sargs, ts_map_short_path, sub_file=analysis.id+'.sub', ana_type='TS_Map', partition='xtralong')
-
-    #getsrcprob
-    sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
-    sargs = sargs.format(get_68_psf(5000),analysis.fermi_data, 5000, analysis.ra, analysis.dec)
-    srcprob_path = os.path.join(analysis.bpath, 'srcprob')
-    analysis.srcprob_path = srcprob_path
-    submit_fit(sargs, srcprob_path, srcs=analysis.srcs, sub_file=analysis.id+'.sub', ana_type='srcprob', partition='xtralong')
-
-print('Submit_SEDs')
-
-for src in analysis.srcs:
-    if make_pdf:
-        continue
-    bpath_src = src_path(analysis.bpath, src.name)
-    print(' \n \n {} is at a distance {:.1f} deg'.format(src.name, src.dist))
-    if src.dist > args['max_dist']:
-        continue
-    if os.path.exists(bpath_src) and (not args['recovery']):
-        print('Remove Path: {}'.format(bpath_src))
-        shutil.rmtree(bpath_src)
-    src.setup_folders(bpath_src)
-    src.get_mw_data(this_path)
+    ts_map_path = os.path.join(analysis.bpath, 'ts_map') 
+    analysis.make_ts_map(ts_map_path) 
+    ts_map_short_path = os.path.join(analysis.bpath, 'ts_map_short') 
+    analysis.make_ts_map(ts_map_short_path, trange=[analysis.tsmjd1, analysis.tsmjd2])
     
-    src.make_sed(analysis.emin, analysis.fermi_data, name='', add_srcs=analysis.srcs, job_id = analysis.id)
-    if analysis.emin < 1e3:
-        src.make_sed(analysis.emin, analysis.fermi_data, name='1GeV', add_srcs=analysis.srcs,
-                     job_id=analysis.id)
+    #getsrcprob
+    srcprob_path = os.path.join(analysis.bpath, 'srcprob')
+    analysis.calc_src_probs(srcprob_path, emin=5000)
 
-    src.make_fixed_binning_lightcurve(analysis.emin, analysis.fermi_data, analysis.mjd_range, mjd=analysis.mjd,
-                                      dt_lc=args['dt_lc'], mode=args['mode'], name='', add_srcs=analysis.srcs,
-                                      job_id = analysis.id)
-    if analysis.emin < 1e3:
-        src.make_fixed_binning_lightcurve(1e3, analysis.fermi_data, analysis.mjd_range, mjd=analysis.mjd,
-                                          dt_lc=args['dt_lc'], mode=args['mode'], name='1GeV',
-                                          add_srcs=analysis.srcs, job_id=analysis.id)
 
-if os.path.exists(analysis_object_path):
-    os.remove(analysis_object_path)
-with open(analysis_object_path, "wb") as f:
-    pickle.dump(analysis, f)
+if not make_pdf:
+    print('Submit_SEDs')
+    for src in analysis.srcs:
+        if make_pdf:
+            continue
+        bpath_src = os.path.join(bpath, src.name.replace(' ', '_'))
+        print(' \n \n {} is at a distance {:.1f} deg'.format(src.name, src.dist))
+        if src.dist > args['max_dist']:
+            continue
+        if os.path.exists(bpath_src) and (not args['recovery']):
+            print('Remove Path: {}'.format(bpath_src))
+            shutil.rmtree(bpath_src)
+        src.setup_folders(bpath_src)
+        src.get_mw_data(this_path)
+        
+        src.make_sed(analysis.emin, analysis.fermi_data, name='', add_srcs=analysis.srcs, job_id = analysis.id)
+        if analysis.emin < 1e3:
+            src.make_sed(analysis.emin, analysis.fermi_data, name='1GeV', add_srcs=analysis.srcs,
+                         job_id=analysis.id)
+
+        src.make_fixed_binning_lightcurve(analysis.emin, analysis.fermi_data, analysis.mjd_range, mjd=analysis.mjd,
+                                          dt_lc=args['dt_lc'], mode=args['mode'], name='', add_srcs=analysis.srcs,
+                                          job_id = analysis.id)
+        if analysis.emin < 1e3:
+            src.make_fixed_binning_lightcurve(1e3, analysis.fermi_data, analysis.mjd_range, mjd=analysis.mjd,
+                                              dt_lc=args['dt_lc'], mode=args['mode'], name='1GeV',
+                                              add_srcs=analysis.srcs, job_id=analysis.id)
+
+    if os.path.exists(analysis_object_path):
+        os.remove(analysis_object_path)
+    with open(analysis_object_path, "wb") as f:
+        pickle.dump(analysis, f)
+
+
+# Wait for jobs to finish....
 mins = 0
 final_pdf = False
 prev_len_jobs = -1
-
-# Wait for jobs to finish....
 while not final_pdf:
     if not make_pdf:
         time.sleep(60)
@@ -247,9 +205,9 @@ while not final_pdf:
         continue
     prev_len_jobs = len_jobs
 
-## Make Plots
+    # Make Plots
     if args['overwrite']:
-        analysis.make_ts_maps()
+        analysis.make_ts_map_plots()
         for src in analysis.srcs:
             if src.dist > args['max_dist']:
                 continue
@@ -258,7 +216,6 @@ while not final_pdf:
                 src.make_sed_lightcurve(lcs=['default', '1GeV'])
             else: 
                 src.make_sed_lightcurve(lcs=['default'])
-
     src_latex = ''
     for src in analysis.srcs:
         if src.dist > args['max_dist']:

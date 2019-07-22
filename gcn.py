@@ -47,8 +47,10 @@ def read_gcn(url, basepath=None):
         gcn_info['SRC_DEC'] = parse_direction(gcn_info['SRC_DEC'])
         gcn_info['SRC_RA'] = parse_direction(gcn_info['SRC_RA'])
         gcn_info['SRC_ERROR'] = parse_error(gcn_info['SRC_ERROR'])
-        gcn_info['SRC_ERROR50'] = parse_error(gcn_info['SRC_ERROR50'])
-        gcn_info['SIGNALNESS'] = calc_signess(gcn_info['SIGNALNESS'])
+        if 'SRC_ERROR50' in gcn_info.keys():
+            gcn_info['SRC_ERROR50'] = parse_error(gcn_info['SRC_ERROR50'])
+        if 'SIGNALNESS' in gcn_info.keys():
+            gcn_info['SIGNALNESS'] = calc_signess(gcn_info['SIGNALNESS'])
         gcn_info['MJD'] = make_mjd(gcn_info['DISCOVERY_DATE'], gcn_info['DISCOVERY_TIME'])
         if basepath is not None:
             np.save(os.path.join(basepath, 'gcn_info_{}.npy'.format(c)), gcn_info)

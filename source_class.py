@@ -175,7 +175,7 @@ class Source(object):
             l_str = l_str.format(srcinfo=t_str)
 
         l_str += 'Associations: {} \\\\ \n'.format(', '.join(self.names))
-        sed_pdf = os.path.join(self.sed_path, 'sed.pdf')
+        sed_pdf = os.path.join(sed_path, 'sed.pdf')
         try:
             srcprob = fits.open(os.path.join(bpath,'srcprob/ft1_srcprob_00.fits'))
             energy = srcprob[1].data['ENERGY']
@@ -206,7 +206,7 @@ class Source(object):
         if os.path.exists(gev_lc):
             l_str += fig_str.format(width = 0.8, path = gev_lc, caption='1GeV light curve for {}'.format(self.name))
         if ('4FGL' in self.name) | ('3FGL' in self.name):
-            cp_candidate_path = os.path.join(self.bpath, 'vou_counterpart', self.name.replace(' ', '_').replace('.','_') + '.eps')
+            cp_candidate_path = os.path.join(bpath_src, 'vou_counterpart', self.name.replace(' ', '_').replace('.','_') + '.eps')
             if os.path.exists(cp_candidate_path):
                 l_str += fig_str.format(width = 0.7, path = cp_candidate_path, caption='Possible couterparts for{}'.format(self.name))
         l_str += '\\clearpage \n'

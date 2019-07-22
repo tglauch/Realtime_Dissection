@@ -1,4 +1,4 @@
-from roi_functions import GreatCircleDistance, get_add_info, path_settings, vou_path
+from roi_functions import GreatCircleDistance, get_add_info, path_settings, vou_path, get_68_psf, submit_fit
 import numpy as np
 from source_class import Source 
 import collections
@@ -35,6 +35,7 @@ files = collections.OrderedDict([
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
+
 class Analysis(object):
     def __init__(self, mjd=None, ra=None, dec=None):
         self.event_name = None
@@ -51,8 +52,10 @@ class Analysis(object):
         self.ts_maps = []
         self.srcprob_path = None
         self.id = id_generator(size=5) 
+        self.notice_date = 'None'
+        self.radius = 180
 
-    def make_ts_maps(self):
+    def make_ts_map_plots(self):
         for tsm in self.ts_maps:
 
             try:
@@ -72,6 +75,27 @@ class Analysis(object):
                 print(inst)
         return
 
+    def calc_src_probs(self, srcprob_path, emin=None):
+        sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
+        if emin is None:
+            emin = self.ts_emin
+        sargs = sargs.format(get_68_psf(emin), self.fermi_data, emin, self.ra, self.dec)
+        self.srcprob_path = srcprob_path
+        submit_fit(sargs, srcprob_path, srcs=self.srcs, sub_file=self.id+'.sub', ana_type='srcprob', partition='xtralong')
+        return
+
+
+
+    def make_ts_map(self, ts_map_path, emin=None, trange=None):
+        sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
+        if emin is None:
+            emin = self.ts_emin
+        if trange is not None:
+           sargs = sargs + ' --time_range {} {}'.format(trange[0], trange[1])
+        sargs = sargs.format(get_68_psf(emin), self.fermi_data, emin, self.ra, self.dec)
+        self.ts_maps.append(ts_map_path)
+        submit_fit(sargs, ts_map_path, sub_file=self.id+'.sub', ana_type='TS_Map', partition='xtralong')
+        return
 
     def make_pdf(self, src_latex, final_pdf=True):
         with open(os.path.join(self.bpath, 'vou_blazar/full_output'), 'r') as f:
@@ -137,7 +161,7 @@ class Analysis(object):
             os.makedirs(self.vou_out)
         os.chdir(self.vou_out)
         cmd = [vou_path,
-               str(self.ra), str(self.dec), radius, str(30), str(90)]
+               str(self.ra), str(self.dec), str(radius), str(self.err90)]
         for i in range(2):
             subprocess.call(cmd)
 
@@ -190,12 +214,18 @@ class Analysis(object):
 
     def from_gcn(self, url):
         gcn_dict = read_gcn(url)
-        self.ra = gcn_dict['SRC_RA']
-        self.dec = gcn_dict['SRC_DEC']
-        self.err90 = gcn_dict['SRC_ERROR']
-        self.err50 = gcn_dict['SRC_ERROR50']
-        self.mjd = gcn_dict['MJD']
-        self.gcn = url
+        if gcn_dict['NOTICE_DATE'] != self.notice_date:
+            self.ra = gcn_dict['SRC_RA']
+            self.dec = gcn_dict['SRC_DEC']
+            self.err90 = gcn_dict['SRC_ERROR']
+            if 'SRC_ERROR50' in gcn_dict.keys():
+                self.err50 = gcn_dict['SRC_ERROR50']
+            self.mjd = gcn_dict['MJD']
+            if self.notice_date != 'None':
+                print('Update GCN and VOU ROI')
+                self.ROI_analysis(self.radius)
+            self.notice_date = gcn_dict['NOTICE_DATE']
+            self.gcn = url
         t = Time.now()
         if np.abs(self.mjd - t.mjd)<2:
             self.mode = 'end'
