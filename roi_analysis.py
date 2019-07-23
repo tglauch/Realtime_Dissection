@@ -4,10 +4,10 @@ import sys
 sys.path.append('/scratch9/tglauch/Fermi_Tools/get_fermi_data')
 sys.path.append('/scratch9/tglauch/realtime_service/python/lib/python2.7/site-packages')
 sys.path.append('/home/ga53lag/Software/python_scripts/')
+sys.path.append('./lib')
 import subprocess
 import argparse
 import os
-from roi_functions import submit_fit, partition_t, get_68_psf 
 import shutil
 import datetime
 import numpy as np

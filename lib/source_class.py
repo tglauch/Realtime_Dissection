@@ -1,6 +1,6 @@
 import numpy as np
-from roi_functions import GreatCircleDistance, vou_path, path_settings, get_lc_time3fgl, \
-                          get_lc_time4fgl,get_68_psf, submit_fit, make_gif
+from functions import GreatCircleDistance, vou_path, path_settings, get_lc_time3fgl, \
+                      get_lc_time4fgl,get_68_psf, submit_fit, make_gif
 from astropy.io import fits
 from myfunctions import MET_to_MJD, dict_to_nparray, ts_to_pval, pval_to_sigma
 import os

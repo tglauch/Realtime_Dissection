@@ -1,4 +1,4 @@
-from roi_functions import GreatCircleDistance, get_add_info, path_settings, vou_path, get_68_psf, submit_fit
+from functions import GreatCircleDistance, get_add_info, path_settings, vou_path, get_68_psf, submit_fit
 import numpy as np
 from source_class import Source 
 import collections
