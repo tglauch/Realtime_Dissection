@@ -94,7 +94,7 @@ def make_lc_plot(basepath, mjd, **kwargs):
     ax2=fig.add_axes((.0, .6,1.,.4))
     if '4FGL' in source:
         if kwargs.get('4fgl_average', True):
-            catalog = fits.open('./gll_psc_v19.fit')
+            catalog = fits.open('./lib/gll_psc_v19.fit')
             names = catalog[1].data['Source_Name']
             ind = np.where(names == source)[0][0]
             av_gamma = catalog[1].data[ind]['PL_Index']
@@ -230,11 +230,11 @@ def make_sed_plot(seds_list, mw_data=None, dec = None):
                         horizontalalignment='center',
                         verticalalignment='center', transform=ax.transAxes)
     if dec is not None:
-        IC_sens = np.genfromtxt('IC_sens.txt', delimiter=',')
+        IC_sens = np.genfromtxt('./lib/IC_sens.txt', delimiter=',')
         inter = scipy.interpolate.UnivariateSpline(IC_sens[:,0], IC_sens[:,1], k=1,s=0)
         flux = inter(np.sin(np.radians(dec))) * MeV_to_erg * 1e6
         ax.plot([5e3, 1e6], [flux, flux], color='green', linestyle='--')
-        IC_disc = np.genfromtxt('IC_disc.txt', delimiter=',')
+        IC_disc = np.genfromtxt('./lib/IC_disc.txt', delimiter=',')
         inter = scipy.interpolate.UnivariateSpline(IC_disc[:,0], IC_disc[:,1], k=1, s=0)
         flux = inter(np.sin(np.radians(dec))) * MeV_to_erg * 1e6
         ax.plot([5e3, 1e6], [flux, flux], color='green', linestyle='-')

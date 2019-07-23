@@ -149,7 +149,7 @@ def make_gif(basepath):
     return
 
 def get_add_info(src_of_interest):
-    data = fits.open('/scratch9/tglauch/realtime_service/main/gll_psc_v19.fit')
+    data = fits.open('./gll_psc_v19.fit')
     eflux = data[1].data['Energy_Flux100']
     inds = np.argsort(eflux)[::-1]
     eflux = eflux[inds]

@@ -48,14 +48,14 @@ def parseArguments():
     parser.add_argument(
         "--event", help="Name of the Event", default='None')
     parser.add_argument(
-        "--only_vou", help="Only run VOU Blazar", action="store_true", default = False)
+        "--vou", help="Only run VOU Blazar", action="store_true", default = False)
     parser.add_argument(
         "--gcn", help="Pass a link to a GCN notice", type=str)
     parser.add_argument(
         "--mode", help="end if given mjd is at the end of the time window, mid if in the middle'",
         type=str, default='end')
     parser.add_argument(
-        "--recovery", help="Is this a run that recovers the previous processing?",
+        "--lat_analysis", help="Run the LAT analysis?",
         action="store_true", default = False)
     parser.add_argument(
         "--make_pdf", help="Only create the output PDF form a previous run ",
@@ -76,12 +76,11 @@ args = parseArguments()
 make_pdf = args['make_pdf']
 print('Run with args \n {}'.format(args))
 
-
 # Setup Analysis Class
 bpath = os.path.join(args['basepath'], args['event'])
 analysis_object_path = os.path.join(bpath,'analysis.pickle')
 if os.path.exists(analysis_object_path):
-    print('Folder {} already exist....exit. Only create PDF'.format(bpath))
+    print('Folder {} already exist....exit.'.format(bpath))
     with open(analysis_object_path, "rb") as f:
         analysis = pickle.load(f)
     analysis.update_gcn()
@@ -112,25 +111,23 @@ else:
     if 'err90' in args.keys():
         analysis.err90 = args['err90']
     analysis.radius = args['radius']
-this_path = os.path.dirname(os.path.abspath(__file__))
-analysis.this_path = this_path
+    analysis.max_dist = args['max_dist']
+    args['vou'] = True
+    args['lat_analysis'] = True
+analysis.this_path = os.path.dirname(os.path.abspath(__file__))
 
-
-if not args['recovery'] and not make_pdf:
+if args['vou']:
     # Run VOU Tool
     analysis.ROI_analysis(analysis.radius)
-    if args['only_vou']:
-        exit()
 
+# Start the gamma-ray analysis
+if args['lat_analysis']:
+    args['overwrite'] = True
     # Download gamma-ray data
     analysis.get_fermi_data(days=args['dt'], mjd_range=args['mjd_range'])
     with open(analysis_object_path, "wb") as f:
         pickle.dump(analysis, f)
 
-
-# Start the gamma-ray analysis
-if not make_pdf:
-    args['overwrite'] = True
     if args['mode'] == 'end':
         tsmjd1 = analysis.mjd-200
         tsmjd2 = analysis.mjd
@@ -149,25 +146,24 @@ if not make_pdf:
     ts_map_short_path = os.path.join(analysis.bpath, 'ts_map_short') 
     analysis.make_ts_map(ts_map_short_path, trange=[analysis.tsmjd1, analysis.tsmjd2])
     
-    #getsrcprob
+    #Calculate Source Probability
     srcprob_path = os.path.join(analysis.bpath, 'srcprob')
     analysis.calc_src_probs(srcprob_path, emin=5000)
 
-
-if not make_pdf:
+    # Run SEDs
     print('Submit_SEDs')
     for src in analysis.srcs:
         if make_pdf:
             continue
         bpath_src = os.path.join(bpath, src.name.replace(' ', '_'))
         print(' \n \n {} is at a distance {:.1f} deg'.format(src.name, src.dist))
-        if src.dist > args['max_dist']:
+        if src.dist > analysis.max_dist:
             continue
         if os.path.exists(bpath_src) and (not args['recovery']):
             print('Remove Path: {}'.format(bpath_src))
             shutil.rmtree(bpath_src)
         src.setup_folders(bpath_src)
-        src.get_mw_data(this_path)
+        src.get_mw_data(analysis.this_path)
         
         src.make_sed(analysis.emin, analysis.fermi_data, name='', add_srcs=analysis.srcs, job_id = analysis.id)
         if analysis.emin < 1e3:
@@ -209,7 +205,9 @@ while not final_pdf:
     if args['overwrite']:
         analysis.make_ts_map_plots()
         for src in analysis.srcs:
-            if src.dist > args['max_dist']:
+            print src.dist
+            print analysis.max_dist
+            if src.dist > analysis.max_dist:
                 continue
             src.make_lc_plot(analysis.mjd)
             if analysis.emin < 1e3: 
@@ -218,7 +216,7 @@ while not final_pdf:
                 src.make_sed_lightcurve(lcs=['default'])
     src_latex = ''
     for src in analysis.srcs:
-        if src.dist > args['max_dist']:
+        if src.dist > analysis.max_dist:
             continue
         src_latex += src.source_summary(analysis.bpath, analysis.mjd, mode=args['mode'])
     analysis.make_pdf(src_latex, final_pdf = final_pdf)

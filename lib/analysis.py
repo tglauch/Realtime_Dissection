@@ -1,4 +1,4 @@
-from functions import GreatCircleDistance, get_add_info, path_settings, vou_path, get_68_psf, submit_fit
+from functions import GreatCircleDistance, path_settings, vou_path, get_68_psf, submit_fit
 import numpy as np
 from source_class import Source 
 import collections
@@ -15,6 +15,7 @@ import string
 import random
 import plot
 import shutil
+import pyfits as fits
 
 files = collections.OrderedDict([
      ('4fgl', {'file': '4fgl.1.csv',
@@ -54,6 +55,7 @@ class Analysis(object):
         self.id = id_generator(size=5) 
         self.notice_date = 'None'
         self.radius = 180
+        self.this_path = None
 
     def make_ts_map_plots(self):
         for tsm in self.ts_maps:
@@ -110,7 +112,7 @@ class Analysis(object):
         with open(os.path.join(self.bpath, 'vou_blazar/short_output'), 'r') as f:
             short_out = f.read().encode('utf8').replace('\x1b', '')
             short_out = re.sub('\*([^\*]*)\*', r'\\textbf{\1}', short_out)
-        with open('../latex/template.tex') as f:
+        with open(os.path.join(self.this_path, 'latex','template.tex')) as f:
             template = f.read()
 
         c = SkyCoord(self.ra, self.dec, frame='icrs', unit="deg")
@@ -160,8 +162,7 @@ class Analysis(object):
         if not os.path.exists(self.vou_out):
             os.makedirs(self.vou_out)
         os.chdir(self.vou_out)
-        cmd = [vou_path,
-               str(self.ra), str(self.dec), str(radius), str(self.err90)]
+        cmd = [vou_path, str(self.ra), str(self.dec), str(radius), str(60.*self.err90)]
         for i in range(2):
             subprocess.call(cmd)
 
@@ -295,7 +296,7 @@ class Analysis(object):
         self.sort_sources_by_distance()
         out_str = ''
         for src in self.srcs:
-            add_info = get_add_info(src.name)
+            add_info = self.get_add_info(src.name)
             ostr= fmt_str.format(src.name, add_info, src.ra, src.dec,
                                  src.dist, src.ra - self.ra, src.dec - self.dec)
             if len(src.names) > 0:
@@ -303,4 +304,15 @@ class Analysis(object):
             print(ostr)
             out_str += ostr + '\n\n'
         return out_str
-    
+   
+    def get_add_info(self, src_of_interest):
+        data = fits.open(os.path.join(self.this_path,'lib',  'gll_psc_v19.fit'))
+        eflux = data[1].data['Energy_Flux100']
+        inds = np.argsort(eflux)[::-1]
+        eflux = eflux[inds]
+        src_names = data[1].data['Source_Name'][inds]
+        if len(np.where(src_names==src_of_interest)[0]) == 0:
+            return ''
+        src_ind = np.where(src_names==src_of_interest)[0][0]
+        ostr = ' | Energy flux (E $\geq$ 100MeV): {:.2e} erg/cm$^2$/s [Top {:.1f}\% in 4FGL]'
+        return ostr.format(eflux[src_ind], 1.*src_ind/len(eflux)*100) 

@@ -183,7 +183,7 @@ class Source(object):
             src_prob = srcprob[1].data[self.name]
             prob_mask = src_prob > 0.90
             ind = np.argsort(energy[prob_mask])[::-1]
-            with open('../latex/tab_template.tex', 'r') as f:
+            with open('./latex/tab_template.tex', 'r') as f:
                 tab_str = f.read()
             prob_str = ''
             for i in range(np.min([5, len(mjd[prob_mask][ind])])):
@@ -195,7 +195,7 @@ class Source(object):
         except Exception as inst:
             warnings.warn("Could not find source probabilities")
             print(inst)
-        with open('../latex/source_summary.tex', 'r') as infile:
+        with open('./latex/source_summary.tex', 'r') as infile:
             fig_str = infile.read()
         if os.path.exists(sed_pdf):
             cap_str = 'SED for {}. See the description in section \\ref{{sec:sed}} for more details.'
