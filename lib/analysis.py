@@ -110,7 +110,7 @@ class Analysis(object):
         with open(os.path.join(self.bpath, 'vou_blazar/short_output'), 'r') as f:
             short_out = f.read().encode('utf8').replace('\x1b', '')
             short_out = re.sub('\*([^\*]*)\*', r'\\textbf{\1}', short_out)
-        with open('./template.tex') as f:
+        with open('../latex/template.tex') as f:
             template = f.read()
 
         c = SkyCoord(self.ra, self.dec, frame='icrs', unit="deg")
@@ -140,7 +140,7 @@ class Analysis(object):
         with open(latex_path, 'w+') as f:
             f.write(out)
         if not os.path.exists(os.path.join(self.bpath, 'sample.bib')):
-            shutil.copyfile('sample.bib', os.path.join(self.bpath, 'sample.bib'))
+            shutil.copyfile('../latex/sample.bib', os.path.join(self.bpath, 'sample.bib'))
         os.chdir(self.bpath)
         cmds  = [
             ['pdflatex', '-interaction', 'nonstopmode', self.event_name + '.tex'],
