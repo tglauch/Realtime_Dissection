@@ -1,6 +1,6 @@
 from functions import GreatCircleDistance, path_settings, vou_path, get_68_psf, submit_fit
 import numpy as np
-from source_class import Source 
+from source_class import Source, Ellipse 
 import collections
 import os
 from astropy.coordinates import SkyCoord
@@ -16,6 +16,7 @@ import random
 import plot
 import shutil
 import pyfits as fits
+import warnings
 
 files = collections.OrderedDict([
      ('4fgl', {'file': '4fgl.1.csv',

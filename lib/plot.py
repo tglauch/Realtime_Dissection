@@ -11,11 +11,16 @@ import pyfits as fits
 import warnings
 from matplotlib.colors import LinearSegmentedColormap
 from astropy.visualization.wcsaxes import SphericalCircle
+from astropy.modeling.functional_models import Ellipse2D
 import astropy.units as u
 from collections import OrderedDict
 import scipy.interpolate
 from astropy.wcs import WCS
 import yaml
+from regions import EllipseSkyRegion
+from astropy.coordinates import SkyCoord
+from source_class import Ellipse
+
 ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'])
 re_cmap = LinearSegmentedColormap.from_list('mycmap2', ['#67a9cf', '#f7f7f7', '#ef8a62'])
 mw_map= LinearSegmentedColormap.from_list('mycmap3', ['#bdbdbd','#939393' ,'red'])
@@ -103,9 +108,14 @@ def make_lc_plot(basepath, mjd, **kwargs):
                                                weights=1./lc_arr['dgamma'])
         ax2.axhline(av_gamma,linestyle='--', color='grey',
                     alpha=0.85, zorder = -1, linewidth=0.9)
-    ax2.errorbar(lc_arr['tmid'][mask&gam_mask], lc_arr['gamma'][mask&gam_mask],
-                 yerr=lc_arr['dgamma'][mask&gam_mask],
-                 xerr=lc_arr['bin_len'][mask&gam_mask]/2., linestyle='')
+
+    mask2 = (lc_arr['dgamma'] > 0)
+    ax2.errorbar(lc_arr['tmid'][mask & mask2 & gam_mask], lc_arr['gamma'][mask & mask2 & gam_mask],
+                 yerr=lc_arr['dgamma'][mask & mask2 & gam_mask],
+                 xerr=lc_arr['bin_len'][mask& mask2 &gam_mask]/2., linestyle='')
+    ax2.errorbar(lc_arr['tmid'][mask & ~mask2 & gam_mask], lc_arr['gamma'][mask & ~mask2 & gam_mask],
+                 yerr=0, xerr=lc_arr['bin_len'][mask& ~mask2 &gam_mask]/2., linestyle='',
+                 ecolor='red')
     ax2.set_ylabel('Index', labelpad=5)
     ax2.set_ylim(0.0,6)
     ax2.set_xticks([])
@@ -326,17 +336,28 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=True, ya
     if os.path.exists(cpath):
         cdata = np.genfromtxt(cpath, delimiter=',')
         cdata = np.vstack([cdata,cdata[0]])
+        pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
+        ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
     elif error90 is not None:
-        vertex = (hdu.header['CRVAL1']*u.degree,hdu.header['CRVAL2']*u.degree) #long, lat
-        x =  SphericalCircle(vertex, error90*u.degree) 
-        cdata = x.get_xy()
+        if isinstance(error90, float):
+            vertex = (hdu.header['CRVAL1']*u.degree,hdu.header['CRVAL2']*u.degree) #long, lat
+            x =  SphericalCircle(vertex, error90*u.degree) 
+            cdata = x.get_xy()
+            pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
+            ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
+        elif isinstance(error90, Ellipse):
+            ell= EllipseSkyRegion(SkyCoord(error90.center_ra* u.deg, error90.center_dec* u.deg, frame='icrs'),
+                                  error90.ra_ax * u.deg, error90.dec_ax * u.deg, angle = error90.rotation * u.deg )
+            pix = ell.to_pixel(wcs)
+            pix.plot(ax=ax)
     else:
         vertex = (hdu.header['CRVAL1']*u.degree,hdu.header['CRVAL2']*u.degree) #long, lat
         x =  SphericalCircle(vertex,1.5*u.degree) 
         cdata = x.get_xy()
+        pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
+        ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
         print('Use new circle')
-    pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
-    ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
+
     cpath = os.path.join(plt_basepath, '../contour50.txt')
     if os.path.exists(cpath):
         cdata = np.genfromtxt(cpath, delimiter=',')
@@ -411,10 +432,12 @@ def get_index(flux_dict):
 
 def get_index_err(flux_dict):
     if flux_dict['SpectrumType']=='PowerLaw':
-        return flux_dict['spectral_pars']['Index']['error']
-    if flux_dict['SpectrumType']=='LogParabola':
-        print flux_dict['spectral_pars']
-        return flux_dict['spectral_pars']['alpha']['error']
+        ret = flux_dict['spectral_pars']['Index']['error']
+    elif flux_dict['SpectrumType']=='LogParabola':
+        ret = flux_dict['spectral_pars']['alpha']['error']
+    if not np.isfinite(ret):
+        ret = -1
+    return ret
 
  
 def weighted_avg_and_std(values, weights):

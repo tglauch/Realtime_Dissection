@@ -22,6 +22,7 @@ from collections import OrderedDict
 from analysis import Analysis
 import pickle
 from slack_lib import print_to_slack
+from source_class import Ellipse
 
 def parseArguments():
     """Parse the command line arguments
@@ -67,7 +68,9 @@ def parseArguments():
         "--basepath", help = 'Basepath for the Output',
         type=str, default = '/scratch9/tglauch/realtime_service/output/')
     parser.add_argument(
-        "--max_dist", help = 'Radius of sources to be included', type=float, default=2.5) 
+        "--max_dist", help = 'Radius of sources to be included', type=float, default=2.5)
+    parser.add_argument(
+        "--err90", help= 'The 90 percent error circle', nargs='+') 
     args = parser.parse_args()
     return args.__dict__
 
@@ -108,14 +111,17 @@ else:
     analysis.bpath = bpath
     analysis.emin = args['emin']
     analysis.event_name = ev_str
-    if 'err90' in args.keys():
-        analysis.err90 = args['err90']
     analysis.radius = args['radius']
     analysis.max_dist = args['max_dist']
     args['vou'] = True
     args['lat_analysis'] = True
 analysis.this_path = os.path.dirname(os.path.abspath(__file__))
-
+if 'err90' is not None:
+    if len(args['err90']) == 1:
+        analysis.err90 = args['err90']
+    else:
+        analysis.err90 = Ellipse(analysis.ra, analysis.dec, args['err90'])
+analysis.max_dist = 2.
 if args['vou']:
     # Run VOU Tool
     analysis.ROI_analysis(analysis.radius)
@@ -205,8 +211,6 @@ while not final_pdf:
     if args['overwrite']:
         analysis.make_ts_map_plots()
         for src in analysis.srcs:
-            print src.dist
-            print analysis.max_dist
             if src.dist > analysis.max_dist:
                 continue
             src.make_lc_plot(analysis.mjd)

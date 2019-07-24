@@ -8,6 +8,27 @@ import plot
 import warnings
 
 
+class Ellipse(object):
+    def __init__(self, center_ra, center_dec, settings):
+        settings = [float(i) for i in settings]
+        self.center_ra = center_ra
+        self.center_dec = center_dec
+        if len(settings) == 2:
+            self.ra_ax = settings[0]
+            self.dec_ax = settings[1]
+        elif len(settings) == 4:
+            arr = np.abs(np.array(settings))
+            self.ra_ax = np.sum(arr[[0,1]])
+            self.dec_ax = np.sum(arr[[2,3]])
+        else:
+            print('No Valid Ellipse')
+        if self.dec_ax < self.ra_ax:
+            self.rotation = 0
+        else:
+            self.rotation = 90
+        return
+
+
 class Lightcurve(object):
     def __init__(self, bpath, time_windows):
         self.bpath = bpath
@@ -208,7 +229,7 @@ class Source(object):
         if ('4FGL' in self.name) | ('3FGL' in self.name):
             cp_candidate_path = os.path.join(bpath_src, 'vou_counterpart', self.name.replace(' ', '_').replace('.','_') + '.eps')
             if os.path.exists(cp_candidate_path):
-                l_str += fig_str.format(width = 0.7, path = cp_candidate_path, caption='Possible couterparts for{}'.format(self.name))
+                l_str += fig_str.format(width = 0.7, path = cp_candidate_path, caption='Possible couterparts for {}'.format(self.name))
         l_str += '\\clearpage \n'
         return l_str
 
