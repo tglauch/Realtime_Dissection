@@ -6,7 +6,7 @@ from myfunctions import MET_to_MJD, dict_to_nparray, ts_to_pval, pval_to_sigma
 import os
 import plot
 import warnings
-
+import shutil
 
 class Ellipse(object):
     def __init__(self, center_ra, center_dec, settings):
@@ -18,15 +18,23 @@ class Ellipse(object):
             self.dec_ax = settings[1]
         elif len(settings) == 4:
             arr = np.abs(np.array(settings))
-            self.ra_ax = np.sum(arr[[0,1]])
-            self.dec_ax = np.sum(arr[[2,3]])
+            self.ra_ax = np.sum(arr[[0,1]]) / 2.
+            self.dec_ax = np.sum(arr[[2,3]]) / 2.
         else:
             print('No Valid Ellipse')
         if self.dec_ax < self.ra_ax:
             self.rotation = 0
         else:
             self.rotation = 90
+        print('The rotation is {}'.format(self.rotation))
         return
+
+    def get_vou_cmd(self, radius):
+        return [str(self.center_ra), str(self.center_dec), str(radius), str(np.max([60. * self.ra_ax, 60. * self.dec_ax])),
+                str(np.min([60. * self.ra_ax, 60. * self.dec_ax])), str(self.rotation + 90)]
+
+    def get_max_extension(self):
+        return np.max([60. * self.ra_ax, 60. * self.dec_ax ])
 
 
 class Lightcurve(object):
@@ -58,7 +66,7 @@ class Source(object):
                 for j in range(1,len(lcs)):    
                     seds_list.append((self.lightcurves[lcs[j]].time_window_results[i],
                                       'k', 'blue' , True, True, False))
-                plot.make_sed_plot(seds_list, mw_data=self.mw_data_path, dec=self.dec)
+                plot.make_sed_plot(seds_list, mw_data=self.mw_data_path, dec=self.dec, twindow=main_lc.time_windows[i])
             except Exception as inst:
                 warnings.warn("Couldn't create SED for source {}".format(self.name))
                 print(inst)
@@ -115,7 +123,7 @@ class Source(object):
 
     def get_mw_data(self, this_path):
         if '4FGL' in self.name:
-            data = fits.open('gll_psc_v19.fit')[1].data
+            data = fits.open('./lib/gll_psc_v19.fit')[1].data
             ind = np.where(data['Source_Name']==self.name)[0]
             m_ax = float(data[ind]['Conf_95_SemiMajor']) * 60
             min_ax = float(data[ind]['Conf_95_SemiMinor']) * 60

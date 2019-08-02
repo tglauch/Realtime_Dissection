@@ -20,11 +20,13 @@ import warnings
 
 files = collections.OrderedDict([
      ('4fgl', {'file': '4fgl.1.csv',
-              'keys': ['name', 'ra', 'dec']}),
+              'keys': ['Source_Name', 'RA', 'Dec']}),
      ('3fgl', {'file': '3fgl.1.csv',
               'keys': ['name', 'ra', 'dec']}),
      ('3fhl', {'file': '3fhl.1.csv',
               'keys': ['name', 'ra', 'dec']}),
+     ('FermiGRB', {'file': 'fgrb.1.csv',
+                   'keys' : ['GRB','RAJ2000','DEJ2000']}),
      ('5bzcat', {'file': '5bzcat.1.csv',
                 'keys': ['Name', 'RAJ2000', 'DEJ2000']}),
      ('3hsp', {'file': '3hsp.1.csv',
@@ -47,8 +49,14 @@ class Analysis(object):
         self.err90 = 2.0
         self.mode = 'end'
         self.mjd = mjd
+        if self.mjd is not None:
+            t = Time.now()
+            if np.abs(self.mjd - t.mjd)<2:
+                self.mode = 'end'
+            else:
+                self.mode = 'mid'
         self.mjd_range = None
-        self.gcn = 'Not Given'
+        self.gcn = 'No GCN given'
         self.vou_out = None
         self.fermi_data = None
         self.ts_maps = []
@@ -87,17 +95,23 @@ class Analysis(object):
         submit_fit(sargs, srcprob_path, srcs=self.srcs, sub_file=self.id+'.sub', ana_type='srcprob', partition='xtralong')
         return
 
-
+    def adaptive_radius(self):
+        if isinstance(self.err90, float):
+            self.radius = np.max([2 * 60. * self.err90, 60.])
+        elif isinstance(self.err90, Ellipse):
+            self.radius = np.max([2 * self.err90.get_max_extension(), 60])
+        return
+        
 
     def make_ts_map(self, ts_map_path, emin=None, trange=None):
-        sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
+        sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {} --roiwidth {}'
         if emin is None:
             emin = self.ts_emin
         if trange is not None:
            sargs = sargs + ' --time_range {} {}'.format(trange[0], trange[1])
-        sargs = sargs.format(get_68_psf(emin), self.fermi_data, emin, self.ra, self.dec)
+        sargs = sargs.format(get_68_psf(emin), self.fermi_data, emin, self.ra, self.dec, 2*self.radius/60.)
         self.ts_maps.append(ts_map_path)
-        submit_fit(sargs, ts_map_path, sub_file=self.id+'.sub', ana_type='TS_Map', partition='xtralong')
+        submit_fit(sargs, ts_map_path, sub_file=self.id+'.sub', ana_type='TS_Map', partition='xtralong') # change back to xtralong
         return
 
     def make_pdf(self, src_latex, final_pdf=True):
@@ -143,7 +157,7 @@ class Analysis(object):
         with open(latex_path, 'w+') as f:
             f.write(out)
         if not os.path.exists(os.path.join(self.bpath, 'sample.bib')):
-            shutil.copyfile('../latex/sample.bib', os.path.join(self.bpath, 'sample.bib'))
+            shutil.copyfile('./latex/sample.bib', os.path.join(self.bpath, 'sample.bib'))
         os.chdir(self.bpath)
         cmds  = [
             ['pdflatex', '-interaction', 'nonstopmode', self.event_name + '.tex'],
@@ -157,13 +171,22 @@ class Analysis(object):
         self.pdf_out_path = os.path.join(self.bpath, self.event_name + '.pdf') 
         return
 
-    def ROI_analysis(self, radius):
-        # To be implemented
+    def ROI_analysis(self):
         self.vou_out = os.path.join(self.bpath, 'vou_blazar')
         if not os.path.exists(self.vou_out):
             os.makedirs(self.vou_out)
         os.chdir(self.vou_out)
-        cmd = [vou_path, str(self.ra), str(self.dec), str(radius), str(60.*self.err90)]
+
+        if isinstance(self.err90, float):
+            print('Run VOU with cicular error')
+            cmd = [vou_path, str(self.ra), str(self.dec), str(self.radius), str(self.err90 * 60)]
+        elif isinstance(self.err90, Ellipse):
+            print('Run VOU with elliptical error')
+            cmd = [vou_path]
+            cmd.extend(self.err90.get_vou_cmd(self.radius))
+        else:
+            print('This type of error regions is not supported yet')
+        print cmd
         for i in range(2):
             subprocess.call(cmd)
 
@@ -211,7 +234,8 @@ class Analysis(object):
         return
 
     def update_gcn(self):
-        self.from_gcn(self.gcn)
+        if self.gcn != 'No GCN given':
+            self.from_gcn(self.gcn)
         return
 
     def from_gcn(self, url):
@@ -225,7 +249,7 @@ class Analysis(object):
             self.mjd = gcn_dict['MJD']
             if self.notice_date != 'None':
                 print('Update GCN and VOU ROI')
-                self.ROI_analysis(self.radius)
+                self.ROI_analysis()
             self.notice_date = gcn_dict['NOTICE_DATE']
             self.gcn = url
         t = Time.now()
@@ -271,7 +295,11 @@ class Analysis(object):
                          ('DEJ2000', '<f8')]
                 temp = temp.astype(dtype)
             for src in temp:
-                src_obj = Source(src[files[key]['keys'][0]],
+                if key == 'FermiGRB':
+                    name = 'GRB' + src[files[key]['keys'][0]]
+                else:
+                    name = src[files[key]['keys'][0]]
+                src_obj = Source(name,
                                  src[files[key]['keys'][1]],
                                  src[files[key]['keys'][2]])
                 self.srcs.append(src_obj)

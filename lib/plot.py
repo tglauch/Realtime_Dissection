@@ -130,7 +130,7 @@ def make_lc_plot(basepath, mjd, **kwargs):
     return
 
 
-def make_sed_plot(seds_list, mw_data=None, dec = None):
+def make_sed_plot(seds_list, mw_data=None, dec = None, twindow=None):
     fig, ax = newfig(0.9)
     ax.set_xscale('log')
     ax.set_yscale('log') 
@@ -156,20 +156,37 @@ def make_sed_plot(seds_list, mw_data=None, dec = None):
     if mw_data is not None:
         mw_idata = np.atleast_2d(np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4)))
         if len(mw_idata) > 0:
-            c = np.array(time2color(mw_idata[:,4], tmin=54500, tmax=59000))
+            #c = np.array(time2color(mw_idata[:,4], tmin=54500, tmax=59000))
+            times = mw_idata[:,4]
+            tmask = np.array([False]*len(times))
+            if twindow is not None:
+                tmask = (times>twindow[0]) & (times<twindow[1])
+            print twindow
             ulim_mask = (mw_idata[:,2] == mw_idata[:,3])
             inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
-            yerr = (mw_idata[:,1][inds & ~ulim_mask] - mw_idata[:,2][inds & ~ulim_mask],
-                    mw_idata[:,3][inds & ~ulim_mask] - mw_idata[:,1][inds & ~ulim_mask])
-            ax.errorbar(mw_idata[:,0][inds & ~ulim_mask] * hz_to_gev, mw_idata[:,1][inds & ~ulim_mask],
-                        yerr=yerr, fmt='o', color='grey',#color=c[inds],
+            tot_mask = inds & ~ulim_mask & ~tmask
+            yerr = (mw_idata[:,1][tot_mask] - mw_idata[:,2][tot_mask],
+                    mw_idata[:,3][tot_mask] - mw_idata[:,1][tot_mask])
+            ax.errorbar(mw_idata[:,0][tot_mask] * hz_to_gev, mw_idata[:,1][tot_mask],
+                        yerr=yerr, fmt='o', color='grey', zorder=1,
+                        alpha=0.5, markersize=3,  linestyle='')
+            tot_mask = inds & ~ulim_mask & tmask
+            yerr = (mw_idata[:,1][tot_mask] - mw_idata[:,2][tot_mask],
+                    mw_idata[:,3][tot_mask] - mw_idata[:,1][tot_mask])
+            ax.errorbar(mw_idata[:,0][tot_mask] * hz_to_gev, mw_idata[:,1][tot_mask],
+                        yerr=yerr, fmt='o', color='red', zorder=2,
                         alpha=0.5, markersize=3,  linestyle='')
 
-            yerr = 10**np.log10(mw_idata[:,1][inds & ulim_mask]) - 10**(np.log10(mw_idata[:,1][inds & ulim_mask])-0.1/8.*factor) 
-            ax.errorbar(mw_idata[:,0][inds & ulim_mask] * hz_to_gev, mw_idata[:,1][inds & ulim_mask],
-                        yerr=yerr, fmt='o', uplims=True, color='grey',
+            tot_mask = inds & ulim_mask & ~tmask
+            yerr = 10**np.log10(mw_idata[:,1][tot_mask]) - 10**(np.log10(mw_idata[:,1][tot_mask])-0.1/8.*factor) 
+            ax.errorbar(mw_idata[:,0][tot_mask] * hz_to_gev, mw_idata[:,1][tot_mask],
+                        yerr=yerr, fmt='o', uplims=True, color='grey', zorder=1,
                         alpha=0.5, markersize=3,  linestyle='')
-            y_vals.extend(mw_idata[:,1][inds])
+            tot_mask = inds & ulim_mask & tmask
+            yerr = 10**np.log10(mw_idata[:,1][tot_mask]) - 10**(np.log10(mw_idata[:,1][tot_mask])-0.1/8.*factor)   
+            ax.errorbar(mw_idata[:,0][tot_mask] * hz_to_gev, mw_idata[:,1][tot_mask],
+                        yerr=yerr, fmt='o', uplims=True, color='red', zorder=2,
+                        alpha=0.5, markersize=3,  linestyle='')
      
     for i, sed_list in enumerate(seds_list):
         basepath = sed_list[0]
@@ -248,8 +265,10 @@ def make_sed_plot(seds_list, mw_data=None, dec = None):
         inter = scipy.interpolate.UnivariateSpline(IC_disc[:,0], IC_disc[:,1], k=1, s=0)
         flux = inter(np.sin(np.radians(dec))) * MeV_to_erg * 1e6
         ax.plot([5e3, 1e6], [flux, flux], color='green', linestyle='-')
-    ax.set_ylim(0.8*np.min(y_vals),np.min([1e-10, 1.2 * np.max(y_vals)]))
+    if np.min(y_vals) < 1e-17:
+        print('Warning: Minimum data point could be out of the plotting range ({})'.format(np.min(y_vals)))
     ax.set_xlim(1e-15, 1e7)
+    ax.set_ylim(np.min(y_vals),1e-10)
     ax.set_xlabel('Energy [GeV]')
     ax.set_ylabel(r'$\nu f(\nu)$ [erg cm$^{-2}$ s$^{-1}$]')
     plt.tight_layout()
@@ -270,14 +289,13 @@ def make_edges(data_f):
 
 
 def get_pix_pos(wcs, ra, dec):
-    pix = wcs.wcs_world2pix(np.array(zip(np.atleast_1d(ra), np.atleast_1d(dec))),
-                            1)
-    return pix[:,0], pix[:,1]
+    pix = wcs.wcs_world2pix(np.array(zip(np.atleast_1d(ra), np.atleast_1d(dec))),1)
+    return pix[:,0]-1, pix[:,1]-1
 
 
 
 def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=True, yaxis=True, error90=None):
-    markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7, 'H','d', 'v' ,'^', '<', '>', 1, 2, 3 ,8]
+    markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7, 'H','d', 'v' ,'^', '<', '>', 1, 2, 3 ,8, '+' ,'h']
     fname = 'fit1_pointsource_powerlaw_2.00_{}.fits'.format(plt_mode)
     fits_path = os.path.join(plt_basepath, fname)
     if os.path.exists(fits_path):
@@ -346,10 +364,11 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=True, ya
             pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
             ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
         elif isinstance(error90, Ellipse):
-            ell= EllipseSkyRegion(SkyCoord(error90.center_ra* u.deg, error90.center_dec* u.deg, frame='icrs'),
-                                  error90.ra_ax * u.deg, error90.dec_ax * u.deg, angle = error90.rotation * u.deg )
+            ell= EllipseSkyRegion(SkyCoord(error90.center_ra * u.deg, error90.center_dec * u.deg, frame='icrs'),
+                                  2. * error90.ra_ax * u.deg, 2. * error90.dec_ax * u.deg,
+                                  angle = (error90.rotation) * u.deg )
             pix = ell.to_pixel(wcs)
-            pix.plot(ax=ax)
+            pix.plot(ax=ax, color='b')
     else:
         vertex = (hdu.header['CRVAL1']*u.degree,hdu.header['CRVAL2']*u.degree) #long, lat
         x =  SphericalCircle(vertex,1.5*u.degree) 
@@ -370,7 +389,7 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=True, ya
                 marker=markers[i],
                 linestyle = '',
                 label=src.name,
-                color='k', ms=4, zorder=3) 
+                color='k', ms=4, zorder=3)
     if len(cand['ra'])>0:
         pix = get_pix_pos(wcs, cand['ra'], cand['dec'])
         ax.plot(pix[0], pix[1], color='#a8a8a8', ms=4, marker="8", zorder=1,
@@ -395,16 +414,13 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=True, ya
         ax.set_ylabel(r'Dec. (degrees)')
     else:
         ax.set_yticklabels([])
-
-    pix = get_pix_pos(wcs, bf_ra, bf_dec) 
-    ax.plot(pix[0], pix[1],
+    pix = get_pix_pos(wcs, bf_ra, bf_dec)
+    ax.plot(pix[0] , pix[1],
             marker='o', color='blue',
             ms=3, fillstyle='none', zorder=2)
     
-    edge_bl = get_pix_pos(wcs,hdu.header['CRVAL1'] - 3. ,hdu.header['CRVAL2'] - 3.)
-    edge_tr = get_pix_pos(wcs,hdu.header['CRVAL1'] + 3. ,hdu.header['CRVAL2'] + 3.)
-    ax.set_xlim(delta_pix, hdu.data.shape[1] - delta_pix)
-    ax.set_ylim(delta_pix, hdu.data.shape[0] - delta_pix) 
+    #ax.set_xlim(0, hdu.data.shape[1])
+    #ax.set_ylim(0, hdu.data.shape[0]) 
     ax2=fig.add_axes((.0, .80,0.7, 0.05))
     plt_cbar = fig.colorbar(cbar, orientation="horizontal", cax=ax2,
                             ticks=np.arange(minmax[0], minmax[1] , ticks))

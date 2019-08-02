@@ -8,7 +8,6 @@ sys.path.append('./lib')
 import subprocess
 import argparse
 import os
-import shutil
 import datetime
 import numpy as np
 import plot
@@ -70,7 +69,10 @@ def parseArguments():
     parser.add_argument(
         "--max_dist", help = 'Radius of sources to be included', type=float, default=2.5)
     parser.add_argument(
-        "--err90", help= 'The 90 percent error circle', nargs='+') 
+        "--err90", help= 'The 90 percent error ellipse. Format:  ra1 ra2 dec1 dec2', nargs='+')
+    parser.add_argument(
+        "--adaptive_scaling", help="Scale VOU and TS map region adaptively",
+        action="store_true", default = False) 
     args = parser.parse_args()
     return args.__dict__
 
@@ -109,22 +111,23 @@ else:
     bpath = os.path.join(args['basepath'], ev_str)
     analysis_object_path = os.path.join(bpath,'analysis.pickle')
     analysis.bpath = bpath
-    analysis.emin = args['emin']
+    analysis.emin = float(args['emin'])
     analysis.event_name = ev_str
-    analysis.radius = args['radius']
-    analysis.max_dist = args['max_dist']
+    analysis.radius = float(args['radius'])
+    analysis.max_dist = float(args['max_dist'])
     args['vou'] = True
     args['lat_analysis'] = True
 analysis.this_path = os.path.dirname(os.path.abspath(__file__))
-if 'err90' is not None:
+if args['err90'] is not None:
     if len(args['err90']) == 1:
-        analysis.err90 = args['err90']
+        analysis.err90 = float(args['err90'])
     else:
         analysis.err90 = Ellipse(analysis.ra, analysis.dec, args['err90'])
-analysis.max_dist = 2.
+if args['adaptive_scaling']:
+        analysis.adaptive_radius()
 if args['vou']:
     # Run VOU Tool
-    analysis.ROI_analysis(analysis.radius)
+    analysis.ROI_analysis()
 
 # Start the gamma-ray analysis
 if args['lat_analysis']:
@@ -134,7 +137,7 @@ if args['lat_analysis']:
     with open(analysis_object_path, "wb") as f:
         pickle.dump(analysis, f)
 
-    if args['mode'] == 'end':
+    if analysis.mode == 'end':
         tsmjd1 = analysis.mjd-200
         tsmjd2 = analysis.mjd
 
@@ -165,9 +168,6 @@ if args['lat_analysis']:
         print(' \n \n {} is at a distance {:.1f} deg'.format(src.name, src.dist))
         if src.dist > analysis.max_dist:
             continue
-        if os.path.exists(bpath_src) and (not args['recovery']):
-            print('Remove Path: {}'.format(bpath_src))
-            shutil.rmtree(bpath_src)
         src.setup_folders(bpath_src)
         src.get_mw_data(analysis.this_path)
         
@@ -177,11 +177,11 @@ if args['lat_analysis']:
                          job_id=analysis.id)
 
         src.make_fixed_binning_lightcurve(analysis.emin, analysis.fermi_data, analysis.mjd_range, mjd=analysis.mjd,
-                                          dt_lc=args['dt_lc'], mode=args['mode'], name='', add_srcs=analysis.srcs,
+                                          dt_lc=args['dt_lc'], mode=analysis.mode, name='', add_srcs=analysis.srcs,
                                           job_id = analysis.id)
         if analysis.emin < 1e3:
             src.make_fixed_binning_lightcurve(1e3, analysis.fermi_data, analysis.mjd_range, mjd=analysis.mjd,
-                                              dt_lc=args['dt_lc'], mode=args['mode'], name='1GeV',
+                                              dt_lc=args['dt_lc'], mode=analysis.mode, name='1GeV',
                                               add_srcs=analysis.srcs, job_id=analysis.id)
 
     if os.path.exists(analysis_object_path):
@@ -222,6 +222,6 @@ while not final_pdf:
     for src in analysis.srcs:
         if src.dist > analysis.max_dist:
             continue
-        src_latex += src.source_summary(analysis.bpath, analysis.mjd, mode=args['mode'])
+        src_latex += src.source_summary(analysis.bpath, analysis.mjd, mode=analysis.mode)
     analysis.make_pdf(src_latex, final_pdf = final_pdf)
     print_to_slack('Fit Results', analysis.pdf_out_path)
