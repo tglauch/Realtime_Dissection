@@ -1,7 +1,8 @@
 # coding: utf-8
 
 # run for example as python roi_analysis.py --mjd 55497.30 --ra 88.95 --dec 0.50 --adaptive_scaling --max_dist 0.8 --err90 0.48 -0.53 0.25 -0.21
-
+import logging
+logging.info('Imports')
 import sys
 sys.path.append('/scratch9/tglauch/Fermi_Tools/get_fermi_data')
 sys.path.append('/home/ga53lag/Software/python_scripts/')
@@ -81,7 +82,7 @@ print('Run with args \n {}'.format(args))
 bpath = os.path.join(args['basepath'], args['event'])
 analysis_object_path = os.path.join(bpath,'analysis.pickle')
 if os.path.exists(analysis_object_path):
-    print('Folder {} already exist....exit.'.format(bpath))
+    logging.info('Read analysis object from {}'.format(bpath))
     with open(analysis_object_path, "rb") as f:
         analysis = pickle.load(f)
     analysis.update_gcn()
@@ -123,10 +124,12 @@ if args['adaptive_scaling']:
         analysis.adaptive_radius()
 if args['vou']:
     # Run VOU Tool
+    logging.info('Start the VOU analysis pipeline')
     analysis.ROI_analysis()
 
 # Start the gamma-ray analysis
 if args['lat_analysis']:
+    logging.info('Start the Fermi LAT Analysis pipeline')
     args['overwrite'] = True
     # Download gamma-ray data
     analysis.get_fermi_data(days=args['dt'], mjd_range=args['mjd_range'])
@@ -203,6 +206,7 @@ while not final_pdf:
     prev_len_jobs = len_jobs
 
     # Make Plots
+    logging.info('Creating Plots...')
     if args['overwrite']:
         analysis.make_ts_map_plots()
         for src in analysis.srcs:
@@ -213,6 +217,7 @@ while not final_pdf:
                 src.make_sed_lightcurve(lcs=['default', '1GeV'])
             else: 
                 src.make_sed_lightcurve(lcs=['default'])
+    logging.info('Make PDF..')
     src_latex = ''
     for src in analysis.srcs:
         if src.dist > analysis.max_dist:
