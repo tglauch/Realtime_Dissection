@@ -1,7 +1,9 @@
 # coding: utf-8
 
+
 # run for example as python roi_analysis.py --mjd 55497.30 --ra 88.95 --dec 0.50 --adaptive_scaling --max_dist 0.8 --err90 0.48 -0.53 0.25 -0.21
 import logging
+#logging.getLogger().setLevel(logging.INFO)
 logging.info('Imports')
 import sys
 sys.path.append('/scratch9/tglauch/Fermi_Tools/get_fermi_data')

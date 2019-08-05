@@ -138,10 +138,13 @@ def make_sed_plot(seds_list, mw_data=None, dec = None, twindow=None):
     ax.set_yscale('log') 
     y_vals = []
     if mw_data is not None:
-        mw_idata = np.atleast_2d(np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4)))
-        if len(mw_idata) > 0:
-            inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
-            y_vals.extend(mw_idata[:,1][inds])
+        try:
+            mw_idata = np.atleast_2d(np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4)))
+            if len(mw_idata) > 0:
+                inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
+                y_vals.extend(mw_idata[:,1][inds])
+        except Exception as inst:
+            pass
     for i, sed_list in enumerate(seds_list):
         basepath = sed_list[0]
         if os.path.exists(os.path.join(basepath, 'sed.npy')):
@@ -156,7 +159,10 @@ def make_sed_plot(seds_list, mw_data=None, dec = None, twindow=None):
     else:
         factor = np.log10(np.max(y_vals)) - np.log10(np.min(y_vals))
     if mw_data is not None:
-        mw_idata = np.atleast_2d(np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4)))
+        try:
+            mw_idata = np.atleast_2d(np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4)))
+        except Exception as inst:
+            mw_idata = np.array([])
         if len(mw_idata) > 0:
             #c = np.array(time2color(mw_idata[:,4], tmin=54500, tmax=59000))
             times = mw_idata[:,4]
