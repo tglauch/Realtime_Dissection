@@ -1,23 +1,19 @@
 # coding: utf-8
 
+# run for example as python roi_analysis.py --mjd 55497.30 --ra 88.95 --dec 0.50 --adaptive_scaling --max_dist 0.8 --err90 0.48 -0.53 0.25 -0.21
+
 import sys
 sys.path.append('/scratch9/tglauch/Fermi_Tools/get_fermi_data')
-sys.path.append('/scratch9/tglauch/realtime_service/python/lib/python2.7/site-packages')
 sys.path.append('/home/ga53lag/Software/python_scripts/')
 sys.path.append('./lib')
-import subprocess
 import argparse
 import os
 import datetime
 import numpy as np
-import plot
-import warnings
 import re
 import time
-from astropy.io import fits
-from astropy.coordinates import SkyCoord
+import plot
 from astropy.time import Time
-from collections import OrderedDict
 from analysis import Analysis
 import pickle
 from slack_lib import print_to_slack
@@ -44,7 +40,7 @@ def parseArguments():
     parser.add_argument(
         "--radius", help="Radius of the region to analyze", type=str, default="180")
     parser.add_argument(
-        "--emin", help="Lower energy bound for SED", type=float, default=1000)
+        "--emin", help="Lower energy bound for SED", type=float, default=100)
     parser.add_argument(
         "--event", help="Name of the Event", default='None')
     parser.add_argument(
@@ -170,25 +166,24 @@ if args['lat_analysis']:
             continue
         src.setup_folders(bpath_src)
         src.get_mw_data(analysis.this_path)
-        
-        src.make_sed(analysis.emin, analysis.fermi_data, name='', add_srcs=analysis.srcs, job_id = analysis.id)
+        add_srcs = [src] #analysis.srcs 
+        src.make_sed(analysis.emin, analysis.fermi_data, name='', add_srcs=add_srcs, job_id = analysis.id)
         if analysis.emin < 1e3:
-            src.make_sed(analysis.emin, analysis.fermi_data, name='1GeV', add_srcs=analysis.srcs,
+            src.make_sed(analysis.emin, analysis.fermi_data, name='1GeV', add_srcs=add_srcs,
                          job_id=analysis.id)
 
         src.make_fixed_binning_lightcurve(analysis.emin, analysis.fermi_data, analysis.mjd_range, mjd=analysis.mjd,
-                                          dt_lc=args['dt_lc'], mode=analysis.mode, name='', add_srcs=analysis.srcs,
+                                          dt_lc=args['dt_lc'], mode=analysis.mode, name='', add_srcs=add_srcs,
                                           job_id = analysis.id)
         if analysis.emin < 1e3:
             src.make_fixed_binning_lightcurve(1e3, analysis.fermi_data, analysis.mjd_range, mjd=analysis.mjd,
                                               dt_lc=args['dt_lc'], mode=analysis.mode, name='1GeV',
-                                              add_srcs=analysis.srcs, job_id=analysis.id)
+                                              add_srcs=add_srcs, job_id=analysis.id)
 
     if os.path.exists(analysis_object_path):
         os.remove(analysis_object_path)
     with open(analysis_object_path, "wb") as f:
         pickle.dump(analysis, f)
-
 
 # Wait for jobs to finish....
 mins = 0

@@ -73,10 +73,10 @@ class Analysis(object):
                 plot.make_ts_plot(tsm, self.srcs,
                                   os.path.join(self.vou_out, 'find_out_temp.txt'),
                                   plt_mode='tsmap', error90 = self.err90)
+                plot.make_ts_plot_legend(tsm, self.srcs)
             except Exception as inst:
                 warnings.warn("Couldn't create TS Map in {}".format(tsm))
                 print(inst)
-
             try:
                 plot.make_ts_plot(tsm, self.srcs,
                                   os.path.join(self.vou_out, 'find_out_temp.txt'),
@@ -145,6 +145,7 @@ class Analysis(object):
                               vou_pic=os.path.join(self.vou_out, 'candidates.eps'),
                               ts_map=os.path.join(self.bpath, 'ts_map/tsmap.png'),
                               ts_map_short=os.path.join(self.bpath, 'ts_map_short/tsmap.png'),
+                              ts_map_legend=os.path.join(self.bpath, 'ts_map_short/legend.png'),
                               vou_output=full_out, event=self.event_name,
                               tsmjd1=self.tsmjd1, tsmjd2=self.tsmjd2, src_latex=src_latex,
                               mjd1=self.mjd_range[0], mjd2=self.mjd_range[1],

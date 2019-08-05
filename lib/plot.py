@@ -21,6 +21,8 @@ from regions import EllipseSkyRegion
 from astropy.coordinates import SkyCoord
 from source_class import Ellipse
 
+
+markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7, 'H','d', 'v' ,'^', '<', '>', 1, 2, 3 ,8, '+' ,'h']
 ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'])
 re_cmap = LinearSegmentedColormap.from_list('mycmap2', ['#67a9cf', '#f7f7f7', '#ef8a62'])
 mw_map= LinearSegmentedColormap.from_list('mycmap3', ['#bdbdbd','#939393' ,'red'])
@@ -77,7 +79,7 @@ def make_lc_plot(basepath, mjd, **kwargs):
     ind = np.argsort(lc_arr['tmid'])
     lc_arr = lc_arr[ind]
     fig = plt.figure(figsize=figsize(0.5, 0.7))
-    mask  = (np.abs(lc_arr['ts'])>4)
+    mask  = (np.abs(lc_arr['ts'])>4) & (lc_arr['flux_err'] < lc_arr['flux'])
     gam_mask = ((lc_arr['dgamma']/lc_arr['gamma'])<2.)
     ## Flux Axis
     ax1=fig.add_axes((.0, .20,1.,.4))
@@ -161,7 +163,6 @@ def make_sed_plot(seds_list, mw_data=None, dec = None, twindow=None):
             tmask = np.array([False]*len(times))
             if twindow is not None:
                 tmask = (times>twindow[0]) & (times<twindow[1])
-            print twindow
             ulim_mask = (mw_idata[:,2] == mw_idata[:,3])
             inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
             tot_mask = inds & ~ulim_mask & ~tmask
@@ -247,6 +248,8 @@ def make_sed_plot(seds_list, mw_data=None, dec = None, twindow=None):
             tmax = llh['config']['selection']['tmax']
             if i == 0:
                 sigma = np.max([0, pval_to_sigma(ts_to_pval(llh['sources'][source]['ts'], 1))])
+                if sigma > 5:
+                    sigma = np.sqrt(llh['sources'][source]['ts'])
                 ax.text(0.2, 1.02, source,
                         horizontalalignment='center',
                         verticalalignment='center', transform=ax.transAxes)
@@ -268,7 +271,7 @@ def make_sed_plot(seds_list, mw_data=None, dec = None, twindow=None):
     if np.min(y_vals) < 1e-17:
         print('Warning: Minimum data point could be out of the plotting range ({})'.format(np.min(y_vals)))
     ax.set_xlim(1e-15, 1e7)
-    ax.set_ylim(np.min(y_vals),1e-10)
+    ax.set_ylim(np.min(y_vals),1e-9)
     ax.set_xlabel('Energy [GeV]')
     ax.set_ylabel(r'$\nu f(\nu)$ [erg cm$^{-2}$ s$^{-1}$]')
     plt.tight_layout()
@@ -293,9 +296,22 @@ def get_pix_pos(wcs, ra, dec):
     return pix[:,0]-1, pix[:,1]-1
 
 
+def make_ts_plot_legend(plt_basepath, srcs):
+    fig = plt.figure()
+    fig_legend = plt.figure(figsize=(2, 1.25))
+    ax = fig.add_subplot(111)
+    patches = []
+    labels = []
+    for i, src in enumerate(srcs):
+        patch = ax.scatter([0], [0],  marker=markers[i],
+                           label=src.name, color='k')
+        labels.append(src.name)
+        patches.append(patch)
+    fig_legend.legend(patches, labels, loc='center', frameon=False)
+    fig_legend.savefig(os.path.join(plt_basepath,'legend.png'), bbox_inches='tight', dpi=300)
+    return
 
-def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=True, yaxis=True, error90=None):
-    markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7, 'H','d', 'v' ,'^', '<', '>', 1, 2, 3 ,8, '+' ,'h']
+def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, yaxis=True, error90=None):
     fname = 'fit1_pointsource_powerlaw_2.00_{}.fits'.format(plt_mode)
     fits_path = os.path.join(plt_basepath, fname)
     if os.path.exists(fits_path):

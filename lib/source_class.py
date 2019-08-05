@@ -186,6 +186,8 @@ class Source(object):
             sed_full_res = np.load(os.path.join(self.sed_path, 'llh.npy'), allow_pickle=True)[()]
             ts = sed_full_res['sources'][self.name]['ts']
             sigma = np.max([0, pval_to_sigma(ts_to_pval(ts, 1))])
+            if sigma > 5:
+                sigma = np.sqrt(sed_full_res['sources'][self.name]['ts'])
         else:
             sigma = -1
         l_str ='\subsection{{{srcinfo}}}'
