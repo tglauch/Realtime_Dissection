@@ -163,6 +163,7 @@ def make_sed_plot(seds_list, mw_data=None, dec = None, twindow=None):
             mw_idata = np.atleast_2d(np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4)))
         except Exception as inst:
             mw_idata = np.array([])
+            print(len(mw_idata))
         if len(mw_idata) > 0:
             #c = np.array(time2color(mw_idata[:,4], tmin=54500, tmax=59000))
             times = mw_idata[:,4]
