@@ -75,14 +75,14 @@ class Analysis(object):
                                   plt_mode='tsmap', error90 = self.err90)
                 plot.make_ts_plot_legend(tsm, self.srcs)
             except Exception as inst:
-                warnings.warn("Couldn't create TS Map in {}".format(tsm))
+                warnings.warn("Couldn't create TS map {}".format(tsm))
                 print(inst)
             try:
                 plot.make_ts_plot(tsm, self.srcs,
                                   os.path.join(self.vou_out, 'find_out_temp.txt'),
                                   plt_mode='residmap',  error90=self.err90)
             except Exception as inst:
-                warnings.warn("Couldn't create residual map...in {}".format(tsm))
+                warnings.warn("Couldn't create residual map {}".format(tsm))
                 print(inst)
         return
 
@@ -104,6 +104,7 @@ class Analysis(object):
         
 
     def make_ts_map(self, ts_map_path, emin=None, trange=None):
+        # add --free_diff if source is in the galactic plane
         sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {} --roiwidth {}'
         if emin is None:
             emin = self.ts_emin

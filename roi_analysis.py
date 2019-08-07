@@ -15,12 +15,13 @@ import datetime
 import numpy as np
 import re
 import time
-import plot
+#import plot
 from astropy.time import Time
 from analysis import Analysis
 import pickle
 from slack_lib import print_to_slack
-from source_class import Ellipse
+from add_classes import Ellipse
+
 
 def parseArguments():
     """Parse the command line arguments
@@ -155,7 +156,8 @@ if args['lat_analysis']:
     analysis.make_ts_map(ts_map_path) 
     ts_map_short_path = os.path.join(analysis.bpath, 'ts_map_short') 
     analysis.make_ts_map(ts_map_short_path, trange=[analysis.tsmjd1, analysis.tsmjd2])
-    
+    ts_map_short_path = os.path.join(analysis.bpath, 'ts_map_very_short')
+    analysis.make_ts_map(ts_map_short_path, trange=[analysis.mjd-1, analysis.mjd+1])
     #Calculate Source Probability
     srcprob_path = os.path.join(analysis.bpath, 'srcprob')
     analysis.calc_src_probs(srcprob_path, emin=5000)

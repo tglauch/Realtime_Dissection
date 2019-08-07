@@ -7,42 +7,8 @@ import os
 import plot
 import warnings
 import shutil
-
-class Ellipse(object):
-    def __init__(self, center_ra, center_dec, settings):
-        settings = [float(i) for i in settings]
-        self.center_ra = center_ra
-        self.center_dec = center_dec
-        if len(settings) == 2:
-            self.ra_ax = settings[0]
-            self.dec_ax = settings[1]
-        elif len(settings) == 4:
-            arr = np.abs(np.array(settings))
-            self.ra_ax = np.sum(arr[[0,1]]) / 2.
-            self.dec_ax = np.sum(arr[[2,3]]) / 2.
-        else:
-            print('No Valid Ellipse')
-        if self.dec_ax < self.ra_ax:
-            self.rotation = 0
-        else:
-            self.rotation = 90
-        print('The rotation is {}'.format(self.rotation))
-        return
-
-    def get_vou_cmd(self, radius):
-        return [str(self.center_ra), str(self.center_dec), str(radius), str(np.max([60. * self.ra_ax, 60. * self.dec_ax])),
-                str(np.min([60. * self.ra_ax, 60. * self.dec_ax])), str(self.rotation + 90)]
-
-    def get_max_extension(self):
-        return np.max([60. * self.ra_ax, 60. * self.dec_ax ])
-
-
-class Lightcurve(object):
-    def __init__(self, bpath, time_windows):
-        self.bpath = bpath
-        self.time_windows =  time_windows
-        self.time_window_results = []
-        return
+from add_classes import Lightcurve, Ellipse
+import multiprocessing
 
 class Source(object):
     """Class holding all the information for a Counterpart Candidate"""
@@ -54,11 +20,14 @@ class Source(object):
         self.dec = dec
         self.lightcurves = dict()
         self.seds = dict()
-
+        self.mw_idata = None
         
     def make_sed_lightcurve(self, lcs=['default']):
         print('Make SED lightcurve for {}'.format(self.name))
         main_lc = self.lightcurves[lcs[0]]
+        #if not hasattr(self, 'mw_idata'):
+        self.set_mw_data()
+        pool = multiprocessing.Pool()
         for i in range(len(main_lc.time_windows)):
             try:
                 seds_list = [(main_lc.time_window_results[i], 'k', 'red' , True, True, True),
@@ -66,15 +35,18 @@ class Source(object):
                 for j in range(1,len(lcs)):    
                     seds_list.append((self.lightcurves[lcs[j]].time_window_results[i],
                                       'k', 'blue' , True, True, False))
-                plot.make_sed_plot(seds_list, mw_data=self.mw_data_path, dec=self.dec, twindow=main_lc.time_windows[i])
+                kwarg_dict = {'mw_idata': self.mw_idata, 'dec':self.dec, 'twindow':main_lc.time_windows[i]}
+                pool.apply_async(plot.make_sed_plot, (seds_list,), kwarg_dict) 
             except Exception as inst:
                 warnings.warn("Couldn't create SED for source {}".format(self.name))
                 print(inst)
+        pool.close()
+        pool.join()
 
         #Create all year SED
         try:
             plot.make_sed_plot([(self.seds['default'], 'grey', 'grey', True, True, True)],
-                               mw_data=self.mw_data_path, dec=self.dec)
+                               mw_idata=self.mw_idata, dec=self.dec)
         except Exception as inst:
                 warnings.warn("Couldn't create all year SED")
                 print(inst)
@@ -165,8 +137,18 @@ class Source(object):
         pre_str = '{vou_path} {ra} {dec} {loc_str} -s ; cat Sed.txt > {bpath}'
         for i in range(2):
             os.system(pre_str.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec,  bpath=self.mw_data_path, loc_str=2))
+        self.set_mw_data()
         return
 
+    def set_mw_data(self):
+        try:
+            self.mw_idata = np.atleast_2d(np.genfromtxt(self.mw_data_path, skip_header=1,
+                                          usecols=(0,1,2,3,4)))
+        except Exception as inst:
+            self.mw_idata = None
+        if len(np.squeeze(self.mw_idata)) == 0:
+            self.mw_idata = None
+        return
 
     def source_summary(self, bpath, mjd, mode='mid'):
         bpath_src = self.bpath
@@ -291,6 +273,7 @@ class Source(object):
 
 
     def make_sed(self, emin, fermi_data_path, name='', add_srcs=None, job_id='fermi'):
+        # add --free_diff if source is in the galactic plane
         sargs = '--target_src {} --free_radius {} --data_path {} --use_4FGL --emin {} '
         if name != '':
             opath = self.sed_path + '_' + name

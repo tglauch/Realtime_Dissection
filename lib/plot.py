@@ -19,8 +19,7 @@ from astropy.wcs import WCS
 import yaml
 from regions import EllipseSkyRegion
 from astropy.coordinates import SkyCoord
-from source_class import Ellipse
-
+from add_classes import Lightcurve, Ellipse
 
 markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7, 'H','d', 'v' ,'^', '<', '>', 1, 2, 3 ,8, '+' ,'h']
 ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'])
@@ -127,24 +126,20 @@ def make_lc_plot(basepath, mjd, **kwargs):
     ax2.text(0.8, 1.1, source,
         horizontalalignment='center',
         verticalalignment='center', transform=ax2.transAxes)
-    plt.savefig(os.path.join(basepath, 'lightcurve.pdf'),
+    fig.savefig(os.path.join(basepath, 'lightcurve.pdf'),
                 bbox_inches='tight')
+    plt.close(fig)
     return
 
 
-def make_sed_plot(seds_list, mw_data=None, dec = None, twindow=None):
+def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None):
     fig, ax = newfig(0.9)
     ax.set_xscale('log')
     ax.set_yscale('log') 
     y_vals = []
-    if mw_data is not None:
-        try:
-            mw_idata = np.atleast_2d(np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4)))
-            if len(mw_idata) > 0:
-                inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
-                y_vals.extend(mw_idata[:,1][inds])
-        except Exception as inst:
-            pass
+    if mw_idata is not None:
+        inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
+        y_vals.extend(mw_idata[:,1][inds])
     for i, sed_list in enumerate(seds_list):
         basepath = sed_list[0]
         if os.path.exists(os.path.join(basepath, 'sed.npy')):
@@ -152,21 +147,22 @@ def make_sed_plot(seds_list, mw_data=None, dec = None, twindow=None):
         else:
             continue
         m = sed['ts'] < ul_ts_threshold
-        y_vals.extend(sed['e2dnde'][~m])
-        y_vals.extend(sed['e2dnde_ul95'][m])
+        y_vals.extend(sed['e2dnde'][~m]*MeV_to_erg)
+        y_vals.extend(sed['e2dnde_ul95'][m]*MeV_to_erg)
+
     if len(y_vals) ==0:
         factor = 1.
+        y_min = 1e-15
+        y_max = 1e-9
     else:
-        factor = np.log10(np.max(y_vals)) - np.log10(np.min(y_vals))
-    if mw_data is not None:
-        try:
-            mw_idata = np.atleast_2d(np.genfromtxt(mw_data, skip_header=1, usecols=(0,1,2,3,4)))
-        except Exception as inst:
-            mw_idata = np.array([])
-            print(len(mw_idata))
+        y_max = np.min([1e-8, 1.1 * np.max(y_vals)])
+        y_min = np.min([0.9 * np.min(y_vals), 1e-15])
+        factor = np.log10(y_max) - np.log10(y_min)
+    if mw_idata is not None:
         if len(mw_idata) > 0:
             #c = np.array(time2color(mw_idata[:,4], tmin=54500, tmax=59000))
             times = mw_idata[:,4]
+            times[times==55000] = -1
             tmask = np.array([False]*len(times))
             if twindow is not None:
                 tmask = (times>twindow[0]) & (times<twindow[1])
@@ -195,7 +191,6 @@ def make_sed_plot(seds_list, mw_data=None, dec = None, twindow=None):
             ax.errorbar(mw_idata[:,0][tot_mask] * hz_to_gev, mw_idata[:,1][tot_mask],
                         yerr=yerr, fmt='o', uplims=True, color='red', zorder=2,
                         alpha=0.5, markersize=3,  linestyle='')
-     
     for i, sed_list in enumerate(seds_list):
         basepath = sed_list[0]
         sed_col = sed_list[1]
@@ -278,14 +273,14 @@ def make_sed_plot(seds_list, mw_data=None, dec = None, twindow=None):
     if np.min(y_vals) < 1e-17:
         print('Warning: Minimum data point could be out of the plotting range ({})'.format(np.min(y_vals)))
     ax.set_xlim(1e-15, 1e7)
-    ax.set_ylim(np.min(y_vals),1e-9)
+    ax.set_ylim(y_min,y_max)
     ax.set_xlabel('Energy [GeV]')
     ax.set_ylabel(r'$\nu f(\nu)$ [erg cm$^{-2}$ s$^{-1}$]')
-    plt.tight_layout()
     spath = os.path.join(seds_list[0][0], 'sed.pdf')
     print('Save SED to {}'.format(spath))
     fig.savefig(spath, bbox_inches='tight')
-
+    plt.close(fig)
+    return
 
 def make_edges(data_f):
     header = data_f[0].header
@@ -304,6 +299,7 @@ def get_pix_pos(wcs, ra, dec):
 
 
 def make_ts_plot_legend(plt_basepath, srcs):
+    plt.clf()
     fig = plt.figure()
     fig_legend = plt.figure(figsize=(2, 1.25))
     ax = fig.add_subplot(111)
@@ -316,9 +312,12 @@ def make_ts_plot_legend(plt_basepath, srcs):
         patches.append(patch)
     fig_legend.legend(patches, labels, loc='center', frameon=False)
     fig_legend.savefig(os.path.join(plt_basepath,'legend.png'), bbox_inches='tight', dpi=300)
+    plt.close(fig)
+    plt.close(fig_legend)
     return
 
 def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, yaxis=True, error90=None):
+    plt.clf()
     fname = 'fit1_pointsource_powerlaw_2.00_{}.fits'.format(plt_mode)
     fits_path = os.path.join(plt_basepath, fname)
     if os.path.exists(fits_path):
@@ -335,7 +334,7 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
         print('{} not yet ready'.format(fits_path))
         return
     wcs = WCS(inp[2].header)
-    cand_pos = np.genfromtxt(vou_cand)
+    cand_pos = np.atleast_2d(np.genfromtxt(vou_cand))
     cand = {'ra': cand_pos[:,0], 'dec': cand_pos[:,1]}
     if (len(cand['ra'])>0) and (len(srcs) >0):
         distances = np.ones(len(cand['ra']))
@@ -348,7 +347,6 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
         inds =  np.argsort(distances)[len(srcs):]
         cand['ra'] = cand['ra'][mask]
         cand['dec'] =cand['dec'][mask]
- 
     if plt_mode == 'tsmap':
         hdu = inp[2]
         Z=pval_to_sigma(ts_to_pval(hdu.data,1.))
@@ -361,7 +359,6 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
         minmax = (-6, 6)
         ticks = 2 
         cmap = re_cmap
-
     bfpath = os.path.join(plt_basepath, '../bf.txt')
     if os.path.exists(bfpath):
         bfdata = np.genfromtxt(bfpath, delimiter=',')
@@ -371,7 +368,6 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
         bf_ra = hdu.header['CRVAL1']
         bf_dec = hdu.header['CRVAL2']
     fig = plt.figure(figsize=figsize(0.4, 1.))
-    plt.clf()
     ax=fig.add_axes((.0, .0,0.7,.7), projection=wcs)
     cpath = os.path.join(plt_basepath, '../contour.txt')
     if os.path.exists(cpath):
@@ -399,7 +395,6 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
         pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
         ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
         print('Use new circle')
-
     cpath = os.path.join(plt_basepath, '../contour50.txt')
     if os.path.exists(cpath):
         cdata = np.genfromtxt(cpath, delimiter=',')
@@ -458,9 +453,11 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
         ax.legend(bbox_to_anchor=(1.1, 0.5), loc='center left', prop={'size': 9})
 
     ax.grid(color='k', ls='--')
-    plt.tight_layout()
-    plt.savefig(os.path.join(plt_basepath,'{}.png'.format(plt_mode)),
+  #  plt.tight_layout()
+    fig.savefig(os.path.join(plt_basepath,'{}.png'.format(plt_mode)),
                 bbox_inches='tight', dpi=300)
+    plt.close(fig)
+    return
 
 
 def get_index(flux_dict):
