@@ -20,9 +20,9 @@ def read_from_ovro(path):
 
 def read_from_asasn(path):
     idata = np.genfromtxt(path, delimiter='|')
-    times = idata[:,0]
-    flux = (idata[:,1]) * jy_to_erg * 15 * 1e9
-    flux_up = (idata[:,1] + idata[:,2]) * jy_to_erg * 15 * 1e9 
-    flux_low = (idata[:,1] - idata[:,2]) * jy_to_erg * 15 * 1e9
-    frequency = np.ones(len(flux)) * 15 * 1e9
+    times = idata[:,4]
+    flux = (idata[:,2])
+    flux_up = (idata[:,2] + idata[:,3]) 
+    flux_low = (idata[:,2] - idata[:,3])
+    frequency = idata[:,0]
     return np.array([frequency, flux, flux_low, flux_up, times]).T
