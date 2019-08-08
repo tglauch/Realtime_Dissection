@@ -9,6 +9,9 @@ import warnings
 import shutil
 from add_classes import Lightcurve, Ellipse
 import multiprocessing
+from read_catalog import read_from_observation 
+ul_ts_threshold = 4
+MeV_to_erg = 1.60218e-6
 
 class Source(object):
     """Class holding all the information for a Counterpart Candidate"""
@@ -28,14 +31,36 @@ class Source(object):
         #if not hasattr(self, 'mw_idata'):
         self.set_mw_data()
         pool = multiprocessing.Pool()
+        y_vals = []
+        if self.mw_idata is not None:
+            inds = (self.mw_idata[:,1] > 0) & (self.mw_idata[:,0] < 1e22)
+            y_vals.extend(self.mw_idata[:,1][inds])
+
+        for basepath in main_lc.time_window_results:
+            if os.path.exists(os.path.join(basepath, 'sed.npy')):
+                sed = np.load(os.path.join(basepath, 'sed.npy'), allow_pickle=True)[()]
+            else:
+                continue
+            m = sed['ts'] < ul_ts_threshold
+            y_vals.extend(sed['e2dnde'][~m]*MeV_to_erg)
+            y_vals.extend(sed['e2dnde_ul95'][m]*MeV_to_erg)
+
+        if len(y_vals) ==0:
+            y_min = 1e-15
+            y_max = 1e-9
+        else:
+            y_max = 2 * np.min([1e-8, 1.1 * np.max(y_vals)])
+            y_min = 0.5 * np.min([0.9 * np.min(y_vals), 1e-15])
+       
         for i in range(len(main_lc.time_windows)):
             try:
                 seds_list = [(main_lc.time_window_results[i], 'k', 'red' , True, True, True),
                              (self.seds['default'], 'grey','grey', True, True, True)]
-                for j in range(1,len(lcs)):    
-                    seds_list.append((self.lightcurves[lcs[j]].time_window_results[i],
-                                      'k', 'blue' , True, True, False))
-                kwarg_dict = {'mw_idata': self.mw_idata, 'dec':self.dec, 'twindow':main_lc.time_windows[i]}
+            #    for j in range(1,len(lcs)):    
+            #        seds_list.append((self.lightcurves[lcs[j]].time_window_results[i],
+            #                          'k', 'blue' , True, True, False))
+                kwarg_dict = {'mw_idata': self.mw_idata, 'dec':self.dec, 'twindow':main_lc.time_windows[i], 'y_min':y_min,
+                              'y_max': y_max}
                 pool.apply_async(plot.make_sed_plot, (seds_list,), kwarg_dict) 
             except Exception as inst:
                 warnings.warn("Couldn't create SED for source {}".format(self.name))
@@ -46,7 +71,7 @@ class Source(object):
         #Create all year SED
         try:
             plot.make_sed_plot([(self.seds['default'], 'grey', 'grey', True, True, True)],
-                               mw_idata=self.mw_idata, dec=self.dec)
+                               mw_idata=self.mw_idata, dec=self.dec, y_min=y_min, y_max=y_max)
         except Exception as inst:
                 warnings.warn("Couldn't create all year SED")
                 print(inst)
@@ -148,6 +173,12 @@ class Source(object):
             self.mw_idata = None
         if len(np.squeeze(self.mw_idata)) == 0:
             self.mw_idata = None
+        add_data_path = os.path.join(self.bpath, 'add_data')
+        if os.path.exists(add_data_path):
+            files = [os.path.join(add_data_path, i) for i in os.listdir(add_data_path)]
+            for f in files:
+                print('Read from {}'.format(f))
+                self.mw_idata = np.concatenate([self.mw_idata, read_from_observation(f)])
         return
 
     def source_summary(self, bpath, mjd, mode='mid'):

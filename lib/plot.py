@@ -132,63 +132,45 @@ def make_lc_plot(basepath, mjd, **kwargs):
     return
 
 
-def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None):
+def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None, y_max=None):
     fig, ax = newfig(0.9)
     ax.set_xscale('log')
     ax.set_yscale('log') 
-    y_vals = []
-    if mw_idata is not None:
-        inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
-        y_vals.extend(mw_idata[:,1][inds])
-    for i, sed_list in enumerate(seds_list):
-        basepath = sed_list[0]
-        if os.path.exists(os.path.join(basepath, 'sed.npy')):
-            sed = np.load(os.path.join(basepath, 'sed.npy'), allow_pickle=True)[()]
-        else:
-            continue
-        m = sed['ts'] < ul_ts_threshold
-        y_vals.extend(sed['e2dnde'][~m]*MeV_to_erg)
-        y_vals.extend(sed['e2dnde_ul95'][m]*MeV_to_erg)
-
-    if len(y_vals) ==0:
-        factor = 1.
-        y_min = 1e-15
-        y_max = 1e-9
-    else:
-        y_max = np.min([1e-8, 1.1 * np.max(y_vals)])
-        y_min = np.min([0.9 * np.min(y_vals), 1e-15])
-        factor = np.log10(y_max) - np.log10(y_min)
+    factor = np.log10(y_max) - np.log10(y_min)
     if mw_idata is not None:
         if len(mw_idata) > 0:
             #c = np.array(time2color(mw_idata[:,4], tmin=54500, tmax=59000))
             times = mw_idata[:,4]
+            flux = mw_idata[:,1]
+            flux_low = mw_idata[:,2]
+            flux_up = mw_idata[:,3]
+            frequency = mw_idata[:,0]
             times[times==55000] = -1
             tmask = np.array([False]*len(times))
             if twindow is not None:
                 tmask = (times>twindow[0]) & (times<twindow[1])
-            ulim_mask = (mw_idata[:,2] == mw_idata[:,3])
-            inds = (mw_idata[:,1] > 0) & (mw_idata[:,0] < 1e22)
+            ulim_mask = (flux_up == flux_low)
+            inds = (flux > 0) & (frequency < 1e22)
             tot_mask = inds & ~ulim_mask & ~tmask
-            yerr = (mw_idata[:,1][tot_mask] - mw_idata[:,2][tot_mask],
-                    mw_idata[:,3][tot_mask] - mw_idata[:,1][tot_mask])
-            ax.errorbar(mw_idata[:,0][tot_mask] * hz_to_gev, mw_idata[:,1][tot_mask],
+            yerr = (flux[tot_mask] - flux_low[tot_mask],
+                    flux_up[tot_mask] - flux[tot_mask])
+            ax.errorbar(frequency[tot_mask] * hz_to_gev, flux[tot_mask],
                         yerr=yerr, fmt='o', color='grey', zorder=1,
                         alpha=0.5, markersize=3,  linestyle='')
             tot_mask = inds & ~ulim_mask & tmask
-            yerr = (mw_idata[:,1][tot_mask] - mw_idata[:,2][tot_mask],
-                    mw_idata[:,3][tot_mask] - mw_idata[:,1][tot_mask])
-            ax.errorbar(mw_idata[:,0][tot_mask] * hz_to_gev, mw_idata[:,1][tot_mask],
+            yerr = (flux[tot_mask] - flux_low[tot_mask],
+                    flux_up[tot_mask] - flux[tot_mask])
+            ax.errorbar(frequency[tot_mask] * hz_to_gev, flux[tot_mask],
                         yerr=yerr, fmt='o', color='red', zorder=2,
                         alpha=0.5, markersize=3,  linestyle='')
-
             tot_mask = inds & ulim_mask & ~tmask
-            yerr = 10**np.log10(mw_idata[:,1][tot_mask]) - 10**(np.log10(mw_idata[:,1][tot_mask])-0.1/8.*factor) 
-            ax.errorbar(mw_idata[:,0][tot_mask] * hz_to_gev, mw_idata[:,1][tot_mask],
+            yerr = 10**np.log10(flux[tot_mask]) - 10**(np.log10(flux[tot_mask])-0.1/8.*factor) 
+            ax.errorbar(frequency[tot_mask] * hz_to_gev, flux[tot_mask],
                         yerr=yerr, fmt='o', uplims=True, color='grey', zorder=1,
                         alpha=0.5, markersize=3,  linestyle='')
             tot_mask = inds & ulim_mask & tmask
-            yerr = 10**np.log10(mw_idata[:,1][tot_mask]) - 10**(np.log10(mw_idata[:,1][tot_mask])-0.1/8.*factor)   
-            ax.errorbar(mw_idata[:,0][tot_mask] * hz_to_gev, mw_idata[:,1][tot_mask],
+            yerr = 10**np.log10(flux[tot_mask]) - 10**(np.log10(flux[tot_mask])-0.1/8.*factor)   
+            ax.errorbar(frequency[tot_mask] * hz_to_gev, flux[tot_mask],
                         yerr=yerr, fmt='o', uplims=True, color='red', zorder=2,
                         alpha=0.5, markersize=3,  linestyle='')
     for i, sed_list in enumerate(seds_list):
@@ -270,8 +252,7 @@ def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None):
         inter = scipy.interpolate.UnivariateSpline(IC_disc[:,0], IC_disc[:,1], k=1, s=0)
         flux = inter(np.sin(np.radians(dec))) * MeV_to_erg * 1e6
         ax.plot([5e3, 1e6], [flux, flux], color='green', linestyle='-')
-    if np.min(y_vals) < 1e-17:
-        print('Warning: Minimum data point could be out of the plotting range ({})'.format(np.min(y_vals)))
+    print y_min, y_max
     ax.set_xlim(1e-15, 1e7)
     ax.set_ylim(y_min,y_max)
     ax.set_xlabel('Energy [GeV]')
