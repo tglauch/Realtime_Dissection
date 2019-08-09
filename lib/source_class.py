@@ -26,13 +26,13 @@ class Source(object):
         self.lightcurves = dict()
         self.seds = dict()
         self.mw_idata = None
+        self.ovro = None
 
     def make_sed_lightcurve(self, lcs=['default']):
         print('Make SED lightcurve for {}'.format(self.name))
         main_lc = self.lightcurves[lcs[0]]
         #if not hasattr(self, 'mw_idata'):
         self.set_mw_data()
-        self.get_ovro_data()
         pool = multiprocessing.Pool()
         y_vals = []
         if self.mw_idata is not None:
@@ -88,6 +88,7 @@ class Source(object):
         return 
 
     def get_ovro_data(self):
+        self.ovro = None
         if '4FGL' in self.name:
             print('Looking for OVRO data for {}'.format(self.name))
             ovro_name = self.name[5:10] + self.name[12:]
@@ -96,15 +97,17 @@ class Source(object):
                 print('Data Found')
                 with open(os.path.join(self.bpath, 'add_data', 'ovro.csv'), 'w+') as ofile:
                     ofile.write(html.text)
+                self.ovro = os.path.join(self.bpath, 'add_data', 'ovro.csv')
             else:
                 print('No Data Found!')
         return                 
 
 
     def make_lc_plot(self, mjd):
+        self.get_ovro_data()
         for lc_key in self.lightcurves.keys():
             try:
-                plot.make_lc_plot(self.lightcurves[lc_key].bpath, mjd)
+                plot.make_lc_plot(self.lightcurves[lc_key].bpath, mjd, self.name, radio=self.ovro)
             except Exception as inst:
                 warnings.warn("Couldn't create {} lightcurve for {}".format(lc_key, self.name))
                 print(inst)

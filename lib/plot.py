@@ -21,6 +21,7 @@ from regions import EllipseSkyRegion
 from astropy.coordinates import SkyCoord
 from add_classes import Lightcurve, Ellipse
 
+
 markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7, 'H','d', 'v' ,'^', '<', '>', 1, 2, 3 ,8, '+' ,'h']
 ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'])
 re_cmap = LinearSegmentedColormap.from_list('mycmap2', ['#67a9cf', '#f7f7f7', '#ef8a62'])
@@ -48,20 +49,12 @@ def time2color(ts, tmin = -1, tmax = -1):
     return c
 
 
-def make_lc_plot(basepath, mjd, radio=None, xray=None, **kwargs):
+def get_lc_dict(basepath, keys):
     lc_dict = dict()
-    keys = ['ts', 'dgamma','gamma',  'flux_ul95',  'flux_err', 'flux']
     for key in keys:
         lc_dict[key] = [] 
     lc_dict['tmid'] = []
     lc_dict['bin_len'] = []
-    n_panels = 2
-
-    if radio is not None:
-        n_panels += 1
-    if xray is not None:
-        n_panels += 1
-
     for folder in os.listdir(basepath):
         path = os.path.join(basepath,folder,'llh.npy')
         if os.path.exists(path):
@@ -76,35 +69,39 @@ def make_lc_plot(basepath, mjd, radio=None, xray=None, **kwargs):
             if key=='gamma':
                 lc_dict[key].append(get_index(flux_dict))
             elif key=='dgamma':
-                lc_dict[key].append(get_index_err(flux_dict))   
+                lc_dict[key].append(get_index_err(flux_dict))
             else:
                 lc_dict[key].append(flux_dict[key])
         lc_dict['tmid'].append((float(folder.split('_')[1])+float(folder.split('_')[0]))/2)
         lc_dict['bin_len'].append(float(folder.split('_')[1])-float(folder.split('_')[0]))
+    return lc_dict, source
+
+
+def plot_fermi_flux(ax, basepath, mjd,**kwargs):
+    lc_dict, source = get_lc_dict(basepath, ['ts', 'dgamma','gamma',  'flux_ul95',  'flux_err', 'flux'])
     lc_arr = dict_to_nparray(lc_dict)
     ind = np.argsort(lc_arr['tmid'])
     lc_arr = lc_arr[ind]
-    fig = plt.figure(figsize=figsize(0.8, 0.35 * n_panels))
     mask  = (np.abs(lc_arr['ts'])>4) & (lc_arr['flux_err'] < lc_arr['flux'])
     gam_mask = ((lc_arr['dgamma']/lc_arr['gamma'])<2.)
-    ## Flux Axis
-    ax1=fig.add_axes((.0, .20,1.,.4))
     scaling = -round(np.max(np.log10(lc_arr['flux'])))+1
-    ax1.errorbar(lc_arr['tmid'][mask], 10**scaling*lc_arr['flux'][mask],
+    ax.errorbar(lc_arr['tmid'][mask], 10**scaling*lc_arr['flux'][mask],
                  yerr = 10**scaling*lc_arr['flux_err'][mask],
                  xerr=lc_arr['bin_len'][mask]/2,linestyle=' ')
-    ax1.errorbar(lc_arr['tmid'][~mask], 10**scaling*lc_arr['flux_ul95'][~mask],
+    ax.errorbar(lc_arr['tmid'][~mask], 10**scaling*lc_arr['flux_ul95'][~mask],
                  xerr=lc_arr['bin_len'][~mask]/2, color='#808080', linestyle=' ')
-    serr = 0.1*(ax1.get_ylim()[1] - ax1.get_ylim()[0])
-    ax1.errorbar(lc_arr['tmid'][~mask], 10**scaling*lc_arr['flux_ul95'][~mask],
+    serr = 0.1*(ax.get_ylim()[1] - ax.get_ylim()[0])
+    ax.errorbar(lc_arr['tmid'][~mask], 10**scaling*lc_arr['flux_ul95'][~mask],
                  yerr=serr,
                  color='#808080', uplims=True, linestyle=' ')
-    ax1.set_ylabel(r'$10^{'+'{:.0f}'.format(-scaling)+'}\,$'+r'ph cm$^{-2}$ s$^{-1}$')
-    ax1.axvline(mjd, color='#696969', linestyle='--')
-    ax1.set_xlabel('Time (MJD)')
+    ax.set_ylabel(r'$10^{'+'{:.0f}'.format(-scaling)+'}\,$'+r'ph cm$^{-2}$ s$^{-1}$')
+    ax.axvline(mjd, color='#696969', linestyle='--') 
+    return ax
 
-    ## Spectral Index Axis
-    ax2=fig.add_axes((.0, .6,1.,.4))
+
+def plot_fermi_index(ax, basepath, mjd, **kwargs):
+    lc_dict, source = get_lc_dict(basepath, ['ts', 'dgamma','gamma',  'flux_ul95',  'flux_err', 'flux'])
+    lc_arr = dict_to_nparray(lc_dict)
     if '4FGL' in source:
         if kwargs.get('4fgl_average', True):
             catalog = fits.open('./lib/gll_psc_v19.fit')
@@ -114,26 +111,77 @@ def make_lc_plot(basepath, mjd, radio=None, xray=None, **kwargs):
         else:
             av_gamma, _ = weighted_avg_and_std(lc_arr['gamma'],
                                                weights=1./lc_arr['dgamma'])
-        ax2.axhline(av_gamma,linestyle='--', color='grey',
+        ax.axhline(av_gamma,linestyle='--', color='grey',
                     alpha=0.85, zorder = -1, linewidth=0.9)
-
+    mask  = (np.abs(lc_arr['ts'])>4) & (lc_arr['flux_err'] < lc_arr['flux'])
+    gam_mask = ((lc_arr['dgamma']/lc_arr['gamma'])<2.)
     mask2 = (lc_arr['dgamma'] > 0)
-    ax2.errorbar(lc_arr['tmid'][mask & mask2 & gam_mask], lc_arr['gamma'][mask & mask2 & gam_mask],
+    ax.errorbar(lc_arr['tmid'][mask & mask2 & gam_mask], lc_arr['gamma'][mask & mask2 & gam_mask],
                  yerr=lc_arr['dgamma'][mask & mask2 & gam_mask],
                  xerr=lc_arr['bin_len'][mask& mask2 &gam_mask]/2., linestyle='')
-    ax2.errorbar(lc_arr['tmid'][mask & ~mask2 & gam_mask], lc_arr['gamma'][mask & ~mask2 & gam_mask],
+    ax.errorbar(lc_arr['tmid'][mask & ~mask2 & gam_mask], lc_arr['gamma'][mask & ~mask2 & gam_mask],
                  yerr=0, xerr=lc_arr['bin_len'][mask& ~mask2 &gam_mask]/2., linestyle='',
                  ecolor='red')
-    ax2.set_ylabel('Index', labelpad=5)
-    ax2.set_ylim(0.0,6)
-    ax2.set_xticks([])
-    ax2.set_yticks([2,4])
-    ax2.axvline(mjd, color='#696969', linestyle='--')
-    ax2.set_xlim(ax1.get_xlim()[0], ax1.get_xlim()[1])
-    ax2.text(0.8, 1.1, source,
-        horizontalalignment='center',
-        verticalalignment='center', transform=ax2.transAxes)
-    fig.savefig(os.path.join(basepath, 'lightcurve.pdf'),
+
+    ax.set_ylabel('Index', labelpad=5)
+    ax.set_ylim(0.0,6)
+    ax.set_yticks([2,4])
+    ax.axvline(mjd, color='#696969', linestyle='--')
+    ax.errorbar(lc_arr['tmid'][mask & ~mask2 & gam_mask], lc_arr['gamma'][mask & ~mask2 & gam_mask],
+                 yerr=0, xerr=lc_arr['bin_len'][mask& ~mask2 &gam_mask]/2., linestyle='',
+                 ecolor='red')
+    return ax
+
+
+def plot_radio(ax, basepath, mjd, **kwargs):
+    idata = np.genfromtxt(basepath, delimiter=',')
+    ax.errorbar(idata[:,0], idata[:,1], yerr=idata[:,2], linestyle='',
+                 ecolor='red')
+    ax.axvline(mjd, color='#696969', linestyle='--')
+    return ax
+
+
+def plot_xray():
+    # ToDo
+    return
+
+
+def make_lc_plot(lat_basepath, mjd, source, radio=None, xray=None, **kwargs):
+    func_dict = {'fermi_flux': plot_fermi_flux, 'fermi_index': plot_fermi_index,
+                 'radio': plot_radio, 'xray': plot_xray}
+
+    path_dict = {'fermi_flux': lat_basepath, 'fermi_index': lat_basepath,
+                 'radio': radio, 'xray': xray}
+    n_panels = 2
+    lcs = ['fermi_flux', 'fermi_index']
+    if radio is not None:
+        lcs.append('radio')
+        n_panels += 1
+    if xray is not None:
+        lcs.append('xray')
+        n_panels += 1
+    height_per_panel = 0.8 / n_panels
+    fig = plt.figure(figsize=figsize(0.8, 0.35 * n_panels))
+    ## Flux Axis
+    axes = []
+    xminmax = None
+    for i, lc in enumerate(lcs):
+        print i
+        new_ax= fig.add_axes((.0, 0.2+ i*height_per_panel,1.,height_per_panel))
+        new_ax= func_dict[lc](new_ax, path_dict[lc], mjd, **kwargs)
+        axes.append(new_ax)
+        if xminmax == None:
+            xminmax = new_ax.get_xlim()
+        else:
+            new_ax.set_xlim(xminmax[0], xminmax[1])
+    axes[0].set_xlabel('Time (MJD)')
+    for i in range(1,len(axes)):
+        axes[i].set_xticks([])
+    ## Spectral Index Axis
+    axes[-1].text(0.8, 1.1, source,
+                  horizontalalignment='center',
+                  verticalalignment='center', transform=axes[-1].transAxes)
+    fig.savefig(os.path.join(lat_basepath, 'lightcurve.pdf'),
                 bbox_inches='tight')
     plt.close(fig)
     return
