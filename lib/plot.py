@@ -48,13 +48,20 @@ def time2color(ts, tmin = -1, tmax = -1):
     return c
 
 
-def make_lc_plot(basepath, mjd, **kwargs):
+def make_lc_plot(basepath, mjd, radio=None, xray=None, **kwargs):
     lc_dict = dict()
     keys = ['ts', 'dgamma','gamma',  'flux_ul95',  'flux_err', 'flux']
     for key in keys:
         lc_dict[key] = [] 
     lc_dict['tmid'] = []
     lc_dict['bin_len'] = []
+    n_panels = 2
+
+    if radio is not None:
+        n_panels += 1
+    if xray is not None:
+        n_panels += 1
+
     for folder in os.listdir(basepath):
         path = os.path.join(basepath,folder,'llh.npy')
         if os.path.exists(path):
@@ -77,7 +84,7 @@ def make_lc_plot(basepath, mjd, **kwargs):
     lc_arr = dict_to_nparray(lc_dict)
     ind = np.argsort(lc_arr['tmid'])
     lc_arr = lc_arr[ind]
-    fig = plt.figure(figsize=figsize(0.5, 0.7))
+    fig = plt.figure(figsize=figsize(0.8, 0.35 * n_panels))
     mask  = (np.abs(lc_arr['ts'])>4) & (lc_arr['flux_err'] < lc_arr['flux'])
     gam_mask = ((lc_arr['dgamma']/lc_arr['gamma'])<2.)
     ## Flux Axis
@@ -252,7 +259,6 @@ def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None
         inter = scipy.interpolate.UnivariateSpline(IC_disc[:,0], IC_disc[:,1], k=1, s=0)
         flux = inter(np.sin(np.radians(dec))) * MeV_to_erg * 1e6
         ax.plot([5e3, 1e6], [flux, flux], color='green', linestyle='-')
-    print y_min, y_max
     ax.set_xlim(1e-15, 1e7)
     ax.set_ylim(y_min,y_max)
     ax.set_xlabel('Energy [GeV]')

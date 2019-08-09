@@ -9,7 +9,9 @@ import warnings
 import shutil
 from add_classes import Lightcurve, Ellipse
 import multiprocessing
-from read_catalog import read_from_observation 
+from read_catalog import read_from_observation
+import requests
+ 
 ul_ts_threshold = 4
 MeV_to_erg = 1.60218e-6
 
@@ -24,12 +26,13 @@ class Source(object):
         self.lightcurves = dict()
         self.seds = dict()
         self.mw_idata = None
-        
+
     def make_sed_lightcurve(self, lcs=['default']):
         print('Make SED lightcurve for {}'.format(self.name))
         main_lc = self.lightcurves[lcs[0]]
         #if not hasattr(self, 'mw_idata'):
         self.set_mw_data()
+        self.get_ovro_data()
         pool = multiprocessing.Pool()
         y_vals = []
         if self.mw_idata is not None:
@@ -84,6 +87,20 @@ class Source(object):
             print(inst)
         return 
 
+    def get_ovro_data(self):
+        if '4FGL' in self.name:
+            print('Looking for OVRO data for {}'.format(self.name))
+            ovro_name = self.name[5:10] + self.name[12:]
+            html= requests.get('http://www.astro.caltech.edu/ovroblazars/HL28/csv/{}.csv'.format(ovro_name))
+            if html.ok:
+                print('Data Found')
+                with open(os.path.join(self.bpath, 'add_data', 'ovro.csv'), 'w+') as ofile:
+                    ofile.write(html.text)
+            else:
+                print('No Data Found!')
+        return                 
+
+
     def make_lc_plot(self, mjd):
         for lc_key in self.lightcurves.keys():
             try:
@@ -115,6 +132,8 @@ class Source(object):
         if not os.path.exists(self.lc_path):
             os.makedirs(self.lc_path)
         self.mw_data_path = os.path.join(bpath_src, 'sed.txt')
+        if not os.path.exists(os.path.join(bpath_src, 'add_data')):
+            os.makedirs(os.path.join(bpath_src, 'add_data'))
         return
 
 
@@ -163,6 +182,7 @@ class Source(object):
         for i in range(2):
             os.system(pre_str.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec,  bpath=self.mw_data_path, loc_str=2))
         self.set_mw_data()
+        self.get_ovro_data()
         return
 
     def set_mw_data(self):
