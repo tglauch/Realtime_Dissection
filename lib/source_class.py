@@ -27,6 +27,7 @@ class Source(object):
         self.seds = dict()
         self.mw_idata = None
         self.ovro = None
+        self.swift = None
 
     def make_sed_lightcurve(self, lcs=['default']):
         print('Make SED lightcurve for {}'.format(self.name))
@@ -89,9 +90,12 @@ class Source(object):
 
     def get_ovro_data(self):
         self.ovro = None
-        if '4FGL' in self.name:
+        mask = [True if '3FGL' in i else False for i in self.names]
+        fgl_name = np.array(self.names)[mask]
+        if len(fgl_name)  >0 :
+            fgl_name = fgl_name[0]
             print('Looking for OVRO data for {}'.format(self.name))
-            ovro_name = self.name[5:10] + self.name[12:]
+            ovro_name = fgl_name[5:10] + fgl_name[12:]
             html= requests.get('http://www.astro.caltech.edu/ovroblazars/HL28/csv/{}.csv'.format(ovro_name))
             if html.ok:
                 print('Data Found')
@@ -105,9 +109,14 @@ class Source(object):
 
     def make_lc_plot(self, mjd):
         self.get_ovro_data()
-        for lc_key in self.lightcurves.keys():
+        self.swift=None
+        self.collect_xray()
+        for i, lc_key in enumerate(self.lightcurves.keys()):
             try:
-                plot.make_lc_plot(self.lightcurves[lc_key].bpath, mjd, self.name, radio=self.ovro)
+                if i == 0:
+                    plot.make_lc_plot(self.lightcurves[lc_key].bpath, mjd, self.name, radio=self.ovro, xray=self.swift)
+                else:
+                    plot.make_lc_plot(self.lightcurves[lc_key].bpath, mjd, self.name)
             except Exception as inst:
                 warnings.warn("Couldn't create {} lightcurve for {}".format(lc_key, self.name))
                 print(inst)
@@ -188,6 +197,24 @@ class Source(object):
         self.get_ovro_data()
         return
 
+    def collect_xray(self):
+        idata = np.genfromtxt(self.mw_data_path, skip_header=1,
+                              usecols=[1,2,3,4,6], dtype=[np.float,np.float,np.float,np.float,object])
+        idata = np.array([list(i) for i in idata])
+        idata = idata[idata[:,4] == 'OUSXB']
+        idata = np.array(idata[:,0:4],dtype=np.float)
+        idata[:,1] = idata[:,1] - idata[:,0]
+        idata[:,2] = idata[:,0] - idata[:,2]
+        if not os.path.exists(os.path.join(self.bpath, 'add_data')):
+            os.makedirs(os.path.join(self.bpath, 'add_data'))
+        if len(idata) >0:
+            np.savetxt(os.path.join(self.bpath, 'add_data', 'swift.csv'), idata)
+            self.swift = os.path.join(self.bpath, 'add_data', 'swift.csv')
+        else:
+            self.swift = None  
+        return
+
+
     def set_mw_data(self):
         try:
             self.mw_idata = np.atleast_2d(np.genfromtxt(self.mw_data_path, skip_header=1,
@@ -266,9 +293,9 @@ class Source(object):
             fig_str = infile.read()
         if os.path.exists(sed_pdf):
             cap_str = 'SED for {}. See the description in section \\ref{{sec:sed}} for more details.'
-            l_str += fig_str.format(width = 0.7, path = sed_pdf, caption=cap_str.format(self.name))
+            l_str += fig_str.format(width = 0.8, path = sed_pdf, caption=cap_str.format(self.name))
         if os.path.exists(lc_path):
-            l_str += fig_str.format(width = 0.7, path = lc_path, caption='Light curve for {}'.format(self.name))
+            l_str += fig_str.format(width = 0.8, path = lc_path, caption='Light curve for {}'.format(self.name))
         gev_lc = os.path.join(lc_base+'_1GeV', 'lightcurve.pdf')
         if os.path.exists(gev_lc):
             l_str += fig_str.format(width = 0.8, path = gev_lc, caption='1GeV light curve for {}'.format(self.name))

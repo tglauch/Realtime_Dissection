@@ -346,4 +346,65 @@ class Analysis(object):
             return ''
         src_ind = np.where(src_names==src_of_interest)[0][0]
         ostr = ' | Energy flux (E $\geq$ 100MeV): {:.2e} erg/cm$^2$/s [Top {:.1f}\% in 4FGL]'
-        return ostr.format(eflux[src_ind], 1.*src_ind/len(eflux)*100) 
+        return ostr.format(eflux[src_ind], 1.*src_ind/len(eflux)*100)
+
+
+    def create_html(self):
+        counterparts = np.array([src for src in self.srcs if not 'CRATES' in src.name])
+        inds = np.argsort([src.dist for src in counterparts])
+        counterparts = counterparts[inds][:2]
+        html_files = os.path.join(self.bpath, 'html/IceCube{}_files'.format(self.event_name[2:]))
+        if os.path.exists(html_files):
+            shutil.rmtree(html_files)
+        shutil.copytree('./htmlcode/IceCubeTemplate_Candidates_files/', html_files)
+        index_html = os.path.join(self.bpath, 'html/index.html')
+        shutil.copyfile('./htmlcode/IceCubeTemplate_{}Candidates.html'.format(len(counterparts)),
+                        index_html)
+        with open(index_html, 'r') as f:
+            code = f.read()
+            code = code.replace('IceCube yyyy', 'IceCube {}'.format(self.event_name[2:]))
+            code = code.replace('ICyyyy', self.event_name)
+            code = code.replace('MJD aaaa', 'MJD {}'.format(self.mjd))
+            code = code.replace('gggg', str(9999))
+            code = code.replace('tttt', self.event_name[2:])
+            code = code.replace('rrrr', self.event_name[2:])
+            
+        with open(index_html, 'w') as f:
+            f.write(code)
+        
+        rxmap_eps = os.path.join(self.vou_out, 'RX_map.eps')
+        rxmap_png = os.path.join(self.vou_out, 'RX_map.png')
+        os.system('convert -density 288 {} {}'.format(rxmap_eps, rxmap_png))
+
+        candidates_eps = os.path.join(self.vou_out, 'candidates.eps')
+        candidates_png = os.path.join(self.vou_out, 'candidates.png')
+        os.system('convert -density 288 {} {}'.format(candidates_eps, candidates_png))
+
+        shutil.copyfile(rxmap_png,
+                        os.path.join(html_files, 'VOU-RXmap.png'))
+        shutil.copyfile(candidates_png,
+                        os.path.join(html_files, 'VOU-candidates.png'))
+        shutil.copyfile(os.path.join(self.bpath, 'ts_map/tsmap.png'), 
+                        os.path.join(html_files, 'tsmap-full.png'))
+        shutil.copyfile(os.path.join(self.bpath, 'ts_map_short/tsmap.png'),
+                        os.path.join(html_files, 'tsmap_200.png'))
+        for i, src in enumerate(counterparts):
+            lc_base = src.lc_path
+            print lc_base
+            lc_path = os.path.join(lc_base, 'lightcurve.png')
+            folders = [fold for fold in os.listdir(lc_base) if os.path.isdir(os.path.join(lc_base, fold))]
+            if len(folders) >  0:
+                if self.mode == 'end':
+                    sed_path = os.path.join(lc_base,sorted(folders)[-1])
+                else:
+                    for fold in folders:
+                        if (self.mjd <= float(fold.split('_')[1])) and (self.mjd > float(fold.split('_')[0])):
+                            sed_path = os.path.join(lc_base,fold)
+                            break
+                print(os.path.join(html_files, 'CANDSED{}.png'.format(i+1)))
+                shutil.copyfile(os.path.join(sed_path, 'sed.png'), os.path.join(html_files, 'CandSED{}.png'.format(i+1)))
+            else:
+                print('SED seems to be not ready, yet')
+            print('CANDLC{}.png'.format(i+1))
+            shutil.copyfile(lc_path, os.path.join(html_files, 'CandLC{}.png'.format(i+1)))
+

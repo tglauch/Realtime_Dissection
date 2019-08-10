@@ -1,0 +1,29 @@
+#!bin/bash
+
+# cshell script to generate a .html file summarising the  results of a dissection analysis 
+# of a IceCube neutrino track event 
+# usage: source newtrack trackname MJD GCN_Number no_of_candidates found
+# example source newtrack 190724 59000.22 24981 2
+
+if [ "$#" -ne 5 ];
+then
+ echo  "missing parameters"
+ echo  "USAGE: source newtrack trackname MJD GCN_number "
+ echo  "example source newtrack 190724 59000.22 24981 2"
+ exit
+fi
+rm -rf $5/html
+mkdir $5/html
+echo 'no_of_candidates '$4
+cp -r IceCubeTemplate_Candidates_files $5/html/IceCube$1_files
+if [ "$4" -eq 0 ];
+then
+  cp IceCubeTemplate_Nocandidates.html $5/html/index.html
+elif [ "$4" -eq 1 ];
+then
+   cp IceCubeTemplate_1Candidate.html $5/html/index.html
+elif [ "$4" -eq 2 ];
+then
+   cp IceCubeTemplate_2Candidates.html $5/html/index.html
+ fi
+vim -c "1,%s/IceCube yyyy/IceCube $1/g" -c 1,%s/ICyyyy/IC$1/g -c "1,%s/MJD aaaa/MJD $2/" -c 1,%s/gggg/$3/g -c 1,%s/tttt/$1/g -c 1,%s/rrrr/$1/g -c x $5/html/index.html 

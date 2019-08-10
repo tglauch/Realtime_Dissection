@@ -138,12 +138,17 @@ def plot_radio(ax, basepath, mjd, **kwargs):
     ax.errorbar(idata[:,0], idata[:,1], yerr=idata[:,2], linestyle='',
                  ecolor='red')
     ax.axvline(mjd, color='#696969', linestyle='--')
+    ax.set_ylabel('Jy', labelpad=5)
     return ax
 
 
-def plot_xray():
-    # ToDo
-    return
+def plot_xray(ax, basepath, mjd, **kwargs):
+    idata = np.genfromtxt(basepath, delimiter=' ')
+    ax.errorbar(idata[:,3], idata[:,0]*1e13, yerr=idata[:,1]*1e13, linestyle='',
+                 ecolor='blue')
+    ax.axvline(mjd, color='#696969', linestyle='--')
+    ax.set_ylabel(r'$10^{-13}\,$'+r'erg cm$^{-2}$ s$^{-1}$', labelpad=5)
+    return ax
 
 
 def make_lc_plot(lat_basepath, mjd, source, radio=None, xray=None, **kwargs):
@@ -161,12 +166,11 @@ def make_lc_plot(lat_basepath, mjd, source, radio=None, xray=None, **kwargs):
         lcs.append('xray')
         n_panels += 1
     height_per_panel = 0.8 / n_panels
-    fig = plt.figure(figsize=figsize(0.8, 0.35 * n_panels))
+    fig = plt.figure(figsize=figsize(0.7, 0.35 * n_panels))
     ## Flux Axis
     axes = []
     xminmax = None
     for i, lc in enumerate(lcs):
-        print i
         new_ax= fig.add_axes((.0, 0.2+ i*height_per_panel,1.,height_per_panel))
         new_ax= func_dict[lc](new_ax, path_dict[lc], mjd, **kwargs)
         axes.append(new_ax)
@@ -183,6 +187,8 @@ def make_lc_plot(lat_basepath, mjd, source, radio=None, xray=None, **kwargs):
                   verticalalignment='center', transform=axes[-1].transAxes)
     fig.savefig(os.path.join(lat_basepath, 'lightcurve.pdf'),
                 bbox_inches='tight')
+    fig.savefig(os.path.join(lat_basepath, 'lightcurve.png'),
+                bbox_inches='tight', dpi=300)
     plt.close(fig)
     return
 
@@ -311,9 +317,11 @@ def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None
     ax.set_ylim(y_min,y_max)
     ax.set_xlabel('Energy [GeV]')
     ax.set_ylabel(r'$\nu f(\nu)$ [erg cm$^{-2}$ s$^{-1}$]')
-    spath = os.path.join(seds_list[0][0], 'sed.pdf')
-    print('Save SED to {}'.format(spath))
-    fig.savefig(spath, bbox_inches='tight')
+    spath_pdf = os.path.join(seds_list[0][0], 'sed.pdf')
+    spath_png = os.path.join(seds_list[0][0], 'sed.png')
+    print('Save SED to {}'.format(spath_pdf))
+    fig.savefig(spath_pdf, bbox_inches='tight')
+    fig.savefig(spath_png, bbox_inches='tight', dpi=300)
     plt.close(fig)
     return
 

@@ -8,6 +8,8 @@ def read_from_observation(path):
         return read_from_ovro(path) # data format as downloaded from the ovro website
     if name == 'asasn':
         return read_from_asasn(path) #
+    if name == 'swift':
+        return np.array([[], [], [], [], []]).T
 
 def read_from_ovro(path):
     idata = np.genfromtxt(path, skip_header=1, delimiter=',')
