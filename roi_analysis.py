@@ -129,6 +129,10 @@ if args['vou']:
     # Run VOU Tool
     logging.info('Start the VOU analysis pipeline')
     analysis.ROI_analysis()
+    if os.path.exists(analysis_object_path):
+        os.remove(analysis_object_path)
+    with open(analysis_object_path, "wb") as f:
+        pickle.dump(analysis, f)
 
 # Start the gamma-ray analysis
 if args['lat_analysis']:
@@ -228,6 +232,5 @@ while not final_pdf:
             continue
         src_latex += src.source_summary(analysis.bpath, analysis.mjd, mode=analysis.mode)
     analysis.create_html()
-    asdf
     analysis.make_pdf(src_latex, final_pdf = final_pdf)
     print_to_slack('Fit Results', analysis.pdf_out_path)
