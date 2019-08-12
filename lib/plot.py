@@ -74,11 +74,11 @@ def get_lc_dict(basepath, keys):
                 lc_dict[key].append(flux_dict[key])
         lc_dict['tmid'].append((float(folder.split('_')[1])+float(folder.split('_')[0]))/2)
         lc_dict['bin_len'].append(float(folder.split('_')[1])-float(folder.split('_')[0]))
-    return lc_dict, source
+    return lc_dict
 
 
-def plot_fermi_flux(ax, basepath, mjd,**kwargs):
-    lc_dict, source = get_lc_dict(basepath, ['ts', 'dgamma','gamma',  'flux_ul95',  'flux_err', 'flux'])
+def plot_fermi_flux(ax, basepath, mjd, source, **kwargs):
+    lc_dict = get_lc_dict(basepath, ['ts', 'dgamma','gamma',  'flux_ul95',  'flux_err', 'flux'])
     lc_arr = dict_to_nparray(lc_dict)
     ind = np.argsort(lc_arr['tmid'])
     lc_arr = lc_arr[ind]
@@ -99,8 +99,8 @@ def plot_fermi_flux(ax, basepath, mjd,**kwargs):
     return ax
 
 
-def plot_fermi_index(ax, basepath, mjd, **kwargs):
-    lc_dict, source = get_lc_dict(basepath, ['ts', 'dgamma','gamma',  'flux_ul95',  'flux_err', 'flux'])
+def plot_fermi_index(ax, basepath, mjd, source, **kwargs):
+    lc_dict = get_lc_dict(basepath, ['ts', 'dgamma','gamma',  'flux_ul95',  'flux_err', 'flux'])
     lc_arr = dict_to_nparray(lc_dict)
     if '4FGL' in source:
         if kwargs.get('4fgl_average', True):
@@ -133,7 +133,7 @@ def plot_fermi_index(ax, basepath, mjd, **kwargs):
     return ax
 
 
-def plot_radio(ax, basepath, mjd, **kwargs):
+def plot_radio(ax, basepath, mjd, source, **kwargs):
     idata = np.genfromtxt(basepath, delimiter=',')
     ax.errorbar(idata[:,0], idata[:,1], yerr=idata[:,2], linestyle='',
                  ecolor='red')
@@ -142,7 +142,7 @@ def plot_radio(ax, basepath, mjd, **kwargs):
     return ax
 
 
-def plot_xray(ax, basepath, mjd, **kwargs):
+def plot_xray(ax, basepath, mjd, source, **kwargs):
     idata = np.genfromtxt(basepath, delimiter=' ')
     ax.errorbar(idata[:,3], idata[:,0]*1e13, yerr=idata[:,1]*1e13, linestyle='',
                  ecolor='blue')
@@ -172,7 +172,7 @@ def make_lc_plot(lat_basepath, mjd, source, radio=None, xray=None, **kwargs):
     xminmax = None
     for i, lc in enumerate(lcs):
         new_ax= fig.add_axes((.0, 0.2+ i*height_per_panel,1.,height_per_panel))
-        new_ax= func_dict[lc](new_ax, path_dict[lc], mjd, **kwargs)
+        new_ax= func_dict[lc](new_ax, path_dict[lc], mjd, source, **kwargs)
         axes.append(new_ax)
         if xminmax == None:
             xminmax = new_ax.get_xlim()

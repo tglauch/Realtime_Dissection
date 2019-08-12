@@ -231,6 +231,6 @@ while not final_pdf:
         if src.dist > analysis.max_dist:
             continue
         src_latex += src.source_summary(analysis.bpath, analysis.mjd, mode=analysis.mode)
-    analysis.create_html()
     analysis.make_pdf(src_latex, final_pdf = final_pdf)
+    analysis.create_html()
     print_to_slack('Fit Results', analysis.pdf_out_path)

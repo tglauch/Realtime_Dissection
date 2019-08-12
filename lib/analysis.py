@@ -18,6 +18,9 @@ import shutil
 import pyfits as fits
 import warnings
 
+
+sc_file_path = '/scratch9/tglauch/Realtime_Dissection/sc_files/current.fits'
+
 files = collections.OrderedDict([
      ('4fgl', {'file': '4fgl.1.csv',
               'keys': ['Source_Name', 'RA', 'Dec']}),
@@ -230,7 +233,7 @@ class Analysis(object):
             args['mode'] = self.mode
         else:
             args['mjd'] = mjd_range
-        MET = get_data(self.ra, self.dec, **args)
+        MET = get_data(self.ra, self.dec, sc_file = sc_file_path , **args)
         MJD = [MET_to_MJD(float(i)) for i in MET]
         self.mjd_range = MJD
         return
@@ -350,14 +353,15 @@ class Analysis(object):
 
 
     def create_html(self):
-        counterparts = np.array([src for src in self.srcs if not 'CRATES' in src.name])
+        mask = [True if src.dist < self.max_dist else False for src in self.srcs]
+        counterparts = np.array([src for src in np.array(self.srcs)[mask] if not 'CRATES' in src.name])
         inds = np.argsort([src.dist for src in counterparts])
         counterparts = counterparts[inds][:2]
-        html_files = os.path.join(self.bpath, 'html/IceCube{}_files'.format(self.event_name[2:]))
+        html_files = os.path.join(self.bpath, '{}/IceCube{}_files'.format(self.event_name, self.event_name[2:]))
         if os.path.exists(html_files):
             shutil.rmtree(html_files)
         shutil.copytree('./htmlcode/IceCubeTemplate_Candidates_files/', html_files)
-        index_html = os.path.join(self.bpath, 'html/index.html')
+        index_html = os.path.join(self.bpath, '{}/index.html'.format(self.event_name))
         shutil.copyfile('./htmlcode/IceCubeTemplate_{}Candidates.html'.format(len(counterparts)),
                         index_html)
         with open(index_html, 'r') as f:
@@ -379,16 +383,23 @@ class Analysis(object):
         candidates_eps = os.path.join(self.vou_out, 'candidates.eps')
         candidates_png = os.path.join(self.vou_out, 'candidates.png')
         os.system('convert -density 288 {} {}'.format(candidates_eps, candidates_png))
-
-        shutil.copyfile(rxmap_png,
-                        os.path.join(html_files, 'VOU-RXmap.png'))
-        shutil.copyfile(candidates_png,
-                        os.path.join(html_files, 'VOU-candidates.png'))
-        shutil.copyfile(os.path.join(self.bpath, 'ts_map/tsmap.png'), 
-                        os.path.join(html_files, 'tsmap-full.png'))
-        shutil.copyfile(os.path.join(self.bpath, 'ts_map_short/tsmap.png'),
-                        os.path.join(html_files, 'tsmap_200.png'))
+        if os.path.exists(rxmap_png):
+            shutil.copyfile(rxmap_png,
+                            os.path.join(html_files, 'VOU-RXmap.png'))
+        if os.path.exists(candidates_png):
+            shutil.copyfile(candidates_png,
+                            os.path.join(html_files, 'VOU-candidates.png'))
+        if os.path.exists(os.path.join(self.bpath, 'ts_map/tsmap.png')):
+            shutil.copyfile(os.path.join(self.bpath, 'ts_map/tsmap.png'), 
+                            os.path.join(html_files, 'tsmap-full.png'))
+        if os.path.exists(os.path.join(self.bpath, 'ts_map_short/tsmap.png')):
+            shutil.copyfile(os.path.join(self.bpath, 'ts_map_short/tsmap.png'),
+                            os.path.join(html_files, 'tsmap_200.png'))
+        pdf_path = os.path.join(self.bpath, self.event_name + '.pdf')
+        if os.path.exists(pdf_path):
+            shutil.copyfile(pdf_path, os.path.join(html_files, self.event_name + '.pdf'))
         for i, src in enumerate(counterparts):
+            print i, src.name
             lc_base = src.lc_path
             print lc_base
             lc_path = os.path.join(lc_base, 'lightcurve.png')
@@ -406,5 +417,11 @@ class Analysis(object):
             else:
                 print('SED seems to be not ready, yet')
             print('CANDLC{}.png'.format(i+1))
-            shutil.copyfile(lc_path, os.path.join(html_files, 'CandLC{}.png'.format(i+1)))
+            if os.path.exists(lc_path):
+                shutil.copyfile(lc_path, os.path.join(html_files, 'CandLC{}.png'.format(i+1)))
+        self.upload_html()
+        return
 
+    def upload_html(self):
+        os.system('scp -r {} tglauch@cobalt.icecube.wisc.edu:/home/tglauch/public_html/Reports/'.format(os.path.join(self.bpath, self.event_name)))
+        return

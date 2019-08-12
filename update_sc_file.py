@@ -2,14 +2,14 @@ import time
 import wget
 from astropy.io import fits
 import requests
+import os 
 
 def get_sc_file():
-    time.sleep(1)
     filename = wget.download('ftp://legacy.gsfc.nasa.gov/FTP/fermi/data/lat/mission/spacecraft/lat_spacecraft_merged.fits',
                              out='./sc_files/new.fits')
     new_file = fits.open('./sc_files/new.fits')
-    print('Photon Data from: {} to {}'.format(x[1].header['TSTART'], x[1].header['TSTOP']))
-    os.remove('/sc_files/current.fits')
+    print('\n Photon Data from: {} to {}'.format(new_file[1].header['TSTART'], new_file[1].header['TSTOP']))
+    os.remove('./sc_files/current.fits')
     os.rename('./sc_files/new.fits', './sc_files/current.fits')
     return
 
@@ -21,12 +21,14 @@ def check_for_new_sc_file():
     if html != last_update:
         print('UPDATE spacecraft file [modified at {}]'.format(html))
         get_sc_file()
-        with open('./sc_files/last_update.txt') as f:
+        with open('./sc_files/last_update.txt', 'w') as f:
             f.write(html)
+        print('Finished')
     return
 
 while True:
     check_for_new_sc_file()
+    print('Wait...')
     time.sleep(30 * 60)
     
     
