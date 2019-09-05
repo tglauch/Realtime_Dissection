@@ -10,6 +10,96 @@ from myfunctions import dict_to_nparray
 import pyfits as fits 
 import imageio
 from scipy.interpolate import interp1d
+
+def get_symbol(src_code):
+    src_code = str(src_code)
+    if src_code == '-1111':
+        return False # gamma sources should be cataloged in Fermi so no plotting here
+        return dict(marker = "^", color='blue', zorder=25,
+                    ms=7, fillstyle='none')
+    elif (src_code == '-99999') or (src_code == '-88888'):
+        return dict(marker = "p", color='purple')
+    else:
+        if src_code[0] =='-':
+            return False
+            mcode = src_code[0:2]
+        else:
+            return False
+        return cat_dict[int(mcode)][1]
+    
+def radio_circle(src_code):
+    src_code = str(src_code)
+    if (src_code == '-1111') or (src_code == '-99999') or (src_code == '-88888'):
+        return False
+    if src_code[0] =='-':
+        mcode = src_code[0:2]
+        if np.abs(int(mcode)) not in [3,7]:
+            return False
+    else:
+        mcode = src_code[0]
+    if cat_dict[int(mcode)][2] is not False:
+        return cat_dict[int(mcode)][2]
+    else:
+        return False
+    
+
+def xray_circle(src_code):
+    src_code = str(src_code)
+    if (src_code == '-1111') or (src_code == '-99999') or (src_code == '-88888'):
+        return False
+    if src_code[0] =='-':
+        return False
+        mcode = src_code[0:2]
+    else:
+        mcode = src_code[0]
+    if cat_dict[int(mcode)][3] is not False:
+        return cat_dict[int(mcode)][3]
+    else:
+        return False
+    return
+    
+def get_circle_size(code):
+    om = int(code/10000.)
+    code = abs(code)
+    cxray  = int((code-abs(om)*10000.)/100.)
+    cradio = code-abs(om)*10000.-cxray*100.
+    if cradio > 0:
+        cs = max(1.0,cradio*8./99.)
+    else:
+        cs = 0
+    if cxray > 0:
+        cx = max(1.0,cxray*8./99.)
+    else:
+        cx =0 
+    return cs, cx
+
+
+
+cat_dict = { 1: ['HSP', dict(marker = ".", zorder=10), 'orange', 'orange'],
+            2: ['ISP', dict(marker = ".", zorder=7), 'cyan', 'darkcyan'],
+            3: ['LSP',dict(marker = ".", zorder=3), 'blue', 'purple'],
+            4: ['non-jet AGN',dict(marker = ".", color='red', ms =0), False, False] ,
+            5:['unkown type', dict(marker = ".", color='red', ms =0), False, False],
+            -1 :['3HSP', dict(marker = "*", color='grey',  ms=15, markeredgecolor='k', zorder=15),
+                 False, False],
+            -2 : ['BZCat', dict(marker = "d", color='grey', ms=10, markeredgecolor='k', zorder=20),
+                  False, False],
+            -3 : ['Crates', dict(marker = "s", color='grey', fillstyle='none', zorder=5, ms=7),
+                  'grey', False],
+            -4: ['Cluster', dict(marker = ".", color='red', ms =3, zorder=5),
+                 False, False],
+            -5 : ['3HSP w/o match',
+                  dict(marker = "*", fillstyle='none', color='grey', ms=15, zorder=15),
+                  False, False],
+            -6: ['5BZCat w/o match', dict(marker = "d", ms=10, color='grey', zorder=20),
+                 False, False],
+            -7: ['Crates w/o match', dict(marker = "s", color='blue', fillstyle='none', zorder=5, ms=7),
+                 'grey', False],
+            -8: ['X-ray sources', dict(marker = ".", color='red', ms =0), False, False,],
+            -9: ['radio sources', dict(marker = ".", color='red', ms =0), False, False],
+            -10: ['fermi sources', dict(marker = "^", color='grey', zorder=25, ms=7, fillstyle='none'), False, False]}
+
+
  
 fields = ['name', 'ra', 'dec', 'alt_name']
 odtype = np.dtype([('name', np.unicode, 32), ('ra', np.float32), ('dec', np.float32), ('dist', np.float32)]) 

@@ -5,13 +5,19 @@ import requests
 import os 
 
 def get_sc_file():
-    filename = wget.download('ftp://legacy.gsfc.nasa.gov/FTP/fermi/data/lat/mission/spacecraft/lat_spacecraft_merged.fits',
-                             out='./sc_files/new.fits')
+    try:
+        filename = wget.download('ftp://legacy.gsfc.nasa.gov/FTP/fermi/data/lat/mission/spacecraft/lat_spacecraft_merged.fits',
+                                 out='./sc_files/new.fits')
+    except Exception as inst:
+        print('Faild to Download new Spacecraft data')
+        print(inst)
+        return False
     new_file = fits.open('./sc_files/new.fits')
     print('\n Photon Data from: {} to {}'.format(new_file[1].header['TSTART'], new_file[1].header['TSTOP']))
+    new_file.close()
     os.remove('./sc_files/current.fits')
     os.rename('./sc_files/new.fits', './sc_files/current.fits')
-    return
+    return True
 
 def check_for_new_sc_file():
     html = requests.get('https://heasarc.gsfc.nasa.gov/FTP/fermi/data/lat/mission/spacecraft/')
@@ -20,9 +26,10 @@ def check_for_new_sc_file():
         last_update = f.read()
     if html != last_update:
         print('UPDATE spacecraft file [modified at {}]'.format(html))
-        get_sc_file()
-        with open('./sc_files/last_update.txt', 'w') as f:
-            f.write(html)
+        success = get_sc_file()
+        if success == True:
+            with open('./sc_files/last_update.txt', 'w') as f:
+                f.write(html)
         print('Finished')
     return
 

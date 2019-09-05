@@ -20,7 +20,7 @@ import yaml
 from regions import EllipseSkyRegion
 from astropy.coordinates import SkyCoord
 from add_classes import Lightcurve, Ellipse
-
+from functions import radio_circle, xray_circle, get_circle_size, get_symbol
 
 markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7, 'H','d', 'v' ,'^', '<', '>', 1, 2, 3 ,8, '+' ,'h']
 ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'])
@@ -188,7 +188,7 @@ def make_lc_plot(lat_basepath, mjd, source, radio=None, xray=None, **kwargs):
     fig.savefig(os.path.join(lat_basepath, 'lightcurve.pdf'),
                 bbox_inches='tight')
     fig.savefig(os.path.join(lat_basepath, 'lightcurve.png'),
-                bbox_inches='tight', dpi=300)
+                bbox_inches='tight', dpi=500)
     plt.close(fig)
     return
 
@@ -321,7 +321,7 @@ def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None
     spath_png = os.path.join(seds_list[0][0], 'sed.png')
     print('Save SED to {}'.format(spath_pdf))
     fig.savefig(spath_pdf, bbox_inches='tight')
-    fig.savefig(spath_png, bbox_inches='tight', dpi=300)
+    fig.savefig(spath_png, bbox_inches='tight', dpi=500)
     plt.close(fig)
     return
 
@@ -341,7 +341,7 @@ def get_pix_pos(wcs, ra, dec):
     return pix[:,0]-1, pix[:,1]-1
 
 
-def make_ts_plot_legend(plt_basepath, srcs):
+def make_ts_plot_legend(plt_basepath, srcs, max_dist):
     plt.clf()
     fig = plt.figure()
     fig_legend = plt.figure(figsize=(2, 1.25))
@@ -349,15 +349,94 @@ def make_ts_plot_legend(plt_basepath, srcs):
     patches = []
     labels = []
     for i, src in enumerate(srcs):
-        patch = ax.scatter([0], [0],  marker=markers[i],
-                           label=src.name, color='k')
-        labels.append(src.name)
-        patches.append(patch)
+        if src.dist > max_dist:
+            continue
+        patch = ax.plot([0], [0], linestyle='', label='{} {}'.format(i, src.name) ,**src.plt_style)
+        labels.append('{} {}'.format(i, src.name))
+        patches.append(patch[0])
     fig_legend.legend(patches, labels, loc='center', frameon=False)
-    fig_legend.savefig(os.path.join(plt_basepath,'legend.png'), bbox_inches='tight', dpi=300)
+    fig_legend.savefig(os.path.join(plt_basepath,'legend.png'), bbox_inches='tight', dpi=500)
     plt.close(fig)
     plt.close(fig_legend)
     return
+
+
+def make_counterparts_plot(ra, dec, save_path='.', vou_cand=False, srcs=[], max_dist=False, legend=False, yaxis=True, error90=None):
+    
+    wcs = WCS(naxis=2)
+    wcs.wcs.crpix = [30.5, 30.5] ## Careful here, this is taken from the current TS definition
+    wcs.wcs.cdelt = [-0.01 , 0.01]
+    wcs.wcs.crval = [ra, dec]
+    wcs.wcs.ctype = ['RA---AIT', 'DEC--AIT']
+    plt.clf()
+    fig = plt.figure(figsize=figsize(0.5, 1.))
+    ax=fig.add_axes((.0, .0,0.71,.7), projection=wcs)
+    for i, src in enumerate(srcs):
+        pix = get_pix_pos(wcs, src.ra, src.dec)
+        if src.dist > max_dist:
+            ax.plot(pix[0], pix[1], **src.plt_style)
+        else:
+            ax.plot(pix[0], pix[1], label='{} {}'.format(i, src.name), **src.plt_style)
+    lon = ax.coords[0]
+    lat = ax.coords[1]
+    lat.set_ticks_position('l')
+    lat.set_ticklabel_position('l')
+    lat.set_axislabel_position('l')
+    lon.set_ticks_position('bt')
+    lon.set_ticklabel_position('bt')
+    lon.set_axislabel_position('b')
+    lon.set_major_formatter('d.d')
+    lat.set_major_formatter('d.d') 
+    ax.set_xlabel(r'R.A. (degrees)')
+    if  yaxis:
+        ax.set_ylabel(r'Dec. (degrees)')
+    else:
+        ax.set_yticklabels([])
+    pix = get_pix_pos(wcs, ra, dec)
+    ax.plot(pix[0] , pix[1],
+            marker='o', color='k',
+            ms=4, fillstyle='none', zorder=25)
+    if vou_cand is not False:
+        for src in vou_cand:
+            pix = get_pix_pos(wcs, src[0], src[1])
+            rc = radio_circle(src[2])
+            xc = xray_circle(src[2])
+            rcs, xcs = get_circle_size(src[2])
+            if (rc is not False):
+                ax.plot(pix[0], pix[1], ms=3*rcs, color=rc, marker='.')        
+            
+            if (xc is not False):
+                ax.plot(pix[0], pix[1], ms=3*xcs,  color=xc, fillstyle='none', marker='.')
+                
+            symbol = get_symbol(src[2])
+            if symbol is not False:
+                ax.scatter(pix[0] , pix[1], **symbol)
+
+    if error90 is not None:
+        if isinstance(error90, float):
+            vertex = (ra*u.degree, dec*u.degree) #long, lat
+            x =  SphericalCircle(vertex, error90*u.degree)
+            cdata = x.get_xy()
+            pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
+            ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
+        elif isinstance(error90, Ellipse):
+            ell= EllipseSkyRegion(SkyCoord(error90.center_ra * u.deg, error90.center_dec * u.deg, frame='icrs'),
+                                  2. * error90.ra_ax * u.deg, 2. * error90.dec_ax * u.deg,
+                                  angle = (error90.rotation) * u.deg )
+            pix = ell.to_pixel(wcs)
+            pix.plot(ax=ax, color='b')
+    
+    if legend:
+        ax.legend(bbox_to_anchor=(1.1, 0.5), loc='center left', prop={'size': 9})
+
+    ax.grid(color='k', ls='--')
+    print('Save Counterpart Plot')
+    fig.savefig(os.path.join(save_path, 'counterparts.pdf'), bbox_inches='tight')
+    fig.savefig(os.path.join(save_path, 'counterparts.png'), bbox_inches='tight', dpi=500)
+    return
+
+
+
 
 def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, yaxis=True, error90=None):
     plt.clf()
@@ -377,19 +456,6 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
         print('{} not yet ready'.format(fits_path))
         return
     wcs = WCS(inp[2].header)
-    cand_pos = np.atleast_2d(np.genfromtxt(vou_cand))
-    cand = {'ra': cand_pos[:,0], 'dec': cand_pos[:,1]}
-    if (len(cand['ra'])>0) and (len(srcs) >0):
-        distances = np.ones(len(cand['ra']))
-        for i in range(len(cand['ra'])):
-            tdist= [GreatCircleDistance(
-                      cand['ra'][i], cand['dec'][i], srcs[j].ra,
-                      srcs[j].dec, unit='deg') for j in range(len(srcs))]
-            distances[i] = np.degrees(np.min(tdist))
-        mask = distances>0.1
-        inds =  np.argsort(distances)[len(srcs):]
-        cand['ra'] = cand['ra'][mask]
-        cand['dec'] =cand['dec'][mask]
     if plt_mode == 'tsmap':
         hdu = inp[2]
         Z=pval_to_sigma(ts_to_pval(hdu.data,1.))
@@ -446,15 +512,22 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
         ax.plot(pix[0], pix[1], color='k', linewidth=0.5)
     for i, src in enumerate(srcs):
         pix = get_pix_pos(wcs, src.ra, src.dec)
-        ax.plot(pix[0], pix[1],
-                marker=markers[i],
-                linestyle = '',
-                label=src.name,
-                color='k', ms=4, zorder=3)
-    if len(cand['ra'])>0:
-        pix = get_pix_pos(wcs, cand['ra'], cand['dec'])
-        ax.plot(pix[0], pix[1], color='#a8a8a8', ms=4, marker="8", zorder=1,
-                linestyle = '', fillstyle='none', label='VOU Sources', mew=1)
+        ax.plot(pix[0], pix[1],label=src.name, **src.plt_style)
+    if vou_cand is not False:
+        for src in vou_cand:
+            pix = get_pix_pos(wcs, src[0], src[1])
+            rc = radio_circle(src[2])
+            xc = xray_circle(src[2])
+            rcs, xcs = get_circle_size(src[2])
+            if (rc is not False):
+                ax.plot(pix[0], pix[1], ms=3*rcs, color=rc, marker='.')
+
+            if (xc is not False):
+                ax.plot(pix[0], pix[1], ms=3*xcs,  color=xc, fillstyle='none', marker='.')
+
+            symbol = get_symbol(src[2])
+            if symbol is not False:
+                ax.plot(pix[0] , pix[1], **symbol)
     lon = ax.coords[0]
     lat = ax.coords[1]
     lat.set_ticks_position('l')
@@ -498,7 +571,7 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
     ax.grid(color='k', ls='--')
   #  plt.tight_layout()
     fig.savefig(os.path.join(plt_basepath,'{}.png'.format(plt_mode)),
-                bbox_inches='tight', dpi=300)
+                bbox_inches='tight', dpi=500)
     plt.close(fig)
     return
 

@@ -125,16 +125,23 @@ if args['err90'] is not None:
         analysis.err90 = Ellipse(analysis.ra, analysis.dec, args['err90'])
 if args['adaptive_scaling']:
         analysis.adaptive_radius()
+
+### Delete Later
+analysis.sort_sources_by_prio()
 if args['vou']:
     # Run VOU Tool
     logging.info('Start the VOU analysis pipeline')
     analysis.ROI_analysis()
+    for src in analysis.srcs:
+        bpath_src = os.path.join(bpath, src.name.replace(' ', '_'))
+        src.setup_folders(bpath_src)
     if os.path.exists(analysis_object_path):
         os.remove(analysis_object_path)
     with open(analysis_object_path, "wb") as f:
         pickle.dump(analysis, f)
 
 # Start the gamma-ray analysis
+
 if args['lat_analysis']:
     logging.info('Start the Fermi LAT Analysis pipeline')
     args['overwrite'] = True
@@ -171,11 +178,9 @@ if args['lat_analysis']:
     for src in analysis.srcs:
         if make_pdf:
             continue
-        bpath_src = os.path.join(bpath, src.name.replace(' ', '_'))
         print(' \n \n {} is at a distance {:.1f} deg'.format(src.name, src.dist))
         if src.dist > analysis.max_dist:
             continue
-        src.setup_folders(bpath_src)
         src.get_mw_data(analysis.this_path)
         add_srcs = [src] #analysis.srcs 
         src.make_sed(analysis.emin, analysis.fermi_data, name='', add_srcs=add_srcs, job_id = analysis.id)
@@ -202,20 +207,21 @@ final_pdf = False
 prev_len_jobs = -1
 while not final_pdf:
     if not make_pdf:
-        time.sleep(60)
+        time.sleep(15)
     mins += 1
     jobs = os.popen('squeue --user ga53lag').read()
     len_jobs = len([i for i in jobs.split('\n') if analysis.id in i])
     print len_jobs
     if len_jobs == 0 or make_pdf:
         final_pdf = True
-    if (not mins % 60 == 1 or not len_jobs != prev_len_jobs) and not final_pdf:
+    if (not mins % 15 == 1 or not len_jobs != prev_len_jobs) and not final_pdf:
         continue
     prev_len_jobs = len_jobs
 
     # Make Plots
     logging.info('Creating Plots...')
     if args['overwrite']:
+        analysis.make_counterparts_plot() 
         analysis.make_ts_map_plots()
         for src in analysis.srcs:
             if src.dist > analysis.max_dist:
@@ -233,4 +239,5 @@ while not final_pdf:
         src_latex += src.source_summary(analysis.bpath, analysis.mjd, mode=analysis.mode)
     analysis.make_pdf(src_latex, final_pdf = final_pdf)
     analysis.create_html()
-    print_to_slack('Fit Results', analysis.pdf_out_path)
+    print_to_slack('New Fit Result on https://icecube.wisc.edu/~tglauch/Reports/{}/'.format(analysis.event_name))    
+#    print_to_slack('Fit Results', analysis.pdf_out_path)

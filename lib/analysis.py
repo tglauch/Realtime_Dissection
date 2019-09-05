@@ -1,4 +1,4 @@
-from functions import GreatCircleDistance, path_settings, vou_path, get_68_psf, submit_fit
+from functions import GreatCircleDistance, path_settings, vou_path, get_68_psf, submit_fit, cat_dict
 import numpy as np
 from source_class import Source, Ellipse 
 import collections
@@ -17,7 +17,12 @@ import plot
 import shutil
 import pyfits as fits
 import warnings
+import copy
 
+marker_colors = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99','#b15928']
+
+src_encoding = {'5BZQ' : -2, '5BZB': -2 , '5BZU': -2, '3HSP': -1, 'CRATES': -3,
+                '3FGL': -10, '4FGL': -10, 'FHL': -10}
 
 sc_file_path = '/scratch9/tglauch/Realtime_Dissection/sc_files/current.fits'
 
@@ -38,6 +43,7 @@ files = collections.OrderedDict([
                   'keys': ['Source_Name', 'RAJ2000', 'DEJ2000']}),
      ('crates', {'file': 'crates.1.csv',
                 'keys': ['name', 'ra', 'dec']})])
+
 
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
@@ -68,21 +74,27 @@ class Analysis(object):
         self.notice_date = 'None'
         self.radius = 180
         self.this_path = None
+        return
+
+
+    def calc_gal_coords(self):
+        c = SkyCoord(self.ra, self.dec, frame='icrs', unit="deg")
+        self.gal_b = c.galactic.b.deg
+        self.gal_l = c.galactic.l.deg
+        return
+
 
     def make_ts_map_plots(self):
         for tsm in self.ts_maps:
-
             try:
-                plot.make_ts_plot(tsm, self.srcs,
-                                  os.path.join(self.vou_out, 'find_out_temp.txt'),
+                plot.make_ts_plot(tsm, self.srcs, self.vou_sources,
                                   plt_mode='tsmap', error90 = self.err90)
-                plot.make_ts_plot_legend(tsm, self.srcs)
+                plot.make_ts_plot_legend(tsm, self.srcs, self.max_dist)
             except Exception as inst:
                 warnings.warn("Couldn't create TS map {}".format(tsm))
                 print(inst)
             try:
-                plot.make_ts_plot(tsm, self.srcs,
-                                  os.path.join(self.vou_out, 'find_out_temp.txt'),
+                plot.make_ts_plot(tsm, self.srcs, self.vou_sources,
                                   plt_mode='residmap',  error90=self.err90)
             except Exception as inst:
                 warnings.warn("Couldn't create residual map {}".format(tsm))
@@ -90,7 +102,7 @@ class Analysis(object):
         return
 
     def calc_src_probs(self, srcprob_path, emin=None):
-        sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {}'
+        sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {} --free_diff'
         if emin is None:
             emin = self.ts_emin
         sargs = sargs.format(get_68_psf(emin), self.fermi_data, emin, self.ra, self.dec)
@@ -107,8 +119,7 @@ class Analysis(object):
         
 
     def make_ts_map(self, ts_map_path, emin=None, trange=None):
-        # add --free_diff if source is in the galactic plane
-        sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {} --roiwidth {}'
+        sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {} --roiwidth {} --free_diff'
         if emin is None:
             emin = self.ts_emin
         if trange is not None:
@@ -146,7 +157,7 @@ class Analysis(object):
                               emin=1.*self.emin/1000., l=gal.l.deg, b=gal.b.deg,
                               cat_srcs=short_out,
                               rx_map=os.path.join(self.vou_out, 'RX_map.eps'),
-                              vou_pic=os.path.join(self.vou_out, 'candidates.eps'),
+                              vou_pic=os.path.join(self.vou_out, 'counterparts.png'),
                               ts_map=os.path.join(self.bpath, 'ts_map/tsmap.png'),
                               ts_map_short=os.path.join(self.bpath, 'ts_map_short/tsmap.png'),
                               ts_map_legend=os.path.join(self.bpath, 'ts_map_short/legend.png'),
@@ -176,6 +187,14 @@ class Analysis(object):
         self.pdf_out_path = os.path.join(self.bpath, self.event_name + '.pdf') 
         return
 
+
+    def make_counterparts_plot(self):
+        self.get_vou_candidates()
+        plot.make_counterparts_plot(self.ra, self.dec, save_path = self.vou_out,  vou_cand=self.vou_sources, srcs=self.srcs,
+                                    max_dist=self.max_dist, legend=False, yaxis=True, error90=self.err90)
+        return
+
+
     def ROI_analysis(self):
         self.vou_out = os.path.join(self.bpath, 'vou_blazar')
         if not os.path.exists(self.vou_out):
@@ -197,7 +216,10 @@ class Analysis(object):
 
         # Setup Variables
         out_str = self.get_sources()
-        headline = '*Result for {} *\n'.format(self.event_name)
+        self.make_counterparts_plot()
+        self.calc_gal_coords()
+        headline = '*Result for {}* [ra: {:.1f}  dec: {:.1f} , gal_l: {:.1f}, gal_b: {:.1f} ]\n'.format(self.event_name,
+                                                                               self.ra, self.dec, self.gal_l, self.gal_b)
         sum_text = headline + out_str
         print_to_slack(sum_text)
 
@@ -205,8 +227,7 @@ class Analysis(object):
         rx_ps = os.path.join(self.vou_out, 'RX_map.ps')
         os.system('ps2eps -B ' + rx_ps)
         cand_ps = os.path.join(self.vou_out, 'candidates.ps')
-        os.system('ps2eps -B ' + cand_ps )
-
+        os.system('ps2eps -B ' + cand_ps)
         #Create VOU Source Summary
         with open('./short_output', 'w+') as ofile:
             ofile.write(out_str.replace('\n' ,'\\\ \n'))
@@ -269,10 +290,29 @@ class Analysis(object):
             src.dist = src.angular_distance(self.ra, self.dec)
         return
             
+
     def sort_sources_by_distance(self):
         dists = np.array([i.dist for i in self.srcs])
         inds = np.argsort(dists)
         self.srcs = [self.srcs[j] for j in inds]
+        return
+
+
+    def sort_sources_by_prio(self, prio=['3HSP', '5BZB', '5BZQ',' 5BZU', '3FGL', '4FGL', 'FHL', 'CRATES']):
+        new_order = []
+        print self.srcs
+        for sclass in prio:
+            for i in range(len(self.srcs)):
+                if i in new_order:
+                    continue
+                if (sclass in self.srcs[i].name) or (np.any([True if sclass in j else False for j in
+                    self.srcs[i].names])):
+                        new_order.append(i)
+                        self.srcs[i].plt_code = src_encoding[sclass] 
+        new_order = np.array(new_order)
+        self.srcs = [self.srcs[j] for j in new_order]
+        # Remove Later!!!
+        self.set_src_plot_style()
         return
     
     def get_sources(self):
@@ -328,6 +368,7 @@ class Analysis(object):
         fmt_str = '*{}* {}\n ra: {:.2f} deg |  dec: {:.2f} deg | distance: {:.2f} deg [ra: {:.2f} deg , dec: {:.2f} deg]'
         self.calc_src_distances_to_bf()
         self.sort_sources_by_distance()
+        self.sort_sources_by_prio()
         out_str = ''
         for src in self.srcs:
             add_info = self.get_add_info(src.name)
@@ -337,7 +378,41 @@ class Analysis(object):
                 ostr +=  '\n Associations: {}'.format(', '.join(src.names))
             print(ostr)
             out_str += ostr + '\n\n'
+        self.set_src_plot_style()
         return out_str
+
+    def set_src_plot_style(self):
+        # srcs arleady need an attribute plt_code that is compatible with the cat dict 
+        marker_styles = np.unique([src_encoding[key] for key in src_encoding.keys()])
+        marker_counter = dict()
+        for sty in marker_styles:
+            marker_counter[sty] = 0
+        for src in self.srcs:
+            if src.dist > self.max_dist:
+                src.plt_style = copy.copy(cat_dict[src.plt_code][1])
+                continue
+            if marker_counter[src.plt_code] > len(marker_colors):
+                print('no more colors for this sourcetype {}.Falling back to default'.format(src.name))
+                src.plt_style = copy.copy(cat_dict[src.plt_code][1])
+                continue
+            src.plt_style = copy.copy(cat_dict[src.plt_code][1])
+            src.plt_style['color'] = marker_colors[marker_counter[src.plt_code]]
+            marker_counter[src.plt_code] += 1
+            print src.plt_style
+        return    
+
+
+    def get_vou_candidates(self):
+        x = np.genfromtxt(os.path.join(self.vou_out, 'find_out_temp.txt'),
+                          dtype=[np.float, np.float, int])
+        mask = []
+        for i in x:
+            if i[2] < 0 :
+                 mask.append(False)
+            else:
+                mask.append(True)
+        self.vou_sources = x[mask]
+        return 
    
     def get_add_info(self, src_of_interest):
         data = fits.open(os.path.join(self.this_path,'lib',  'gll_psc_v19.fit'))
@@ -380,9 +455,9 @@ class Analysis(object):
         rxmap_png = os.path.join(self.vou_out, 'RX_map.png')
         os.system('convert -density 288 {} {}'.format(rxmap_eps, rxmap_png))
 
-        candidates_eps = os.path.join(self.vou_out, 'candidates.eps')
-        candidates_png = os.path.join(self.vou_out, 'candidates.png')
-        os.system('convert -density 288 {} {}'.format(candidates_eps, candidates_png))
+        #candidates_eps = os.path.join(self.vou_out, 'candidates.eps')
+        candidates_png = os.path.join(self.vou_out, 'counterparts.png')
+        #os.system('convert -density 288 {} {}'.format(candidates_eps, candidates_png))
         if os.path.exists(rxmap_png):
             shutil.copyfile(rxmap_png,
                             os.path.join(html_files, 'VOU-RXmap.png'))

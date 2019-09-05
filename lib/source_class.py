@@ -309,7 +309,7 @@ class Source(object):
 
     def make_fixed_binning_lightcurve(self, emin, fermi_data_path, mjd_range, mjd=None, dt_lc=None, mode='end',
                                       name='', add_srcs=None, job_id='fermi'):
-        sargs = '--target_src {} --free_radius {} --data_path {} --use_4FGL --emin {} '
+        sargs = '--target_src {} --free_radius {} --data_path {} --use_4FGL --emin {} --free_diff'
         sub_args = sargs.format(self.name.replace(' ', '_'), get_68_psf(emin), fermi_data_path, emin)
         if '3FGL' in self.name:
             dt_lc = get_lc_time3fgl(self.name, emin=emin)
@@ -354,8 +354,7 @@ class Source(object):
 
 
     def make_sed(self, emin, fermi_data_path, name='', add_srcs=None, job_id='fermi'):
-        # add --free_diff if source is in the galactic plane
-        sargs = '--target_src {} --free_radius {} --data_path {} --use_4FGL --emin {} '
+        sargs = '--target_src {} --free_radius {} --data_path {} --use_4FGL --emin {} --free_diff'
         if name != '':
             opath = self.sed_path + '_' + name
         else:
