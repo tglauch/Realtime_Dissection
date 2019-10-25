@@ -1,7 +1,9 @@
 import numpy as np
 import os
 from shutil import copy2
-
+import sys
+sys.path.append('./lib')
+from lib.read_catalog import read_from_observation 
 
 in_base = '/scratch9/tglauch/realtime_service/output/TXS/'
 src = '4FGL_J0509.4+0542'
@@ -39,4 +41,12 @@ for f in copy_files:
     copy2(os.path.join(in_path, 'all_year/sed', f),
           all_mission_dir)
 
-    
+more_data = os.listdir(os.path.join(in_path, 'add_data'))
+for f in more_data:
+    add_data = [list(i) for i in read_from_observation(os.path.join(in_path, 'add_data', f))]
+    if len(add_data) > 0 :
+        for i in  add_data:
+            i.extend([i[-1], f.split('.')[0]])
+        print add_data
+        with open(os.path.join(out_path, 'sed.txt'), 'a') as sed_file:
+            np.savetxt(sed_file, add_data, fmt="%s")
