@@ -117,10 +117,11 @@ else:
     analysis.max_dist = float(args['max_dist'])
     args['vou'] = True
     args['lat_analysis'] = True
+analysis.bpath=bpath
 analysis.this_path = os.path.dirname(os.path.abspath(__file__))
 if args['err90'] is not None:
     if len(args['err90']) == 1:
-        analysis.err90 = float(args['err90'])
+        analysis.err90 = float(args['err90'][0])
     else:
         analysis.err90 = Ellipse(analysis.ra, analysis.dec, args['err90'])
 if args['adaptive_scaling']:
@@ -181,7 +182,7 @@ if args['lat_analysis']:
         print(' \n \n {} is at a distance {:.1f} deg'.format(src.name, src.dist))
         if src.dist > analysis.max_dist:
             continue
-        src.get_mw_data(analysis.this_path)
+        src.get_mw_data()
         add_srcs = [src] #analysis.srcs 
         src.make_sed(analysis.emin, analysis.fermi_data, name='', add_srcs=add_srcs, job_id = analysis.id)
         if analysis.emin < 1e3:

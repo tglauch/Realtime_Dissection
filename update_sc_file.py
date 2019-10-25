@@ -2,11 +2,11 @@ import time
 import wget
 from astropy.io import fits
 import requests
-import os 
+import os
 
 def get_sc_file():
     try:
-        filename = wget.download('ftp://legacy.gsfc.nasa.gov/FTP/fermi/data/lat/mission/spacecraft/lat_spacecraft_merged.fits',
+        filename = wget.download('https://heasarc.gsfc.nasa.gov/FTP/fermi/data/lat/mission/spacecraft/lat_spacecraft_merged.fits',
                                  out='./sc_files/new.fits')
     except Exception as inst:
         print('Faild to Download new Spacecraft data')

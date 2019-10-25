@@ -136,7 +136,7 @@ def plot_fermi_index(ax, basepath, mjd, source, **kwargs):
 def plot_radio(ax, basepath, mjd, source, **kwargs):
     idata = np.genfromtxt(basepath, delimiter=',')
     ax.errorbar(idata[:,0], idata[:,1], yerr=idata[:,2], linestyle='',
-                 ecolor='red')
+                 ecolor='red', color='red', fmt='o', ms=2)
     ax.axvline(mjd, color='#696969', linestyle='--')
     ax.set_ylabel('Jy', labelpad=5)
     return ax
@@ -145,7 +145,7 @@ def plot_radio(ax, basepath, mjd, source, **kwargs):
 def plot_xray(ax, basepath, mjd, source, **kwargs):
     idata = np.genfromtxt(basepath, delimiter=' ')
     ax.errorbar(idata[:,3], idata[:,0]*1e13, yerr=idata[:,1]*1e13, linestyle='',
-                 ecolor='blue')
+                 ecolor='blue', fmt='o', color='blue',  ms=2)
     ax.axvline(mjd, color='#696969', linestyle='--')
     ax.set_ylabel(r'$10^{-13}\,$'+r'erg cm$^{-2}$ s$^{-1}$', labelpad=5)
     return ax
@@ -361,10 +361,10 @@ def make_ts_plot_legend(plt_basepath, srcs, max_dist):
     return
 
 
-def make_counterparts_plot(ra, dec, save_path='.', vou_cand=False, srcs=[], max_dist=False, legend=False, yaxis=True, error90=None):
+def make_counterparts_plot(basepath, ra, dec, plt_radius, save_path='.', vou_cand=False, srcs=[], max_dist=False, legend=False, yaxis=True, error90=None):
     
     wcs = WCS(naxis=2)
-    wcs.wcs.crpix = [30.5, 30.5] ## Careful here, this is taken from the current TS definition
+    wcs.wcs.crpix = [0., 0.] ## Careful here, this is taken from the current TS definition
     wcs.wcs.cdelt = [-0.01 , 0.01]
     wcs.wcs.crval = [ra, dec]
     wcs.wcs.ctype = ['RA---AIT', 'DEC--AIT']
@@ -411,25 +411,44 @@ def make_counterparts_plot(ra, dec, save_path='.', vou_cand=False, srcs=[], max_
             symbol = get_symbol(src[2])
             if symbol is not False:
                 ax.scatter(pix[0] , pix[1], **symbol)
-
-    if error90 is not None:
-        if isinstance(error90, float):
-            vertex = (ra*u.degree, dec*u.degree) #long, lat
-            x =  SphericalCircle(vertex, error90*u.degree)
-            cdata = x.get_xy()
-            pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
-            ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
-        elif isinstance(error90, Ellipse):
-            ell= EllipseSkyRegion(SkyCoord(error90.center_ra * u.deg, error90.center_dec * u.deg, frame='icrs'),
-                                  2. * error90.ra_ax * u.deg, 2. * error90.dec_ax * u.deg,
-                                  angle = (error90.rotation) * u.deg )
-            pix = ell.to_pixel(wcs)
-            pix.plot(ax=ax, color='b')
-    
+    cpath = os.path.join(basepath, 'contour.txt')
+    cpath_rad = os.path.join(basepath, 'contour_rad.txt')
+    if os.path.exists(cpath):
+        cdata = np.genfromtxt(cpath, delimiter=',')
+        cdata = np.vstack([cdata,cdata[0]])
+        pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
+        ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
+    elif os.path.exists(cpath_rad):
+        print('Use dfit Contour')
+        cdata = np.genfromtxt(cpath_rad, delimiter=' ', skip_header=1)
+        cdata = np.vstack([cdata,cdata[0]])
+        print np.degrees(cdata[:,0])
+        print 360+np.degrees(cdata[:,1])
+        pix = get_pix_pos(wcs,  360+np.degrees(cdata[:,1]), np.degrees(cdata[:,0]))
+        ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
+    else:
+        if error90 is not None:
+            if isinstance(error90, float):
+                vertex = (ra*u.degree, dec*u.degree) #long, lat
+                x =  SphericalCircle(vertex, error90*u.degree)
+                cdata = x.get_xy()
+                pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
+                ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
+            elif isinstance(error90, Ellipse):
+                ell= EllipseSkyRegion(SkyCoord(error90.center_ra * u.deg, error90.center_dec * u.deg, frame='icrs'),
+                                      2. * error90.ra_ax * u.deg, 2. * error90.dec_ax * u.deg,
+                                      angle = (error90.rotation) * u.deg )
+                pix = ell.to_pixel(wcs)
+                pix.plot(ax=ax, color='b')
+        
     if legend:
         ax.legend(bbox_to_anchor=(1.1, 0.5), loc='center left', prop={'size': 9})
-
     ax.grid(color='k', ls='--')
+    factorm = 1./wcs.wcs.cdelt[0]
+    factorp = 1./wcs.wcs.cdelt[1]
+    print plt_radius*factorm, plt_radius*factorp
+    ax.set_xlim(plt_radius*factorm, plt_radius*factorp)
+    ax.set_ylim(plt_radius*factorm, plt_radius*factorp)    
     print('Save Counterpart Plot')
     fig.savefig(os.path.join(save_path, 'counterparts.pdf'), bbox_inches='tight')
     fig.savefig(os.path.join(save_path, 'counterparts.png'), bbox_inches='tight', dpi=500)
@@ -479,10 +498,19 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
     fig = plt.figure(figsize=figsize(0.4, 1.))
     ax=fig.add_axes((.0, .0,0.7,.7), projection=wcs)
     cpath = os.path.join(plt_basepath, '../contour.txt')
+    cpath_rad = os.path.join(plt_basepath, '../contour_rad.txt')
     if os.path.exists(cpath):
         cdata = np.genfromtxt(cpath, delimiter=',')
         cdata = np.vstack([cdata,cdata[0]])
         pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
+        ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
+    elif os.path.exists(cpath_rad):
+        print('Use dfit Contour')
+        cdata = np.genfromtxt(cpath_rad, delimiter=' ', skip_header=1)
+        cdata = np.vstack([cdata,cdata[0]])
+        print np.degrees(cdata[:,0])
+        print 360+np.degrees(cdata[:,1])
+        pix = get_pix_pos(wcs,  360+np.degrees(cdata[:,1]), np.degrees(cdata[:,0]))
         ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
     elif error90 is not None:
         if isinstance(error90, float):

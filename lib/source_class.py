@@ -31,6 +31,7 @@ class Source(object):
 
     def make_sed_lightcurve(self, lcs=['default']):
         print('Make SED lightcurve for {}'.format(self.name))
+        print self.lightcurves.keys()
         main_lc = self.lightcurves[lcs[0]]
         #if not hasattr(self, 'mw_idata'):
         self.set_mw_data()
@@ -149,7 +150,8 @@ class Source(object):
         return
 
 
-    def get_mw_data(self, this_path):
+    def get_mw_data(self):
+        this_path = os.getcwd()
         if '4FGL' in self.name:
             data = fits.open('./lib/gll_psc_v19.fit')[1].data
             ind = np.where(data['Source_Name']==self.name)[0]
@@ -192,12 +194,15 @@ class Source(object):
             cp_dec = self.dec
         pre_str = '{vou_path} {ra} {dec} {loc_str} -s ; cat Sed.txt > {bpath}'
         for i in range(2):
-            os.system(pre_str.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec,  bpath=self.mw_data_path, loc_str=2))
+            os.system(pre_str.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec,  bpath=self.mw_data_path,
+                                     loc_str=6))
         self.set_mw_data()
         self.get_ovro_data()
         return
 
     def collect_xray(self):
+        if not os.path.exists(self.mw_data_path):
+            self.get_mw_data() 
         idata = np.genfromtxt(self.mw_data_path, skip_header=1,
                               usecols=[1,2,3,4,6], dtype=[np.float,np.float,np.float,np.float,object])
         idata = np.array([list(i) for i in idata])
@@ -232,6 +237,7 @@ class Source(object):
         return
 
     def source_summary(self, bpath, mjd, mode='mid'):
+        sed_path = None
         bpath_src = self.bpath
         lc_base = self.lc_path
         lc_path = os.path.join(lc_base, 'lightcurve.pdf')
@@ -253,6 +259,8 @@ class Source(object):
                 sigma = np.sqrt(sed_full_res['sources'][self.name]['ts'])
         else:
             sigma = -1
+        if sed_path == None:
+            return ''
         l_str ='\subsection{{{srcinfo}}}'
         if os.path.exists(os.path.join(sed_path, 'llh.npy')):
             fit_res = np.load(os.path.join(sed_path, 'llh.npy'), allow_pickle=True)[()]

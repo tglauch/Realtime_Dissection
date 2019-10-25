@@ -80,7 +80,7 @@ cat_dict = { 1: ['HSP', dict(marker = ".", zorder=10), 'orange', 'orange'],
             3: ['LSP',dict(marker = ".", zorder=3), 'blue', 'purple'],
             4: ['non-jet AGN',dict(marker = ".", color='red', ms =0), False, False] ,
             5:['unkown type', dict(marker = ".", color='red', ms =0), False, False],
-            -1 :['3HSP', dict(marker = "*", color='grey',  ms=15, markeredgecolor='k', zorder=15),
+            -1 :['3HSP', dict(marker = "*", color='grey',  ms=10, markeredgecolor='k', zorder=15),
                  False, False],
             -2 : ['BZCat', dict(marker = "d", color='grey', ms=10, markeredgecolor='k', zorder=20),
                   False, False],
@@ -89,7 +89,7 @@ cat_dict = { 1: ['HSP', dict(marker = ".", zorder=10), 'orange', 'orange'],
             -4: ['Cluster', dict(marker = ".", color='red', ms =3, zorder=5),
                  False, False],
             -5 : ['3HSP w/o match',
-                  dict(marker = "*", fillstyle='none', color='grey', ms=15, zorder=15),
+                  dict(marker = "*", fillstyle='none', color='grey', ms=10, zorder=15),
                   False, False],
             -6: ['5BZCat w/o match', dict(marker = "d", ms=10, color='grey', zorder=20),
                  False, False],
@@ -97,7 +97,7 @@ cat_dict = { 1: ['HSP', dict(marker = ".", zorder=10), 'orange', 'orange'],
                  'grey', False],
             -8: ['X-ray sources', dict(marker = ".", color='red', ms =0), False, False,],
             -9: ['radio sources', dict(marker = ".", color='red', ms =0), False, False],
-            -10: ['fermi sources', dict(marker = "^", color='grey', zorder=25, ms=7, fillstyle='none'), False, False]}
+            -10: ['fermi sources', dict(marker = "^", color='grey', zorder=25, ms=10, fillstyle='none'), False, False]}
 
 
  

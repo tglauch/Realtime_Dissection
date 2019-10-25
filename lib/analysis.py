@@ -189,8 +189,10 @@ class Analysis(object):
 
 
     def make_counterparts_plot(self):
+        self.set_src_plot_style()
         self.get_vou_candidates()
-        plot.make_counterparts_plot(self.ra, self.dec, save_path = self.vou_out,  vou_cand=self.vou_sources, srcs=self.srcs,
+        print self.radius/60.
+        plot.make_counterparts_plot(self.bpath, self.ra, self.dec, self.radius/60., save_path = self.vou_out,  vou_cand=self.vou_sources, srcs=self.srcs,
                                     max_dist=self.max_dist, legend=False, yaxis=True, error90=self.err90)
         return
 
@@ -261,10 +263,11 @@ class Analysis(object):
 
     def update_gcn(self):
         if self.gcn != 'No GCN given':
-            self.from_gcn(self.gcn)
+            self.mode = 'end'
+            self.from_gcn(self.gcn, update=True)
         return
 
-    def from_gcn(self, url):
+    def from_gcn(self, url, update=False):
         gcn_dict = read_gcn(url)
         if gcn_dict['NOTICE_DATE'] != self.notice_date:
             self.ra = gcn_dict['SRC_RA']
@@ -273,16 +276,17 @@ class Analysis(object):
             if 'SRC_ERROR50' in gcn_dict.keys():
                 self.err50 = gcn_dict['SRC_ERROR50']
             self.mjd = gcn_dict['MJD']
-            if self.notice_date != 'None':
-                print('Update GCN and VOU ROI')
-                self.ROI_analysis()
+            #if self.notice_date != 'None':
+            #    print('Update GCN and VOU ROI')
+            #    self.ROI_analysis()
             self.notice_date = gcn_dict['NOTICE_DATE']
             self.gcn = url
-        t = Time.now()
-        if np.abs(self.mjd - t.mjd)<2:
-            self.mode = 'end'
-        else:
-            self.mode = 'mid'
+        if update is False:
+            t = Time.now()
+            if np.abs(self.mjd - t.mjd)<2:
+                self.mode = 'end'
+            else:
+                self.mode = 'mid'
         return 
         
     def calc_src_distances_to_bf(self):
@@ -312,7 +316,6 @@ class Analysis(object):
         new_order = np.array(new_order)
         self.srcs = [self.srcs[j] for j in new_order]
         # Remove Later!!!
-        self.set_src_plot_style()
         return
     
     def get_sources(self):
@@ -479,7 +482,8 @@ class Analysis(object):
             print lc_base
             lc_path = os.path.join(lc_base, 'lightcurve.png')
             folders = [fold for fold in os.listdir(lc_base) if os.path.isdir(os.path.join(lc_base, fold))]
-            if len(folders) >  0:
+            print self.mode
+            if len(folders) >0:
                 if self.mode == 'end':
                     sed_path = os.path.join(lc_base,sorted(folders)[-1])
                 else:
