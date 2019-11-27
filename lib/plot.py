@@ -193,8 +193,9 @@ def make_lc_plot(lat_basepath, mjd, source, radio=None, xray=None, **kwargs):
     return
 
 
-def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None, y_max=None):
-    fig, ax = newfig(0.9)
+def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None, y_max=None,
+                  fig_scale=0.67, add_text=False, markersize=2):
+    fig, ax = newfig(fig_scale)
     ax.set_xscale('log')
     ax.set_yscale('log') 
     factor = np.log10(y_max) - np.log10(y_min)
@@ -217,23 +218,23 @@ def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None
                     flux_up[tot_mask] - flux[tot_mask])
             ax.errorbar(frequency[tot_mask] * hz_to_gev, flux[tot_mask],
                         yerr=yerr, fmt='o', color='grey', zorder=1,
-                        alpha=0.5, markersize=3,  linestyle='')
+                        alpha=0.5, markersize=markersize,  linestyle='')
             tot_mask = inds & ~ulim_mask & tmask
             yerr = (flux[tot_mask] - flux_low[tot_mask],
                     flux_up[tot_mask] - flux[tot_mask])
             ax.errorbar(frequency[tot_mask] * hz_to_gev, flux[tot_mask],
                         yerr=yerr, fmt='o', color='red', zorder=2,
-                        alpha=0.5, markersize=3,  linestyle='')
+                        alpha=0.5, markersize=markersize+0.5,  linestyle='')
             tot_mask = inds & ulim_mask & ~tmask
             yerr = 10**np.log10(flux[tot_mask]) - 10**(np.log10(flux[tot_mask])-0.1/8.*factor) 
             ax.errorbar(frequency[tot_mask] * hz_to_gev, flux[tot_mask],
                         yerr=yerr, fmt='o', uplims=True, color='grey', zorder=1,
-                        alpha=0.5, markersize=3,  linestyle='')
+                        alpha=0.5, markersize=markersize,  linestyle='')
             tot_mask = inds & ulim_mask & tmask
             yerr = 10**np.log10(flux[tot_mask]) - 10**(np.log10(flux[tot_mask])-0.1/8.*factor)   
             ax.errorbar(frequency[tot_mask] * hz_to_gev, flux[tot_mask],
                         yerr=yerr, fmt='o', uplims=True, color='red', zorder=2,
-                        alpha=0.5, markersize=3,  linestyle='')
+                        alpha=0.5, markersize=markersize+0.5,  linestyle='')
     for i, sed_list in enumerate(seds_list):
         basepath = sed_list[0]
         sed_col = sed_list[1]
@@ -281,12 +282,12 @@ def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None
                 ax.errorbar(x[~m], y[~m], xerr=xerr1,
                             yerr=(yerr_lo[~m], yerr_hi[~m]),
                             linestyle='', color=sed_col, fmt='o', zorder=100-i,
-                            markersize=3)
+                            markersize=markersize)
                 serr = 10**np.log10(yul[m]) - 10**(np.log10(yul[m])-0.1/8.*factor)
                 ax.errorbar(x[m], yul[m], xerr=xerr0,
                             yerr=serr,  uplims=True,
                             color=sed_col, fmt='o', zorder=100-i,
-                            markersize=3)
+                            markersize=markersize)
 
 
             tmin = llh['config']['selection']['tmin']
@@ -295,28 +296,29 @@ def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None
                 sigma = np.max([0, pval_to_sigma(ts_to_pval(llh['sources'][source]['ts'], 1))])
                 if sigma > 5:
                     sigma = np.sqrt(llh['sources'][source]['ts'])
-                ax.text(0.2, 1.02, source,
-                        horizontalalignment='center',
-                        verticalalignment='center', transform=ax.transAxes)
-                ax.text(0.5, 1.02, '$\Sigma$: {:.1f} $\sigma$'.format(sigma),
-                        horizontalalignment='center',
-                        verticalalignment='center', transform=ax.transAxes)
-                ax.text(0.8, 1.02, 'MJD: {:.1f} - {:.1f}'.format(MET_to_MJD(tmin), MET_to_MJD(tmax)),
-                        horizontalalignment='center',
-                        verticalalignment='center', transform=ax.transAxes)
+                if add_text:
+                    ax.text(0.2, 1.02, source,
+                            horizontalalignment='center',
+                            verticalalignment='center', transform=ax.transAxes)
+                    ax.text(0.5, 1.02, '$\Sigma$: {:.1f} $\sigma$'.format(sigma),
+                            horizontalalignment='center',
+                            verticalalignment='center', transform=ax.transAxes)
+                    ax.text(0.8, 1.02, 'MJD: {:.1f} - {:.1f}'.format(MET_to_MJD(tmin), MET_to_MJD(tmax)),
+                            horizontalalignment='center',
+                            verticalalignment='center', transform=ax.transAxes)
     if dec is not None:
         IC_sens = np.genfromtxt('./lib/IC_sens.txt', delimiter=',')
         inter = scipy.interpolate.UnivariateSpline(IC_sens[:,0], IC_sens[:,1], k=1,s=0)
         flux = inter(np.sin(np.radians(dec))) * MeV_to_erg * 1e6
-        ax.plot([5e3, 1e6], [flux, flux], color='green', linestyle='--')
+        ax.plot([5e3, 1e6], [flux, flux], color='#0065BD', linestyle='--')
         IC_disc = np.genfromtxt('./lib/IC_disc.txt', delimiter=',')
         inter = scipy.interpolate.UnivariateSpline(IC_disc[:,0], IC_disc[:,1], k=1, s=0)
         flux = inter(np.sin(np.radians(dec))) * MeV_to_erg * 1e6
-        ax.plot([5e3, 1e6], [flux, flux], color='green', linestyle='-')
+        ax.plot([5e3, 1e6], [flux, flux], color='#0065BD', linestyle='-')
     ax.set_xlim(1e-15, 1e7)
     ax.set_ylim(y_min,y_max)
     ax.set_xlabel('Energy [GeV]')
-    ax.set_ylabel(r'$\nu f(\nu)$ [erg cm$^{-2}$ s$^{-1}$]')
+    #ax.set_ylabel(r'$\nu f(\nu)$ [erg cm$^{-2}$ s$^{-1}$]')
     spath_pdf = os.path.join(seds_list[0][0], 'sed.pdf')
     spath_png = os.path.join(seds_list[0][0], 'sed.png')
     print('Save SED to {}'.format(spath_pdf))
@@ -447,8 +449,8 @@ def make_counterparts_plot(basepath, ra, dec, plt_radius, save_path='.', vou_can
     factorm = 1./wcs.wcs.cdelt[0]
     factorp = 1./wcs.wcs.cdelt[1]
     print plt_radius*factorm, plt_radius*factorp
-    ax.set_xlim(plt_radius*factorm, plt_radius*factorp)
-    ax.set_ylim(plt_radius*factorm, plt_radius*factorp)    
+    #ax.set_xlim(plt_radius*factorm, plt_radius*factorp)
+    #ax.set_ylim(plt_radius*factorm, plt_radius*factorp)    
     print('Save Counterpart Plot')
     fig.savefig(os.path.join(save_path, 'counterparts.pdf'), bbox_inches='tight')
     fig.savefig(os.path.join(save_path, 'counterparts.png'), bbox_inches='tight', dpi=500)
@@ -508,9 +510,7 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
         print('Use dfit Contour')
         cdata = np.genfromtxt(cpath_rad, delimiter=' ', skip_header=1)
         cdata = np.vstack([cdata,cdata[0]])
-        print np.degrees(cdata[:,0])
-        print 360+np.degrees(cdata[:,1])
-        pix = get_pix_pos(wcs,  360+np.degrees(cdata[:,1]), np.degrees(cdata[:,0]))
+        pix = get_pix_pos(wcs, 360 + np.degrees(cdata[:,1]), np.degrees(cdata[:,0]))
         ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
     elif error90 is not None:
         if isinstance(error90, float):
@@ -533,8 +533,8 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
         ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
         print('Use new circle')
     cpath = os.path.join(plt_basepath, '../contour50.txt')
-    if os.path.exists(cpath):
-        cdata = np.genfromtxt(cpath, delimiter=',')
+    if False: #os.path.exists(cpath):
+        cdata = np.genfromtxt(cpath, delimiter=' ')
         cdata = np.vstack([cdata,cdata[0]])
         pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
         ax.plot(pix[0], pix[1], color='k', linewidth=0.5)

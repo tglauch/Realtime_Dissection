@@ -4,6 +4,15 @@ from shutil import copy2
 import sys
 sys.path.append('./lib')
 from lib.read_catalog import read_from_observation 
+import zipfile
+
+
+def zipdir(path, ziph):
+    # ziph is zipfile handle
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            ziph.write(os.path.join(root, file))
+
 
 in_base = '/scratch9/tglauch/realtime_service/output/TXS/'
 src = '4FGL_J0509.4+0542'
@@ -26,7 +35,7 @@ for f in ['lightcurve.png', 'lightcurve.pdf', 'movie.gif']:
     c_file = os.path.join(lc_base, f)
     copy2(c_file, lc_out)
 
-copy_files = ['bowtie.npy', 'llh.fits', 'sed.fits']
+copy_files = ['bowtie.npy', 'llh.fits', 'sed.fits', 'sed.pdf']
 dirs = [i for i in os.listdir(lc_base) if os.path.isdir(os.path.join(lc_base, i))]
 for d in dirs:
     if not os.path.exists(os.path.join(lc_out, d)):
@@ -47,6 +56,8 @@ for f in more_data:
     if len(add_data) > 0 :
         for i in  add_data:
             i.extend([i[-1], f.split('.')[0]])
-        print add_data
         with open(os.path.join(out_path, 'sed.txt'), 'a') as sed_file:
             np.savetxt(sed_file, add_data, fmt="%s")
+zipf = zipfile.ZipFile(out_path+'.zip', 'w', zipfile.ZIP_DEFLATED)
+zipdir(out_path, zipf)
+zipf.close()

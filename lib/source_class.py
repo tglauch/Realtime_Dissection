@@ -203,9 +203,12 @@ class Source(object):
     def collect_xray(self):
         if not os.path.exists(self.mw_data_path):
             self.get_mw_data() 
-        idata = np.genfromtxt(self.mw_data_path, skip_header=1,
+        idata = np.genfromtxt(self.mw_data_path, skip_header=4,
                               usecols=[1,2,3,4,6], dtype=[np.float,np.float,np.float,np.float,object])
         idata = np.array([list(i) for i in idata])
+        if idata == []:
+            self.swift=None
+            return
         idata = idata[idata[:,4] == 'OUSXB']
         idata = np.array(idata[:,0:4],dtype=np.float)
         idata[:,1] = idata[:,1] - idata[:,0]
@@ -222,10 +225,12 @@ class Source(object):
 
     def set_mw_data(self):
         try:
-            self.mw_idata = np.atleast_2d(np.genfromtxt(self.mw_data_path, skip_header=1,
+            self.mw_idata = np.atleast_2d(np.genfromtxt(self.mw_data_path, skip_header=4,
                                           usecols=(0,1,2,3,4)))
         except Exception as inst:
+            print(inst)
             self.mw_idata = None
+            return
         if len(np.squeeze(self.mw_idata)) == 0:
             self.mw_idata = None
         add_data_path = os.path.join(self.bpath, 'add_data')

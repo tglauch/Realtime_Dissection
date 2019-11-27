@@ -15,7 +15,7 @@ import string
 import random
 import plot
 import shutil
-import pyfits as fits
+from astropy.io import fits
 import warnings
 import copy
 
@@ -40,9 +40,9 @@ files = collections.OrderedDict([
      ('3hsp', {'file': '3hsp.1.csv',
               'keys': ['Name', 'ra', 'dec']}),
      ('fermi8yr', {'file': 'fermi8yr.1.csv',
-                  'keys': ['Source_Name', 'RAJ2000', 'DEJ2000']}),
-     ('crates', {'file': 'crates.1.csv',
-                'keys': ['name', 'ra', 'dec']})])
+                  'keys': ['Source_Name', 'RAJ2000', 'DEJ2000']}),])
+#     ('crates', {'file': 'crates.1.csv',
+#                'keys': ['name', 'ra', 'dec']})])
 
 
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):

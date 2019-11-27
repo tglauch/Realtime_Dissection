@@ -65,7 +65,7 @@ def parseArguments():
         action="store_true", default = False)
     parser.add_argument(
         "--basepath", help = 'Basepath for the Output',
-        type=str, default = '/scratch9/tglauch/realtime_service/output/')
+        type=str, default = '/scratch8/tglauch/dissection_output/')
     parser.add_argument(
         "--max_dist", help = 'Radius of sources to be included', type=float, default=2.5)
     parser.add_argument(
@@ -132,14 +132,19 @@ analysis.sort_sources_by_prio()
 if args['vou']:
     # Run VOU Tool
     logging.info('Start the VOU analysis pipeline')
-    analysis.ROI_analysis()
-    for src in analysis.srcs:
-        bpath_src = os.path.join(bpath, src.name.replace(' ', '_'))
-        src.setup_folders(bpath_src)
-    if os.path.exists(analysis_object_path):
-        os.remove(analysis_object_path)
-    with open(analysis_object_path, "wb") as f:
-        pickle.dump(analysis, f)
+    if args['overwrite']:
+        for src in analysis.srcs:
+            print('Re-run SED for {} at dec {} ra {}'.format(src.name, src.dec, src.ra))
+            src.get_mw_data()
+    else:
+        analysis.ROI_analysis()
+        for src in analysis.srcs:
+            bpath_src = os.path.join(bpath, src.name.replace(' ', '_'))
+            src.setup_folders(bpath_src)
+        if os.path.exists(analysis_object_path):
+            os.remove(analysis_object_path)
+        with open(analysis_object_path, "wb") as f:
+            pickle.dump(analysis, f)
 
 # Start the gamma-ray analysis
 
