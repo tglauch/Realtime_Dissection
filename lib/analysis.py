@@ -24,7 +24,7 @@ marker_colors = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#f
 src_encoding = {'5BZQ' : -2, '5BZB': -2 , '5BZU': -2, '3HSP': -1, 'CRATES': -3,
                 '3FGL': -10, '4FGL': -10, 'FHL': -10}
 
-sc_file_path = '/scratch9/tglauch/Realtime_Dissection/sc_files/current.fits'
+sc_file_path = '/scratch8/tglauch/spacecraft_files/current.fits'
 
 files = collections.OrderedDict([
      ('4fgl', {'file': '4fgl.1.csv',
@@ -33,12 +33,12 @@ files = collections.OrderedDict([
               'keys': ['name', 'ra', 'dec']}),
      ('3fhl', {'file': '3fhl.1.csv',
               'keys': ['name', 'ra', 'dec']}),
-     ('FermiGRB', {'file': 'fgrb.1.csv',
-                   'keys' : ['GRB','RAJ2000','DEJ2000']}),
-     ('5bzcat', {'file': '5bzcat.1.csv',
-                'keys': ['Name', 'RAJ2000', 'DEJ2000']}),
      ('3hsp', {'file': '3hsp.1.csv',
               'keys': ['Name', 'ra', 'dec']}),
+     ('5bzcat', {'file': '5bzcat.1.csv',
+                'keys': ['Name', 'RAJ2000', 'DEJ2000']}),
+     ('FermiGRB', {'file': 'fgrb.1.csv',
+                   'keys' : ['GRB','RAJ2000','DEJ2000']}),
      ('fermi8yr', {'file': 'fermi8yr.1.csv',
                   'keys': ['Source_Name', 'RAJ2000', 'DEJ2000']}),])
 #     ('crates', {'file': 'crates.1.csv',
@@ -86,10 +86,11 @@ class Analysis(object):
 
     def make_ts_map_plots(self):
         for tsm in self.ts_maps:
+            print('Make plot for {}'.format(tsm))
             try:
+                plot.make_ts_plot_legend(tsm, self.srcs, self.max_dist)
                 plot.make_ts_plot(tsm, self.srcs, self.vou_sources,
                                   plt_mode='tsmap', error90 = self.err90)
-                plot.make_ts_plot_legend(tsm, self.srcs, self.max_dist)
             except Exception as inst:
                 warnings.warn("Couldn't create TS map {}".format(tsm))
                 print(inst)
@@ -115,6 +116,7 @@ class Analysis(object):
             self.radius = np.max([2 * 60. * self.err90, 60.])
         elif isinstance(self.err90, Ellipse):
             self.radius = np.max([2 * self.err90.get_max_extension(), 60])
+        self.max_dist = self.radius
         return
         
 
@@ -191,10 +193,34 @@ class Analysis(object):
     def make_counterparts_plot(self):
         self.set_src_plot_style()
         self.get_vou_candidates()
-        print self.radius/60.
         plot.make_counterparts_plot(self.bpath, self.ra, self.dec, self.radius/60., save_path = self.vou_out,  vou_cand=self.vou_sources, srcs=self.srcs,
                                     max_dist=self.max_dist, legend=False, yaxis=True, error90=self.err90)
         return
+
+
+    def make_aladin_plot(self):
+        with open('./htmlcode/aladin.html') as ifile:
+             aladin_code = ifile.read()
+
+        temp_str  = 'overlay.add(A.circle( {ra} ,  {dec}, .05, {{color: \'{color}\'}} )); \n \
+                     overlay.add(A.circle( {ra} ,  {dec}, .0027, {{color: \'{color}\'}} )); \n \
+                     cat.addSources([A.source({ra} , {dec}, {{name: \' Nr. {name}\'}})]);\n'
+        circle_str = ''
+        for j, src in enumerate(self.vou_sources):
+            circle_str += temp_str.format(ra=src[0], dec=src[1], color='blue', name=j)
+        for src in self.srcs:
+            circle_str += temp_str.format(ra=src.ra, dec=src.dec, color='red', name=src.name)
+        cpath = os.path.join(self.bpath, 'contour.txt')
+        if os.path.exists(cpath):
+            cdata = np.degrees(np.genfromtxt(cpath, delimiter=' '))
+            nlist = []
+            for i in cdata:
+                nlist.append(list(i))
+            print(str(nlist))
+            circle_str += 'overlay.add(A.polyline({pos_arr}, {{color:\'white\'}}));'.format(pos_arr=str(nlist))
+        aladin_code = aladin_code.format(ra=self.ra, dec=self.dec, circles=circle_str)
+        return aladin_code
+            
 
 
     def ROI_analysis(self):
@@ -433,25 +459,46 @@ class Analysis(object):
     def create_html(self):
         mask = [True if src.dist < self.max_dist else False for src in self.srcs]
         counterparts = np.array([src for src in np.array(self.srcs)[mask] if not 'CRATES' in src.name])
-        inds = np.argsort([src.dist for src in counterparts])
-        counterparts = counterparts[inds][:2]
+        #inds = np.argsort([src.dist for src in counterparts])
+       # counterparts = counterparts[inds]
         html_files = os.path.join(self.bpath, '{}/IceCube{}_files'.format(self.event_name, self.event_name[2:]))
         if os.path.exists(html_files):
             shutil.rmtree(html_files)
-        shutil.copytree('./htmlcode/IceCubeTemplate_Candidates_files/', html_files)
-        index_html = os.path.join(self.bpath, '{}/index.html'.format(self.event_name))
-        shutil.copyfile('./htmlcode/IceCubeTemplate_{}Candidates.html'.format(len(counterparts)),
-                        index_html)
-        with open(index_html, 'r') as f:
+        shutil.copytree('./htmlcode/', html_files)
+        src_string = ''
+        for i, src in enumerate(counterparts):
+            with open(os.path.join(html_files, 'src.html'), 'r') as f:
+                in_str = f.read()
+                src_string += in_str.format(num=i+1,
+                                            ra = src.ra,
+                                            dec = src.dec,
+                                            src_name=src.name,
+                                            dist=src.dist,
+                                            alt_names= ', '.join(src.names),
+                                            sed_path='CandSED{}.png'.format(i+1),
+                                            lc_path='CandLC{}.png'.format(i+1))
+
+        c = SkyCoord(self.ra, self.dec, frame='icrs', unit="deg")
+        gal = c.galactic      
+        aladin_str = self.make_aladin_plot()
+        with open(os.path.join(html_files, 'template.html'), 'r') as f:
             code = f.read()
-            code = code.replace('IceCube yyyy', 'IceCube {}'.format(self.event_name[2:]))
-            code = code.replace('ICyyyy', self.event_name)
-            code = code.replace('MJD aaaa', 'MJD {}'.format(self.mjd))
-            code = code.replace('gggg', str(9999))
-            code = code.replace('tttt', self.event_name[2:])
-            code = code.replace('rrrr', self.event_name[2:])
+            code = code.format(mjd = self.mjd,
+                               src_summary=src_string,
+                               ev_name_full = self.event_name.replace('IC', 'IceCube-')+'A',
+                               ev_name = self.event_name,
+                               dec = self.dec,
+                               ra = self.ra,
+                               gal_lat = gal.b.deg,  
+                               ts_mjd1 = self.tsmjd1,
+                               ts_mjd2 =  self.tsmjd2,
+                               ts_full_mjd1 = self.mjd_range[0],
+                               ts_full_mjd2 = self.mjd_range[1],
+                               ts_length = self.tsmjd2 - self.tsmjd1,
+                               aladin_text = aladin_str,
+                               )
             
-        with open(index_html, 'w') as f:
+        with open(os.path.join(html_files, 'index.html'), 'w') as f:
             f.write(code)
         
         rxmap_eps = os.path.join(self.vou_out, 'RX_map.eps')
@@ -470,6 +517,9 @@ class Analysis(object):
         if os.path.exists(os.path.join(self.bpath, 'ts_map/tsmap.png')):
             shutil.copyfile(os.path.join(self.bpath, 'ts_map/tsmap.png'), 
                             os.path.join(html_files, 'tsmap-full.png'))
+        if os.path.exists(os.path.join(self.bpath, 'ts_map/legend.png')):
+            shutil.copyfile(os.path.join(self.bpath, 'ts_map/legend.png'),
+                            os.path.join(html_files, 'legend.png'))
         if os.path.exists(os.path.join(self.bpath, 'ts_map_short/tsmap.png')):
             shutil.copyfile(os.path.join(self.bpath, 'ts_map_short/tsmap.png'),
                             os.path.join(html_files, 'tsmap_200.png'))
@@ -491,16 +541,18 @@ class Analysis(object):
                         if (self.mjd <= float(fold.split('_')[1])) and (self.mjd > float(fold.split('_')[0])):
                             sed_path = os.path.join(lc_base,fold)
                             break
-                print(os.path.join(html_files, 'CANDSED{}.png'.format(i+1)))
-                shutil.copyfile(os.path.join(sed_path, 'sed.png'), os.path.join(html_files, 'CandSED{}.png'.format(i+1)))
+                print(os.path.join(html_files, 'CandSED{}.png'.format(i+1)))
+                if os.path.exists(os.path.join(sed_path, 'sed.png')):
+                    shutil.copyfile(os.path.join(sed_path, 'sed.png'), os.path.join(html_files, 'CandSED{}.png'.format(i+1)))
             else:
                 print('SED seems to be not ready, yet')
-            print('CANDLC{}.png'.format(i+1))
             if os.path.exists(lc_path):
                 shutil.copyfile(lc_path, os.path.join(html_files, 'CandLC{}.png'.format(i+1)))
-        self.upload_html()
+        self.upload_html(html_files)
         return
 
-    def upload_html(self):
-        os.system('scp -r {} tglauch@cobalt.icecube.wisc.edu:/home/tglauch/public_html/Reports/'.format(os.path.join(self.bpath, self.event_name)))
+    def upload_html(self, html_files):
+        cmd = 'rsync -r {}/* tglauch@cobalt.icecube.wisc.edu:/home/tglauch/public_html/Reports/{}/'.format(html_files, self.event_name)
+        print(cmd)
+        os.system(cmd)
         return

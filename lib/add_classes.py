@@ -11,7 +11,9 @@ class Ellipse(object):
         elif len(settings) == 4:
             arr = np.abs(np.array(settings))
             self.ra_ax = np.sum(arr[[0,1]]) / 2.
+            self.center_ra = self.center_ra + (arr[0]-arr[1])/2
             self.dec_ax = np.sum(arr[[2,3]]) / 2.
+            self.center_dec = self.center_dec + (arr[2]-arr[3])/2
         else:
             print('No Valid Ellipse')
         if self.dec_ax < self.ra_ax:

@@ -1,10 +1,11 @@
 import numpy as np
 import os
-from shutil import copy2
+from shutil import copy2, make_archive
 import sys
 sys.path.append('./lib')
 from lib.read_catalog import read_from_observation 
 import zipfile
+import argparse
 
 
 def zipdir(path, ziph):
@@ -13,9 +14,18 @@ def zipdir(path, ziph):
         for file in files:
             ziph.write(os.path.join(root, file))
 
+p = argparse.ArgumentParser(
+       description = "Calculates Point-Source Trials",
+       formatter_class = argparse.RawTextHelpFormatter)
+p.add_argument("--bpath", type=str,
+     help='What is the basepath')
+p.add_argument("--src", type=str, required=True,
+     help='Which source?')
+args = p.parse_args()
+print('Run with args {}'.format(args))
 
-in_base = '/scratch9/tglauch/realtime_service/output/TXS/'
-src = '4FGL_J0509.4+0542'
+in_base = args.bpath
+src = args.src
 out_base = '/scratch9/tglauch/erin/'
 
 in_path = os.path.join(in_base, src)
@@ -58,6 +68,9 @@ for f in more_data:
             i.extend([i[-1], f.split('.')[0]])
         with open(os.path.join(out_path, 'sed.txt'), 'a') as sed_file:
             np.savetxt(sed_file, add_data, fmt="%s")
-zipf = zipfile.ZipFile(out_path+'.zip', 'w', zipfile.ZIP_DEFLATED)
-zipdir(out_path, zipf)
-zipf.close()
+zip_path = os.path.normpath(out_path)+'.zip'
+make_archive(out_path, 'zip', out_path)
+#print('Create Zip File in {}'.format(zip_path))
+#zipf = zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED)
+#zipdir(out_path, zipf)
+#zipf.close()

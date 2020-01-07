@@ -65,7 +65,7 @@ class Source(object):
             #        seds_list.append((self.lightcurves[lcs[j]].time_window_results[i],
             #                          'k', 'blue' , True, True, False))
                 kwarg_dict = {'mw_idata': self.mw_idata, 'dec':self.dec, 'twindow':main_lc.time_windows[i], 'y_min':y_min,
-                              'y_max': y_max}
+                              'y_max': y_max, 'add_text':True}
                 pool.apply_async(plot.make_sed_plot, (seds_list,), kwarg_dict) 
             except Exception as inst:
                 warnings.warn("Couldn't create SED for source {}".format(self.name))
@@ -76,7 +76,7 @@ class Source(object):
         #Create all year SED
         try:
             plot.make_sed_plot([(self.seds['default'], 'grey', 'grey', True, True, True)],
-                               mw_idata=self.mw_idata, dec=self.dec, y_min=y_min, y_max=y_max)
+                               mw_idata=self.mw_idata, dec=self.dec, y_min=y_min, y_max=y_max, add_text=True)
         except Exception as inst:
                 warnings.warn("Couldn't create all year SED")
                 print(inst)
@@ -192,10 +192,16 @@ class Source(object):
         else:
             cp_ra = self.ra
             cp_dec = self.dec
-        pre_str = '{vou_path} {ra} {dec} {loc_str} -s ; cat Sed.txt > {bpath}'
+        pre_str = '{vou_path} {ra} {dec} {loc_str} -s'
+        form_str = pre_str.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec,loc_str=1)
+        print('Fetch SED with command \n {}'.format(form_str))
         for i in range(2):
-            os.system(pre_str.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec,  bpath=self.mw_data_path,
-                                     loc_str=6))
+            os.system(form_str)
+        if os.path.exists('Sed.txt'):
+            print('Move Sed.txt to {}'.format(self.mw_data_path))
+            shutil.move('Sed.txt', self.mw_data_path)
+        else:
+            print('There is no File called Sed.txt')
         self.set_mw_data()
         self.get_ovro_data()
         return
@@ -203,13 +209,22 @@ class Source(object):
     def collect_xray(self):
         if not os.path.exists(self.mw_data_path):
             self.get_mw_data() 
-        idata = np.genfromtxt(self.mw_data_path, skip_header=4,
-                              usecols=[1,2,3,4,6], dtype=[np.float,np.float,np.float,np.float,object])
-        idata = np.array([list(i) for i in idata])
-        if idata == []:
+        try:
+            idata = np.genfromtxt(self.mw_data_path, skip_header=4,
+                                  usecols=[1,2,3,4,6], dtype=[np.float,np.float,np.float,np.float,object])
+        except Exception as inst:
+            print(inst)
             self.swift=None
             return
-        idata = idata[idata[:,4] == 'OUSXB']
+        idata = np.array([list(i) for i in idata])
+        try:
+            idata = idata[idata[:,4] == 'OUSXB']
+            self.swift=None
+            return
+        except Exception as inst:
+            print(inst)
+            self.swift=None
+            return
         idata = np.array(idata[:,0:4],dtype=np.float)
         idata[:,1] = idata[:,1] - idata[:,0]
         idata[:,2] = idata[:,0] - idata[:,2]
@@ -224,6 +239,7 @@ class Source(object):
 
 
     def set_mw_data(self):
+        print('Read multi-wavelength data from {}'.format(self.mw_data_path))
         try:
             self.mw_idata = np.atleast_2d(np.genfromtxt(self.mw_data_path, skip_header=4,
                                           usecols=(0,1,2,3,4)))

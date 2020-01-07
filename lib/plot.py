@@ -194,7 +194,7 @@ def make_lc_plot(lat_basepath, mjd, source, radio=None, xray=None, **kwargs):
 
 
 def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None, y_max=None,
-                  fig_scale=0.67, add_text=False, markersize=2):
+                  fig_scale=0.8, add_text=False, markersize=2):
     fig, ax = newfig(fig_scale)
     ax.set_xscale('log')
     ax.set_yscale('log') 
@@ -263,7 +263,7 @@ def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None
             dehi = (sed['e_max'] - sed['e_ctr'])/1e3
             xerr0 = np.vstack((delo[m], dehi[m]))
             xerr1 = np.vstack((delo[~m], dehi[~m]))
-            if ts > 9 and bowtie_bool:
+            if ts > 4 and bowtie_bool:
                 ax.plot(energies,
                         bowtie['dnde'] * e2 * MeV_to_erg, color=bowtie_col,
                         zorder=10-i)
@@ -297,13 +297,13 @@ def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None
                 if sigma > 5:
                     sigma = np.sqrt(llh['sources'][source]['ts'])
                 if add_text:
-                    ax.text(0.2, 1.02, source,
+                    ax.text(0.2, 1.03, source,
                             horizontalalignment='center',
                             verticalalignment='center', transform=ax.transAxes)
-                    ax.text(0.5, 1.02, '$\Sigma$: {:.1f} $\sigma$'.format(sigma),
+                    ax.text(0.5, 1.03, '$\Sigma$: {:.1f} $\sigma$'.format(sigma),
                             horizontalalignment='center',
                             verticalalignment='center', transform=ax.transAxes)
-                    ax.text(0.8, 1.02, 'MJD: {:.1f} - {:.1f}'.format(MET_to_MJD(tmin), MET_to_MJD(tmax)),
+                    ax.text(0.8, 1.03, 'MJD: {:.1f} - {:.1f}'.format(MET_to_MJD(tmin), MET_to_MJD(tmax)),
                             horizontalalignment='center',
                             verticalalignment='center', transform=ax.transAxes)
     if dec is not None:
@@ -318,7 +318,7 @@ def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None
     ax.set_xlim(1e-15, 1e7)
     ax.set_ylim(y_min,y_max)
     ax.set_xlabel('Energy [GeV]')
-    #ax.set_ylabel(r'$\nu f(\nu)$ [erg cm$^{-2}$ s$^{-1}$]')
+    ax.set_ylabel(r'$\nu f(\nu)$ [erg cm$^{-2}$ s$^{-1}$]')
     spath_pdf = os.path.join(seds_list[0][0], 'sed.pdf')
     spath_png = os.path.join(seds_list[0][0], 'sed.png')
     print('Save SED to {}'.format(spath_pdf))
@@ -344,20 +344,21 @@ def get_pix_pos(wcs, ra, dec):
 
 
 def make_ts_plot_legend(plt_basepath, srcs, max_dist):
+    mask = [True if src.dist < max_dist else False for src in srcs]
     plt.clf()
     fig = plt.figure()
-    fig_legend = plt.figure(figsize=(2, 1.25))
+    fig_legend = plt.figure(figsize=(3, 2.))
     ax = fig.add_subplot(111)
     patches = []
     labels = []
-    for i, src in enumerate(srcs):
+    for i, src in enumerate(np.array(srcs)[mask]):
         if src.dist > max_dist:
             continue
         patch = ax.plot([0], [0], linestyle='', label='{} {}'.format(i, src.name) ,**src.plt_style)
         labels.append('{} {}'.format(i, src.name))
         patches.append(patch[0])
-    fig_legend.legend(patches, labels, loc='center', frameon=False)
-    fig_legend.savefig(os.path.join(plt_basepath,'legend.png'), bbox_inches='tight', dpi=500)
+    fig_legend.legend(patches, labels, loc='center', frameon=False, labelspacing=1.3)
+    fig_legend.savefig(os.path.join(plt_basepath,'legend.png'), bbox_inches='tight', dpi=300)
     plt.close(fig)
     plt.close(fig_legend)
     return
@@ -416,9 +417,9 @@ def make_counterparts_plot(basepath, ra, dec, plt_radius, save_path='.', vou_can
     cpath = os.path.join(basepath, 'contour.txt')
     cpath_rad = os.path.join(basepath, 'contour_rad.txt')
     if os.path.exists(cpath):
-        cdata = np.genfromtxt(cpath, delimiter=',')
+        cdata = np.genfromtxt(cpath, delimiter=' ')
         cdata = np.vstack([cdata,cdata[0]])
-        pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
+        pix = get_pix_pos(wcs, np.degrees(cdata[:,0]), np.degrees(cdata[:,1]))
         ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
     elif os.path.exists(cpath_rad):
         print('Use dfit Contour')
@@ -465,14 +466,6 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
     fits_path = os.path.join(plt_basepath, fname)
     if os.path.exists(fits_path):
         inp = fits.open(fits_path)
-        try:
-            with open(os.path.join(plt_basepath, 'config.yaml'), 'r') as f:
-                yml = yaml.safe_load(f)
-            binning = yml['binning']
-            delta_pix = (binning[ 'roiwidth']/binning['binsz'] - 6./binning['binsz']) / 2. ## Assume radius of 3 deg (total width 6 deg)
-        except Exception as inst:
-            delta_pix = 10 # random default value
-            print inst
     else:
         print('{} not yet ready'.format(fits_path))
         return
@@ -502,9 +495,9 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
     cpath = os.path.join(plt_basepath, '../contour.txt')
     cpath_rad = os.path.join(plt_basepath, '../contour_rad.txt')
     if os.path.exists(cpath):
-        cdata = np.genfromtxt(cpath, delimiter=',')
+        cdata = np.genfromtxt(cpath, delimiter=' ')
         cdata = np.vstack([cdata,cdata[0]])
-        pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
+        pix = get_pix_pos(wcs, np.degrees(cdata[:,0]), np.degrees(cdata[:,1]))
         ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
     elif os.path.exists(cpath_rad):
         print('Use dfit Contour')
@@ -568,9 +561,13 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
     lat.set_major_formatter('d.d') 
     cbar = ax.contourf(Z, levels=np.linspace(minmax[0], minmax[1], 500),
                        cmap=cmap)
-    levels=np.array([2,3,4,5])
-    CS = ax.contour(Z, levels=levels,
-                    colors='black', linewidths=(0.3,))
+    levels=np.array([2,3,4])
+    CS1 = ax.contour(Z, levels=levels,
+                    colors='black', linewidths=(0.2,))
+    levels=np.array([5])
+    if np.max(Z) > 5:
+        CS2 = ax.contour(Z, levels=levels,
+                        colors='black', linewidths=(0.8,))
     ax.set_xlabel(r'R.A. (degrees)')
     if  yaxis:
         ax.set_ylabel(r'Dec. (degrees)')

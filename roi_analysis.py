@@ -42,7 +42,7 @@ def parseArguments():
     parser.add_argument(
         "--dt", help="Length of time window to analyze", type=float)
     parser.add_argument(
-        "--radius", help="Radius of the region to analyze", type=str, default="180")
+        "--radius", help="Radius of the region to analyze in arcmin", type=str, default="240")
     parser.add_argument(
         "--emin", help="Lower energy bound for SED", type=float, default=100)
     parser.add_argument(
@@ -67,7 +67,7 @@ def parseArguments():
         "--basepath", help = 'Basepath for the Output',
         type=str, default = '/scratch8/tglauch/dissection_output/')
     parser.add_argument(
-        "--max_dist", help = 'Radius of sources to be included', type=float, default=2.5)
+        "--max_dist", help = 'Radius of sources to be included', type=float, default=3.5)
     parser.add_argument(
         "--err90", help= 'The 90 percent error ellipse. Format:  ra1 ra2 dec1 dec2', nargs='+')
     parser.add_argument(
