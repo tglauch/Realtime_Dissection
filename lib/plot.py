@@ -493,7 +493,7 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
     fig = plt.figure(figsize=figsize(0.4, 1.))
     ax=fig.add_axes((.0, .0,0.7,.7), projection=wcs)
     cpath = os.path.join(plt_basepath, '../contour.txt')
-    cpath_rad = os.path.join(plt_basepath, '../contour_rad.txt')
+    cpath_rad = os.path.join(plt_basepath, '../contour_df.txt')
     if os.path.exists(cpath):
         cdata = np.genfromtxt(cpath, delimiter=' ')
         cdata = np.vstack([cdata,cdata[0]])

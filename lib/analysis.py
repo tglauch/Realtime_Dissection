@@ -211,13 +211,23 @@ class Analysis(object):
         for src in self.srcs:
             circle_str += temp_str.format(ra=src.ra, dec=src.dec, color='red', name=src.name)
         cpath = os.path.join(self.bpath, 'contour.txt')
+        cpath_df= os.path.join(self.bpath, 'contour_df.txt')
+        nlist = []
         if os.path.exists(cpath):
             cdata = np.degrees(np.genfromtxt(cpath, delimiter=' '))
-            nlist = []
             for i in cdata:
+                nlist.append(list(i)) 
+        elif os.path.exists(cpath_df):
+            cdata =  np.degrees(np.genfromtxt(cpath_df, delimiter=' '))
+            for i in cdata:
+                nlist.append([i[1], i[0]])
+        elif isinstance(self.err90, Ellipse):
+            t = np.linspace(0, 2*np.pi, 100)
+            ra = self.err90.center_ra + self.err90.dec_ax * np.cos(t)
+            dec = self.err90.center_dec + self.err90.ra_ax * np.sin(t)
+            for i in (zip(ra,dec)):
                 nlist.append(list(i))
-            print(str(nlist))
-            circle_str += 'overlay.add(A.polyline({pos_arr}, {{color:\'white\'}}));'.format(pos_arr=str(nlist))
+        circle_str += 'overlay.add(A.polyline({pos_arr}, {{color:\'white\'}}));'.format(pos_arr=str(nlist))           
         aladin_code = aladin_code.format(ra=self.ra, dec=self.dec, circles=circle_str)
         return aladin_code
             
