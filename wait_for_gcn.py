@@ -26,5 +26,5 @@ def check_for_new_gcn():
     return
 
 while True:
-    time.sleep(60)
     check_for_new_gcn()
+    time.sleep(60)

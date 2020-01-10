@@ -67,7 +67,7 @@ def parseArguments():
         "--basepath", help = 'Basepath for the Output',
         type=str, default = '/scratch8/tglauch/dissection_output/')
     parser.add_argument(
-        "--max_dist", help = 'Radius of sources to be included', type=float, default=3.5)
+        "--max_dist", help = 'Radius of sources to be included in degrees', type=float, default=3.5)
     parser.add_argument(
         "--err90", help= 'The 90 percent error ellipse. Format:  ra1 ra2 dec1 dec2', nargs='+')
     parser.add_argument(
@@ -148,6 +148,12 @@ if args['vou']:
 
 # Start the gamma-ray analysis
 
+if args['adaptive_scaling']:
+    analysis.mask_sources()
+
+analysis.set_src_plot_style()
+analysis.make_counterparts_plot()
+
 if args['lat_analysis']:
     logging.info('Start the Fermi LAT Analysis pipeline')
     args['overwrite'] = True
@@ -185,7 +191,7 @@ if args['lat_analysis']:
         if make_pdf:
             continue
         print(' \n \n {} is at a distance {:.1f} deg'.format(src.name, src.dist))
-        if src.dist > analysis.max_dist:
+        if not src.in_err:
             continue
         src.get_mw_data()
         add_srcs = [src] #analysis.srcs 
@@ -230,8 +236,9 @@ while not final_pdf:
         analysis.make_counterparts_plot() 
         analysis.make_ts_map_plots()
         for src in analysis.srcs:
-            if src.dist > analysis.max_dist:
+            if not src.in_err:
                 continue
+            print('Make Plots for Sources {} at distance {:.1f}'.format(src.name, src.dist))
             src.make_lc_plot(analysis.mjd)
             if analysis.emin < 1e3: 
                 src.make_sed_lightcurve(lcs=['default', '1GeV'])
@@ -240,10 +247,14 @@ while not final_pdf:
     logging.info('Make PDF..')
     src_latex = ''
     for src in analysis.srcs:
-        if src.dist > analysis.max_dist:
+        if not src.in_err:
             continue
         src_latex += src.source_summary(analysis.bpath, analysis.mjd, mode=analysis.mode)
     analysis.make_pdf(src_latex, final_pdf = final_pdf)
     analysis.create_html()
-    print_to_slack('New Fit Result on https://icecube.wisc.edu/~tglauch/Reports/{}/'.format(analysis.event_name))    
+    print_to_slack('New Fit Result on https://icecube.wisc.edu/~tglauch/Reports/{}/'.format(analysis.event_name))
+    if os.path.exists(analysis_object_path):
+        os.remove(analysis_object_path)
+    with open(analysis_object_path, "wb") as f:
+        pickle.dump(analysis, f)    
 #    print_to_slack('Fit Results', analysis.pdf_out_path)

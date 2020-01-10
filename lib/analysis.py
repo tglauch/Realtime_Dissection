@@ -38,7 +38,7 @@ files = collections.OrderedDict([
      ('5bzcat', {'file': '5bzcat.1.csv',
                 'keys': ['Name', 'RAJ2000', 'DEJ2000']}),
      ('FermiGRB', {'file': 'fgrb.1.csv',
-                   'keys' : ['GRB','RAJ2000','DEJ2000']}),
+                   'keys' : ['gcn_name','ra','dec']}),
      ('fermi8yr', {'file': 'fermi8yr.1.csv',
                   'keys': ['Source_Name', 'RAJ2000', 'DEJ2000']}),])
 #     ('crates', {'file': 'crates.1.csv',
@@ -72,7 +72,8 @@ class Analysis(object):
         self.srcprob_path = None
         self.id = id_generator(size=5) 
         self.notice_date = 'None'
-        self.radius = 180
+        self.radius = 200
+        self.max_dist = 3.
         self.this_path = None
         return
 
@@ -113,12 +114,27 @@ class Analysis(object):
 
     def adaptive_radius(self):
         if isinstance(self.err90, float):
-            self.radius = np.max([2 * 60. * self.err90, 60.])
+            self.radius = np.max([1.5 * 60. * self.err90, 60.])
         elif isinstance(self.err90, Ellipse):
-            self.radius = np.max([2 * self.err90.get_max_extension(), 60])
-        self.max_dist = self.radius
+            self.radius = np.max([1.5 * self.err90.get_max_extension(), 60])
+        self.max_dist = self.radius/60.
         return
         
+
+    def mask_sources(self):
+        if isinstance(self.err90, float):
+            for src in self.srcs:
+                src.in_err=True
+                if src.dist > self.max_dist:
+                    src.in_err = False
+        elif isinstance(self.err90, Ellipse):
+            for src in self.srcs:
+                src.in_err = True
+                ra_bool = np.abs(src.ra - self.err90.center_ra) > (1.5 * self.err90.ra_ax)
+                dec_bool = np.abs(src.dec - self.err90.center_dec) > (1.5 * self.err90.dec_ax)
+                if (ra_bool | dec_bool):
+                    src.in_err = False
+        return
 
     def make_ts_map(self, ts_map_path, emin=None, trange=None):
         sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {} --roiwidth {} --free_diff'
@@ -128,7 +144,7 @@ class Analysis(object):
            sargs = sargs + ' --time_range {} {}'.format(trange[0], trange[1])
         sargs = sargs.format(get_68_psf(emin), self.fermi_data, emin, self.ra, self.dec, 2*self.radius/60.)
         self.ts_maps.append(ts_map_path)
-        submit_fit(sargs, ts_map_path, sub_file=self.id+'.sub', ana_type='TS_Map', partition='xtralong') # change back to xtralong
+        submit_fit(sargs, ts_map_path, sub_file=self.id+'.sub', ana_type='TS_Map', partition='xtralong')
         return
 
     def make_pdf(self, src_latex, final_pdf=True):
@@ -191,7 +207,6 @@ class Analysis(object):
 
 
     def make_counterparts_plot(self):
-        self.set_src_plot_style()
         self.get_vou_candidates()
         plot.make_counterparts_plot(self.bpath, self.ra, self.dec, self.radius/60., save_path = self.vou_out,  vou_cand=self.vou_sources, srcs=self.srcs,
                                     max_dist=self.max_dist, legend=False, yaxis=True, error90=self.err90)
@@ -223,8 +238,8 @@ class Analysis(object):
                 nlist.append([i[1], i[0]])
         elif isinstance(self.err90, Ellipse):
             t = np.linspace(0, 2*np.pi, 100)
-            ra = self.err90.center_ra + self.err90.dec_ax * np.cos(t)
-            dec = self.err90.center_dec + self.err90.ra_ax * np.sin(t)
+            ra = self.err90.center_ra + self.err90.ra_ax * np.cos(t)
+            dec = self.err90.center_dec + self.err90.dec_ax * np.sin(t)
             for i in (zip(ra,dec)):
                 nlist.append(list(i))
         circle_str += 'overlay.add(A.polyline({pos_arr}, {{color:\'white\'}}));'.format(pos_arr=str(nlist))           
@@ -249,12 +264,11 @@ class Analysis(object):
         else:
             print('This type of error regions is not supported yet')
         print cmd
-        for i in range(2):
+        for i in range(1): # With new version only need to run ones?!?!
             subprocess.call(cmd)
 
         # Setup Variables
         out_str = self.get_sources()
-        self.make_counterparts_plot()
         self.calc_gal_coords()
         headline = '*Result for {}* [ra: {:.1f}  dec: {:.1f} , gal_l: {:.1f}, gal_b: {:.1f} ]\n'.format(self.event_name,
                                                                                self.ra, self.dec, self.gal_l, self.gal_b)
@@ -379,10 +393,7 @@ class Analysis(object):
                          ('DEJ2000', '<f8')]
                 temp = temp.astype(dtype)
             for src in temp:
-                if key == 'FermiGRB':
-                    name = 'GRB' + src[files[key]['keys'][0]]
-                else:
-                    name = src[files[key]['keys'][0]]
+                name = src[files[key]['keys'][0]]
                 src_obj = Source(name,
                                  src[files[key]['keys'][1]],
                                  src[files[key]['keys'][2]])
@@ -417,7 +428,6 @@ class Analysis(object):
                 ostr +=  '\n Associations: {}'.format(', '.join(src.names))
             print(ostr)
             out_str += ostr + '\n\n'
-        self.set_src_plot_style()
         return out_str
 
     def set_src_plot_style(self):
@@ -427,8 +437,9 @@ class Analysis(object):
         for sty in marker_styles:
             marker_counter[sty] = 0
         for src in self.srcs:
-            if src.dist > self.max_dist:
+            if not src.in_err:
                 src.plt_style = copy.copy(cat_dict[src.plt_code][1])
+                src.plt_style['color'] = 'grey'
                 continue
             if marker_counter[src.plt_code] > len(marker_colors):
                 print('no more colors for this sourcetype {}.Falling back to default'.format(src.name))
@@ -437,7 +448,9 @@ class Analysis(object):
             src.plt_style = copy.copy(cat_dict[src.plt_code][1])
             src.plt_style['color'] = marker_colors[marker_counter[src.plt_code]]
             marker_counter[src.plt_code] += 1
-            print src.plt_style
+        for src in self.srcs:
+            print('name: {} dist: {:.1f} in_err: {} plt_style: {}'.format(src.name, src.dist, src.in_err,
+                                                                          src.plt_style))
         return    
 
 
@@ -467,7 +480,7 @@ class Analysis(object):
 
 
     def create_html(self):
-        mask = [True if src.dist < self.max_dist else False for src in self.srcs]
+        mask = [src.in_err for src in self.srcs]
         counterparts = np.array([src for src in np.array(self.srcs)[mask] if not 'CRATES' in src.name])
         #inds = np.argsort([src.dist for src in counterparts])
        # counterparts = counterparts[inds]

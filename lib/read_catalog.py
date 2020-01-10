@@ -9,7 +9,7 @@ def read_from_observation(path):
     if name == 'asasn':
         return read_from_asasn(path) #
     if name == 'swift':
-        return np.array([[], [], [], [], []]).T
+        return read_from_swift(path)
 
 def read_from_ovro(path):
     idata = np.genfromtxt(path, skip_header=1, delimiter=',')
@@ -27,4 +27,15 @@ def read_from_asasn(path):
     flux_up = (idata[:,2] + idata[:,3]) 
     flux_low = (idata[:,2] - idata[:,3])
     frequency = idata[:,0]
+    return np.array([frequency, flux, flux_low, flux_up, times]).T
+
+def read_from_swift(path):
+    idata = np.genfromtxt(path)
+    frequency = idata[:,1]
+    flux = idata[:,3]
+    print(flux)
+    flux_up = (idata[:,3] + idata[:,4])
+    flux_low = (idata[:,3] - idata[:,4])
+    times = idata[:,0]
+    print(times)
     return np.array([frequency, flux, flux_low, flux_up, times]).T

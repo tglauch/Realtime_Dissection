@@ -28,11 +28,16 @@ class Source(object):
         self.mw_idata = None
         self.ovro = None
         self.swift = None
+        self.in_err = True
 
     def make_sed_lightcurve(self, lcs=['default']):
         print('Make SED lightcurve for {}'.format(self.name))
         print self.lightcurves.keys()
-        main_lc = self.lightcurves[lcs[0]]
+        try:
+            main_lc = self.lightcurves[lcs[0]]
+        except Exception as inst:
+            return
+            
         #if not hasattr(self, 'mw_idata'):
         self.set_mw_data()
         pool = multiprocessing.Pool()
@@ -95,7 +100,7 @@ class Source(object):
         fgl_name = np.array(self.names)[mask]
         if len(fgl_name)  >0 :
             fgl_name = fgl_name[0]
-            print('Looking for OVRO data for {}'.format(self.name))
+            print('Looking for OVRO data for {} ({})'.format(self.name, fgl_name))
             ovro_name = fgl_name[5:10] + fgl_name[12:]
             html= requests.get('http://www.astro.caltech.edu/ovroblazars/HL28/csv/{}.csv'.format(ovro_name))
             if html.ok:
@@ -164,7 +169,7 @@ class Source(object):
                 shutil.rmtree(ofolder)
             os.makedirs(ofolder)
             os.chdir(ofolder)
-            for i in range(2):
+            for i in range(1):
                 os.system('{vou_path} {ra} {dec} {loc_str}'.format(vou_path=vou_path, ra=self.ra,
                                                                    dec=self.dec,loc_str=loc_str))
             if not os.path.exists('candidates.eps'):
@@ -195,7 +200,7 @@ class Source(object):
         pre_str = '{vou_path} {ra} {dec} {loc_str} -s'
         form_str = pre_str.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec,loc_str=1)
         print('Fetch SED with command \n {}'.format(form_str))
-        for i in range(2):
+        for i in range(1):
             os.system(form_str)
         if os.path.exists('Sed.txt'):
             print('Move Sed.txt to {}'.format(self.mw_data_path))
@@ -230,11 +235,11 @@ class Source(object):
         idata[:,2] = idata[:,0] - idata[:,2]
         if not os.path.exists(os.path.join(self.bpath, 'add_data')):
             os.makedirs(os.path.join(self.bpath, 'add_data'))
-        if len(idata) >0:
-            np.savetxt(os.path.join(self.bpath, 'add_data', 'swift.csv'), idata)
-            self.swift = os.path.join(self.bpath, 'add_data', 'swift.csv')
-        else:
-            self.swift = None  
+        #if len(idata) >0:
+        #    np.savetxt(os.path.join(self.bpath, 'add_data', 'swift.csv'), idata)
+        #    self.swift = os.path.join(self.bpath, 'add_data', 'swift.csv')
+        #else:
+        #    self.swift = None  
         return
 
 

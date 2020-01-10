@@ -344,7 +344,7 @@ def get_pix_pos(wcs, ra, dec):
 
 
 def make_ts_plot_legend(plt_basepath, srcs, max_dist):
-    mask = [True if src.dist < max_dist else False for src in srcs]
+    mask = [src.in_err for src in srcs]
     plt.clf()
     fig = plt.figure()
     fig_legend = plt.figure(figsize=(3, 2.))
@@ -352,9 +352,7 @@ def make_ts_plot_legend(plt_basepath, srcs, max_dist):
     patches = []
     labels = []
     for i, src in enumerate(np.array(srcs)[mask]):
-        if src.dist > max_dist:
-            continue
-        patch = ax.plot([0], [0], linestyle='', label='{} {}'.format(i, src.name) ,**src.plt_style)
+        patch = ax.plot([0], [0], linestyle='', label='{} {}'.format(i+1, src.name) ,**src.plt_style)
         labels.append('{} {}'.format(i, src.name))
         patches.append(patch[0])
     fig_legend.legend(patches, labels, loc='center', frameon=False, labelspacing=1.3)
@@ -376,7 +374,7 @@ def make_counterparts_plot(basepath, ra, dec, plt_radius, save_path='.', vou_can
     ax=fig.add_axes((.0, .0,0.71,.7), projection=wcs)
     for i, src in enumerate(srcs):
         pix = get_pix_pos(wcs, src.ra, src.dec)
-        if src.dist > max_dist:
+        if not src.in_err:
             ax.plot(pix[0], pix[1], **src.plt_style)
         else:
             ax.plot(pix[0], pix[1], label='{} {}'.format(i, src.name), **src.plt_style)
