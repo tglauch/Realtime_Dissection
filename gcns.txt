@@ -13,3 +13,5 @@ https://gcn.gsfc.nasa.gov/notices_amon_g_b/133394_27261780.amon
 https://gcn.gsfc.nasa.gov/notices_amon_g_b/133433_29047901.amon
 https://gcn.gsfc.nasa.gov/notices_amon_g_b/133572_82361476.amon
 https://gcn.gsfc.nasa.gov/notices_amon_g_b/133609_37927131.amon
+https://gcn.gsfc.nasa.gov/notices_amon_g_b/133634_1410505.amon
+https://gcn.gsfc.nasa.gov/notices_amon_g_b/133644_43767651.amon

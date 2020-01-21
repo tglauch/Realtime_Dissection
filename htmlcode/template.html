@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<!-- Template by Quackit.com -->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+
+    <title>{ev_name} - Report</title>
+
+    <!-- Bootstrap Core CSS -->
+    <link href="../css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom CSS: You can use this stylesheet to override any Bootstrap styles and/or apply your own styles -->
+    <link href="../css/custom.css" rel="stylesheet">
+
+   <script type="text/javascript" src="https://code.jquery.com/jquery-1.10.1.min.js"></script>
+   <link rel="stylesheet" href="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css" >
+   <script type="text/javascript">var jqMenu = jQuery.noConflict();</script>
+   <script type="text/javascript">
+   var hipsDir=null;</script>
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+        <div class="container">
+            <!-- Logo and responsive toggle -->
+            <div class="navbar-header">
+                <a class="navbar-brand" href="http://www.openuniverse.asi.it/">
+                	<img src="../OU-logo.png" alt="", width="140"> 
+                </a>
+                <img src="../TUM_IAS_MS_farbig_RGB.jpg", width="60">  
+            </div>
+
+            <!-- Navbar links -->
+            <div class="collapse navbar-collapse" id="navbar">
+                <ul class="nav navbar-nav">
+                    <li class="active">
+                        <a href="index.html">Latest Event</a>
+                    </li>
+                    <li>
+                        <a href="../about.html">About the Project</a>
+                    </li>
+                    <li>
+                        <a href="#">Other Neutrino Events</a>
+                    </li>
+                </ul>
+
+				<!-- Search -->
+				<form class="navbar-form navbar-right" role="search">
+					<div class="form-group">
+						<input type="text" class="form-control">
+					</div>
+					<button type="submit" class="btn btn-default">Search</button>
+				</form>
+
+            </div>
+            <!-- /.navbar-collapse -->
+        </div>
+        <!-- /.container -->
+    </nav>
+
+	<div class="jumbotron feature">
+		<div class="container">
+			<h1> {ev_name_full}</h1>
+			<p>right ascension: {ra:.2f} deg |  declination: {dec:.2f} deg | galactic latitude: {gal_lat:.2f} deg </p>
+			<p><a class="btn btn-default" href="{ev_name}.pdf">See the full report</a></p>
+		</div>
+	</div>
+
+    <!-- Content -->
+    <div class="container">
+
+        <!-- Heading -->
+        <div class="row">
+            <div class="col-lg-12">
+                <h1 class="page-header">{ev_name_full}
+                    <small>Basic Information</small>
+                </h1>
+                <p>On MJD {mjd:.2f} the IceCube Neutrino Observatory reported the detection of the highly-energetic neutrino {ev_name_full} (GCN 9999). Due to the high-energy and the track-like signature the event has a good positional uncertainty and is likely of astrophysical origin.  With the goal of contributing to the identification of the corresponding electromagnetic counterpart we report here a brief summary of the results of our multi-wavelength dissection of the region around the event. <br> <br>
+
+                The automatic pipeline processing performs a multi-wavelength analysis similar to that presented by Padovani et al. 2017 for IC170922 [1] and consists of a) a search for blazar and other possible candidates counterparts using the VOU-BLazars tool, b) a detailed analysis of the Fermi-LAT gamma-ray emission around the IceCube error region in a temporal window close to the neutrino detection and the full Fermi data set, and c) the production of the broad band SED and of the light-curves of the most promising candidates. </p>
+            </div>
+        </div>
+        <!-- /.row -->
+
+        <div class="row">
+            <div class="col-lg-12">
+                <h1 class="page-header">Counterpart Identification
+                    <small>VOU-Blazar Result</small>
+                </h1>
+            <p> This section provides the results of the search for blazar-like neutrino counterparts using all the
+publicly available multi-frequency data on the web. While the cross-matching of the neutrino error region with source
+catalogs provides first insides, it doesn't unfold the full sensitivity and completeness required to get a clear
+picture of the region. For this reason we are combining here the information from multiple search strategies. First we
+retrieve information about known sources from the 3HSP, 4FGL and BZCat catalogs. Nevertheless it is not unlikely that
+there are more, yet undiscovered sources. Hence. in a second step, we then use all the publicly available data via the
+VOU-Blazar tool to search for spatial coincidences between radio and x-ray sources. Once such an object is identified we
+get a preliminary classification of the object using the radio to x-ray flux ratio. All this information is combined in
+the following two plots - radio and x-ray sources (left) and counterpart candidates (right). The description of the
+different symbols can be found in the caption. </p>
+           </div>
+        </div>
+        <br> <br>
+        <!-- Feature Row -->
+        <div class="row">
+            <article class="col-md-4 article-intro">
+                    <img class="img-responsive img-rounded" src="VOU-RXmap.png" alt="">
+                <p>Radio, X-ray and gamma-ray sources in the area including the error region of IC190730. Radio sources appear as red filled circles, X-ray sources as open blue circles, and gamma-ray sources as purple open triangles. Symbol size is proportional to source intensity.</p>
+            </article>
+            <article class="col-md-4 article-intro">
+                <img class="img-responsive img-rounded" src="VOU-candidates.png" alt="">
+                <p>Map of the area around the 90% error region of {ev_name} (blue, solid line) showing candidate blazars (based on radio to
+X-ray flux ratio), objects from selected catalogues (5BZCat, 3HSP, 4FGL), and flat-spectrum radio sources. Blazar types
+are color coded as follows: orange for HBLs, cyan for IBLs and dark blue for LBLs. Catalogued sources appear as:
+diamonds for BZCAT blazars, stars for 3HSP blazars, and traingles for 4FGL sources without counterpart in either
+of the two previously mentioned catalogs.</p>
+            </article>
+            <article class="col-md-4 article-intro">
+                <img class="img-responsive img-rounded" src="legend.png" alt="">
+            </article>
+        </div>
+        <!-- /.row -->
+        <!-- Feature Row -->
+
+        <div class="row">
+            <div class="col-lg-12">
+                <h1 class="page-header">Gamma-Ray Emission
+                    <small>Fermi-LAT TS Maps</small>
+                </h1>
+            <p> Astrophysical neutrinos are usually assumed to be produced through the decay of mesons from
+photo-hadronic or nuclear-hadronic interactions. Along with the neutrinos these processes also produce gamma-rays at
+similar energies. It is therefore a promising approach to focus on those counterpart candidates with observable
+gamma-ray emission. In this section we present the analysis of Fermi-LAT data between 100MeV and 800GeV in photon
+energy. The two plots below show the residual test-statics maps after subtracting known 4FGL sources in a time window of
+200 days around the alert (left) and the entire Fermi mission (right). The maps are produced by adding a fictive source
+with a spectral index of 2 at each position in the region and fitting for the flux normalisation. The subtraction of the
+known 4FGL source allows us to identify yet unknown gamma-ray sources coincident with the previously identified
+multi-wavelength candidates. In each of the plots the successive contour lines indicate regions with an excess of
+2,3,4,5 sigma respectively. </p>
+           </div>
+        </div>
+  
+        <br><br>
+        <div class="row">
+            <article class="col-md-4 article-intro">
+                <img class="img-responsive img-rounded" src="tsmap_200.png" alt="">
+                <p>Fermi-LAT test statistic map between {ts_mjd1:.1f} and {ts_mjd2:.1f} ({ts_length:.1f} days around the neutrino arrival time) using all photons above 100MeV. 4FGL
+sources have been substracted to identify new, yet unkown, gamma-ray objects in the region. </p>
+            </article>
+            <article class="col-md-4 article-intro">
+                <img class="img-responsive img-rounded" src="tsmap-full.png" alt="">
+            <p> Fermi-LAT test statistic map between {ts_full_mjd1:.1f} and {ts_full_mjd2:.1f} (full mission) using all photons above 100MeV. 4FGL 
+sources have been substracted to identify new, yet unkown, gamma-ray objects in the region. </p>
+           </article>
+            <article class="col-md-4 article-intro">
+                <img class="img-responsive img-rounded" src="legend.png" alt="">
+            </article>
+        </div>
+    <!-- /.container -->
+
+
+       <div class="row">
+            <div class="col-lg-12">
+                <h1 class="page-header">SEDs and Lightcurves
+                </h1>
+            </div> 
+        
+Finally we present the time-dependent multi-wavelength emission of the most promising candidate sources. The SED data
+taken from a list of more than 70 catalogs, including the OUSXB database which contains a complete image analysis of all
+the blazars observed by the Swift-XRT during the first 14 years of operations [2]. The time-dependent analysis is binned
+in a way that we expect a ~5 sigma Fermi LAT gamma-ray detection in each time bin (assuming somewhat steady emission),
+with a maximum of 200 days per bin in order to not miss interesting features that are important on the order of
+IceCube's sensitivity time scale. Hence the binning is fixed for a single source, but varies between the sources.
+<br> <br>
+
+The SED in the left panel combines archival and time-integrated data, with time simultaneous data in the following way:
+ <ul>
+<li> Grey points and bowties indicate non-simultaneous data from radio to x-ray and time-integrated data for the
+Fermi-LAT gamma-rays.</li>
+<li> Red data points and bowties represent measurements in the time bin around the neutrino detection.
+Additionally black SED points are added to the (red) Fermi-LAT bowtie (if available).</li>
+</ul>
+Additionally the IceCube sensitivity and discovery potential at the given declination are shown as dashed and solid blue
+lines, respectively. 
+
+<br> <br>
+The light curves on the right show the measured gamma-ray photon flux and spectral index with the pre-calculated
+binning. I available an additional panel is added with OVRO 15GHz radio data [3] and the x-ray data from the OUSXB
+database [2].
+       
+        {src_summary} 
+        </div>
+
+       <div class="row">
+            <div class="col-lg-12">
+                <h1 class="page-header">Aladin
+                </h1>
+            </div>
+        {aladin_text}
+       </div>
+    </div>
+    <br><br><br>
+	<footer>
+		<div class="footer-blurb">
+            <div class="container">
+                <div class="footer-link">
+                [1] Padovani P., Giommi P., Resconi E., Glauch T., Arsioli B., Sahakyan N., Huber M., 2018, MNRAS,
+480,192 <a href="https://arxiv.org/abs/1807.04461"> arXiv:1807.04461 </a><br>
+                [2]  Chang, Y.-L., C.H. Brandt, and P. Giommi. The Open Universe VOU-Blazars Tool. Astronomy and
+Computing 30 (2020): 100350. Crossref. Web. <a href="https://arxiv.org/abs/1909.11455"> arXiv:1909.11455 </a> </br>
+                [3] Giommi P., et al., 2019a, A&A, 631, A116 <br>
+                [4] Richards J.~L., et al., 2011, ApJS, 194, 29  <a href="https://arxiv.org/abs/1011.3111">arXiv:1101.3111 </a><br>
+                </div> 
+            </div>
+        </div>
+
+        
+        <div class="small-print">
+        	<div class="container">
+        		<p><a href="#">Terms &amp; Conditions</a> <a href="#">Contact</a></p>
+        		<p>Copyright &copy; T.Glauch & P.Giommi (2019) </p>
+        	</div>
+        </div>
+	</footer>
+
+	
+    <!-- jQuery -->
+    <script src="js/jquery-1.11.3.min.js"></script>
+
+    <!-- Bootstrap Core JavaScript -->
+    <script src="js/bootstrap.min.js"></script>
+	
+	<!-- IE10 viewport bug workaround -->
+	<script src="js/ie10-viewport-bug-workaround.js"></script>
+	
+	<!-- Placeholder Images -->
+	<script src="js/holder.min.js"></script>
+	
+</body>
+
+</html>

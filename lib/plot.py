@@ -353,7 +353,7 @@ def make_ts_plot_legend(plt_basepath, srcs, max_dist):
     labels = []
     for i, src in enumerate(np.array(srcs)[mask]):
         patch = ax.plot([0], [0], linestyle='', label='{} {}'.format(i+1, src.name) ,**src.plt_style)
-        labels.append('{} {}'.format(i, src.name))
+        labels.append('{} {}'.format(i+1, src.name))
         patches.append(patch[0])
     fig_legend.legend(patches, labels, loc='center', frameon=False, labelspacing=1.3)
     fig_legend.savefig(os.path.join(plt_basepath,'legend.png'), bbox_inches='tight', dpi=300)

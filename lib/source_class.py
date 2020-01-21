@@ -29,6 +29,9 @@ class Source(object):
         self.ovro = None
         self.swift = None
         self.in_err = True
+        self.nu_peak = -1
+        self.fermi_sigma = -1
+        return
 
     def make_sed_lightcurve(self, lcs=['default']):
         print('Make SED lightcurve for {}'.format(self.name))
@@ -285,11 +288,11 @@ class Source(object):
                 sigma = np.sqrt(sed_full_res['sources'][self.name]['ts'])
         else:
             sigma = -1
+        self.fermi_sigma = sigma
         if sed_path == None:
             return ''
         l_str ='\subsection{{{srcinfo}}}'
         if os.path.exists(os.path.join(sed_path, 'llh.npy')):
-            fit_res = np.load(os.path.join(sed_path, 'llh.npy'), allow_pickle=True)[()]
             t_str = '{src_name} $|$ \\small\\textnormal{{{src_info}}}'
             t_str_info = 'ra = {ra:.2f}$^\circ$, dec = {dec:.2f}$^\circ$, $\Sigma$= {sigma:.1f} $\sigma$, $\Delta\psi$ = {dist:.2f}$^\circ$'
             t_str_info = t_str_info.format(sigma=sigma, ra=self.ra, dec=self.dec, dist=self.dist)

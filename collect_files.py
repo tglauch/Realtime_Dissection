@@ -26,7 +26,7 @@ print('Run with args {}'.format(args))
 
 in_base = args.bpath
 src = args.src
-out_base = '/scratch9/tglauch/erin/'
+out_base = '/scratch9/tglauch/foteini/'
 
 in_path = os.path.join(in_base, src)
 out_path = os.path.join(out_base, src)

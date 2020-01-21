@@ -153,6 +153,7 @@ if args['adaptive_scaling']:
 
 analysis.set_src_plot_style()
 analysis.make_counterparts_plot()
+analysis.classify()
 
 if args['lat_analysis']:
     logging.info('Start the Fermi LAT Analysis pipeline')

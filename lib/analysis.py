@@ -18,6 +18,7 @@ import shutil
 from astropy.io import fits
 import warnings
 import copy
+from sed_classifier import SED_Classification 
 
 marker_colors = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99','#b15928']
 
@@ -77,6 +78,15 @@ class Analysis(object):
         self.this_path = None
         return
 
+
+    def classify(self):
+        classifier = SED_Classification('./lib/sed_classification.h5')
+        for src in self.srcs:
+            if os.path.exists(src.mw_data_path):
+                nu_peak = classifier.do_classification(src.mw_data_path)
+                src.nu_peak = nu_peak[0]
+                src.nu_peak_err = np.abs(nu_peak[1])
+        return
 
     def calc_gal_coords(self):
         c = SkyCoord(self.ra, self.dec, frame='icrs', unit="deg")
@@ -437,6 +447,8 @@ class Analysis(object):
         for sty in marker_styles:
             marker_counter[sty] = 0
         for src in self.srcs:
+            if not hasattr(src, 'in_err'):
+                self.mask_sources()
             if not src.in_err:
                 src.plt_style = copy.copy(cat_dict[src.plt_code][1])
                 src.plt_style['color'] = 'grey'
@@ -497,6 +509,9 @@ class Analysis(object):
                                             dec = src.dec,
                                             src_name=src.name,
                                             dist=src.dist,
+                                            fermi = src.fermi_sigma,
+                                            nu = src.nu_peak,
+                                            nu_err = src.nu_peak_err, 
                                             alt_names= ', '.join(src.names),
                                             sed_path='CandSED{}.png'.format(i+1),
                                             lc_path='CandLC{}.png'.format(i+1))
