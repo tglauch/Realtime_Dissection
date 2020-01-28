@@ -504,6 +504,7 @@ class Analysis(object):
         for i, src in enumerate(counterparts):
             with open(os.path.join(html_files, 'src.html'), 'r') as f:
                 in_str = f.read()
+                print('Make HTML string for {}'.format(src.name))
                 src_string += in_str.format(num=i+1,
                                             ra = src.ra,
                                             dec = src.dec,

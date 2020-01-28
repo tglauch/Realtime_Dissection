@@ -52,6 +52,7 @@ class SED_Classification(object):
                           dtype=[np.float, np.float, np.float, np.float, object])
         in_data = self.prepare_data(idata)
         out = self.__model.predict(in_data)[0]
+        out[1] = np.abs(out[1])
         print('Predict Nu-Peak of {} +- {}'.format(out[0], out[1]))
         return out 
  

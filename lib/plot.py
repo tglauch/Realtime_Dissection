@@ -82,8 +82,8 @@ def plot_fermi_flux(ax, basepath, mjd, source, **kwargs):
     lc_arr = dict_to_nparray(lc_dict)
     ind = np.argsort(lc_arr['tmid'])
     lc_arr = lc_arr[ind]
-    mask  = (np.abs(lc_arr['ts'])>4) & (lc_arr['flux_err'] < lc_arr['flux'])
-    gam_mask = ((lc_arr['dgamma']/lc_arr['gamma'])<2.)
+    mask  = (np.abs(lc_arr['ts'])>4) #& (lc_arr['flux_err'] < lc_arr['flux'])
+    #gam_mask = ((lc_arr['dgamma']/lc_arr['gamma'])<2.)
     scaling = -round(np.max(np.log10(lc_arr['flux'])))+1
     ax.errorbar(lc_arr['tmid'][mask], 10**scaling*lc_arr['flux'][mask],
                  yerr = 10**scaling*lc_arr['flux_err'][mask],
@@ -113,22 +113,23 @@ def plot_fermi_index(ax, basepath, mjd, source, **kwargs):
                                                weights=1./lc_arr['dgamma'])
         ax.axhline(av_gamma,linestyle='--', color='grey',
                     alpha=0.85, zorder = -1, linewidth=0.9)
-    mask  = (np.abs(lc_arr['ts'])>4) & (lc_arr['flux_err'] < lc_arr['flux'])
-    gam_mask = ((lc_arr['dgamma']/lc_arr['gamma'])<2.)
+    mask  = (np.abs(lc_arr['ts'])>4) # & (lc_arr['flux_err'] < lc_arr['flux'])
+    #gam_mask = ((lc_arr['dgamma']/lc_arr['gamma'])<2.)
     mask2 = (lc_arr['dgamma'] > 0)
-    ax.errorbar(lc_arr['tmid'][mask & mask2 & gam_mask], lc_arr['gamma'][mask & mask2 & gam_mask],
-                 yerr=lc_arr['dgamma'][mask & mask2 & gam_mask],
-                 xerr=lc_arr['bin_len'][mask& mask2 &gam_mask]/2., linestyle='')
-    ax.errorbar(lc_arr['tmid'][mask & ~mask2 & gam_mask], lc_arr['gamma'][mask & ~mask2 & gam_mask],
-                 yerr=0, xerr=lc_arr['bin_len'][mask& ~mask2 &gam_mask]/2., linestyle='',
+    tot_mask = mask & mask2
+    ax.errorbar(lc_arr['tmid'][mask & mask2], lc_arr['gamma'][mask & mask2],
+                 yerr=lc_arr['dgamma'][mask & mask2],
+                 xerr=lc_arr['bin_len'][mask& mask2]/2., linestyle='')
+    ax.errorbar(lc_arr['tmid'][mask & ~mask2], lc_arr['gamma'][mask & ~mask2],
+                 yerr=0, xerr=lc_arr['bin_len'][mask& ~mask2]/2., linestyle='',
                  ecolor='red')
 
     ax.set_ylabel('Index', labelpad=5)
     ax.set_ylim(0.0,6)
     ax.set_yticks([2,4])
     ax.axvline(mjd, color='#696969', linestyle='--')
-    ax.errorbar(lc_arr['tmid'][mask & ~mask2 & gam_mask], lc_arr['gamma'][mask & ~mask2 & gam_mask],
-                 yerr=0, xerr=lc_arr['bin_len'][mask& ~mask2 &gam_mask]/2., linestyle='',
+    ax.errorbar(lc_arr['tmid'][mask & ~mask2 ], lc_arr['gamma'][mask & ~mask2],
+                 yerr=0, xerr=lc_arr['bin_len'][mask& ~mask2]/2., linestyle='',
                  ecolor='red')
     return ax
 

@@ -45,7 +45,7 @@ for f in ['lightcurve.png', 'lightcurve.pdf', 'movie.gif']:
     c_file = os.path.join(lc_base, f)
     copy2(c_file, lc_out)
 
-copy_files = ['bowtie.npy', 'llh.fits', 'sed.fits', 'sed.pdf']
+copy_files = ['bowtie.npy', 'llh.fits', 'sed.fits', 'llh.npy', 'sed.npy', 'sed.pdf']
 dirs = [i for i in os.listdir(lc_base) if os.path.isdir(os.path.join(lc_base, i))]
 for d in dirs:
     if not os.path.exists(os.path.join(lc_out, d)):

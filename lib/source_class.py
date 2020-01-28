@@ -266,6 +266,8 @@ class Source(object):
         return
 
     def source_summary(self, bpath, mjd, mode='mid'):
+        print('Make Summary for {}'.format(self.name))
+        self.fermi_sigma = -1 # Remove as fast as possible
         sed_path = None
         bpath_src = self.bpath
         lc_base = self.lc_path
