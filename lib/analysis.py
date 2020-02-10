@@ -86,7 +86,11 @@ class Analysis(object):
         for src in self.srcs:
             if os.path.exists(src.mw_data_path):
                 print(src.dec)
-                nu_peak = classifier.do_classification(src.mw_data_path, src.dec)
+                nu_peak = classifier.do_classification(src.mw_data_path, src.dec
+                                                       exclude_nu_band=[],
+                                                       mask_catalog=['DEBL', 'SPIRE250',
+                                                                    'SPIRE350', 'SPIRE500'],
+                                                       return_sed = False, verbose=True) 
                 src.nu_peak = nu_peak[0]
                 src.nu_peak_err = nu_peak[1]
         return
