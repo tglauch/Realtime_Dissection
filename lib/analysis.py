@@ -18,7 +18,9 @@ import shutil
 from astropy.io import fits
 import warnings
 import copy
-from sed_classifier import SED_Classification 
+import sys
+sys.path.append('/scratch9/tglauch/sed_classification/classifier/')
+from DNNSed import NuPeakCalculator 
 
 marker_colors = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99','#b15928']
 
@@ -80,12 +82,13 @@ class Analysis(object):
 
 
     def classify(self):
-        classifier = SED_Classification('./lib/sed_classification.h5')
+        classifier = NuPeakCalculator()
         for src in self.srcs:
             if os.path.exists(src.mw_data_path):
-                nu_peak = classifier.do_classification(src.mw_data_path)
+                print(src.dec)
+                nu_peak = classifier.do_classification(src.mw_data_path, src.dec)
                 src.nu_peak = nu_peak[0]
-                src.nu_peak_err = np.abs(nu_peak[1])
+                src.nu_peak_err = nu_peak[1]
         return
 
     def calc_gal_coords(self):

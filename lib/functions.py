@@ -203,13 +203,14 @@ def get_lc_time4fgl(src_of_interest, emin=1e3):
             E_bins[i] = 0
     ts_sum = np.sum([data[1].data[src_ind]['Sqrt_TS_Band'][i]**2*E_bins[i]
                      for i in range(len(E_bins)-1)])
-    t_sens = (16/ts_sum)*(365*8)
+    t_sens = (6/ts_sum)*(365*8)
     if t_sens < 100:
         t_disc = (25/ts_sum)*(365*8)
         t_disc = np.max([t_disc, 56])
         t_disc = np.min([t_disc, 100])
         return t_disc
-    return np.min([t_sens, 250])
+    print(t_sens)
+    return np.min([t_sens, 365])
 
 def GreatCircleDistance(ra_1, dec_1, ra_2, dec_2):
     '''Compute the great circle distance between two events'''
