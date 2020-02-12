@@ -19,9 +19,8 @@ from astropy.io import fits
 import warnings
 import copy
 import sys
-sys.path.append('/scratch9/tglauch/sed_classification/classifier/')
-from DNNSed import NuPeakCalculator 
-
+from DNNSed.DNNnupeak import NuPeakCalculator
+ 
 marker_colors = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99','#b15928']
 
 src_encoding = {'5BZQ' : -2, '5BZB': -2 , '5BZU': -2, '3HSP': -1, 'CRATES': -3,
@@ -82,11 +81,10 @@ class Analysis(object):
 
 
     def classify(self):
-        classifier = NuPeakCalculator()
+        classifier = NuPeakCalculator(dec=self.dec)
         for src in self.srcs:
             if os.path.exists(src.mw_data_path):
-                print(src.dec)
-                nu_peak = classifier.do_classification(src.mw_data_path, src.dec
+                nu_peak = classifier.do_classification(src.mw_data_path, src.dec,
                                                        exclude_nu_band=[],
                                                        mask_catalog=['DEBL', 'SPIRE250',
                                                                     'SPIRE350', 'SPIRE500'],
