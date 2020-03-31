@@ -26,5 +26,8 @@ def check_for_new_gcn():
     return
 
 while True:
-    check_for_new_gcn()
+    try:
+        check_for_new_gcn()
+    except Exception as e:
+        print(e)
     time.sleep(60)

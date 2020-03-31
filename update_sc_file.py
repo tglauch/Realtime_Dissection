@@ -35,7 +35,10 @@ def check_for_new_sc_file():
     return
 
 while True:
-    check_for_new_sc_file()
+    try:
+        check_for_new_sc_file()
+    except Exception as e:
+        print(e)
     print('Wait...')
     time.sleep(30 * 60)
     

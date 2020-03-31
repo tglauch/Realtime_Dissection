@@ -20,6 +20,7 @@ import warnings
 import copy
 import sys
 from DNNSed.DNNnupeak import NuPeakCalculator
+from DNNSed.DNNredshift import RedshiftCalculator
  
 marker_colors = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99','#b15928']
 
@@ -81,16 +82,23 @@ class Analysis(object):
 
 
     def classify(self):
-        classifier = NuPeakCalculator(dec=self.dec)
+        nu_peak_dnn = NuPeakCalculator(dec=self.dec)
+        redshift_dnn = RedshiftCalculator(dec=self.dec)
         for src in self.srcs:
             if os.path.exists(src.mw_data_path):
-                nu_peak = classifier.do_classification(src.mw_data_path, src.dec,
-                                                       exclude_nu_band=[],
-                                                       mask_catalog=['DEBL', 'SPIRE250',
+                nu_peak = nu_peak_dnn.make_prediction(src.mw_data_path, src.dec,
+                                                      exclude_nu_band=[],
+                                                      mask_catalog=['DEBL', 'SPIRE250',
                                                                     'SPIRE350', 'SPIRE500'],
-                                                       return_sed = False, verbose=True) 
+                                                      return_sed = False, verbose=True) 
                 src.nu_peak = nu_peak[0]
                 src.nu_peak_err = nu_peak[1]
+                nu_peak = redshift_dnn.make_prediction(src.mw_data_path, src.dec,
+                                                      exclude_nu_band=[],
+                                                      mask_catalog=['DEBL'],
+                                                      return_sed = False, verbose=True)
+                src.redshift = nu_peak[0]
+                src.redshift_err = nu_peak[1]
         return
 
     def calc_gal_coords(self):
@@ -517,7 +525,9 @@ class Analysis(object):
                                             dist=src.dist,
                                             fermi = src.fermi_sigma,
                                             nu = src.nu_peak,
-                                            nu_err = src.nu_peak_err, 
+                                            nu_err = src.nu_peak_err,
+                                            z = src.redshift,
+                                            z_err = src.redshift_err, 
                                             alt_names= ', '.join(src.names),
                                             sed_path='CandSED{}.png'.format(i+1),
                                             lc_path='CandLC{}.png'.format(i+1))
