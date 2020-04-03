@@ -113,6 +113,10 @@ def get_68_psf(E):
     x = np.genfromtxt('./lib/lat_68_psf.txt', delimiter = ',')
     return interp1d(x[:,0], x[:,1])(E)
 
+def get_95_psf(E):
+    x = np.genfromtxt('./lib/lat_95_psf.txt', delimiter = ',')
+    return interp1d(x[:,0], x[:,1])(E)
+
 
 def submit_fit(args, opath, srcs=None, trange='', sub_file='fermi.sub',  ana_type='SED', partition='kta'):
     if trange != '':

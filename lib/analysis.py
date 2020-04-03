@@ -1,4 +1,4 @@
-from functions import GreatCircleDistance, path_settings, vou_path, get_68_psf, submit_fit, cat_dict
+from functions import GreatCircleDistance, path_settings, vou_path, get_95_psf, submit_fit, cat_dict
 import numpy as np
 from source_class import Source, Ellipse 
 import collections
@@ -130,7 +130,7 @@ class Analysis(object):
         sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {} --free_diff'
         if emin is None:
             emin = self.ts_emin
-        sargs = sargs.format(get_68_psf(emin), self.fermi_data, emin, self.ra, self.dec)
+        sargs = sargs.format(get_95_psf(emin), self.fermi_data, emin, self.ra, self.dec)
         self.srcprob_path = srcprob_path
         submit_fit(sargs, srcprob_path, srcs=self.srcs, sub_file=self.id+'.sub', ana_type='srcprob', partition='xtralong')
         return
@@ -165,7 +165,7 @@ class Analysis(object):
             emin = self.ts_emin
         if trange is not None:
            sargs = sargs + ' --time_range {} {}'.format(trange[0], trange[1])
-        sargs = sargs.format(get_68_psf(emin), self.fermi_data, emin, self.ra, self.dec, 2*self.radius/60.)
+        sargs = sargs.format(get_95_psf(emin), self.fermi_data, emin, self.ra, self.dec, 2*self.radius/60.)
         self.ts_maps.append(ts_map_path)
         submit_fit(sargs, ts_map_path, sub_file=self.id+'.sub', ana_type='TS_Map', partition='xtralong')
         return

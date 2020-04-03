@@ -1,6 +1,6 @@
 import numpy as np
 from functions import GreatCircleDistance, vou_path, path_settings, get_lc_time3fgl, \
-                      get_lc_time4fgl,get_68_psf, submit_fit, make_gif
+                      get_lc_time4fgl,get_95_psf, submit_fit, make_gif
 from astropy.io import fits
 from myfunctions import MET_to_MJD, dict_to_nparray, ts_to_pval, pval_to_sigma
 import os
@@ -30,7 +30,10 @@ class Source(object):
         self.swift = None
         self.in_err = True
         self.nu_peak = -1
+        self.nu_peak_err = -1
         self.fermi_sigma = -1
+        self.redshift = -1
+        self.redshift_err = -1
         return
 
     def make_sed_lightcurve(self, lcs=['default']):
@@ -349,7 +352,7 @@ class Source(object):
     def make_fixed_binning_lightcurve(self, emin, fermi_data_path, mjd_range, mjd=None, dt_lc=None, mode='end',
                                       name='', add_srcs=None, job_id='fermi'):
         sargs = '--target_src {} --free_radius {} --data_path {} --use_4FGL --emin {} --free_diff'
-        sub_args = sargs.format(self.name.replace(' ', '_'), get_68_psf(emin), fermi_data_path, emin)
+        sub_args = sargs.format(self.name.replace(' ', '_'), get_95_psf(emin), fermi_data_path, emin)
         if '3FGL' in self.name:
             dt_lc = get_lc_time3fgl(self.name, emin=emin)
         elif '4FGL' in self.name:
@@ -398,7 +401,7 @@ class Source(object):
             opath = self.sed_path + '_' + name
         else:
             opath = self.sed_path
-        sub_args = sargs.format(self.name.replace(' ', '_'), get_68_psf(emin), fermi_data_path, emin)
+        sub_args = sargs.format(self.name.replace(' ', '_'), get_95_psf(emin), fermi_data_path, emin)
         submit_fit(sub_args, opath, srcs=add_srcs, sub_file=job_id + '.sub', trange='', partition='xtralong') 
         if name == '':
             self.seds['default'] = opath

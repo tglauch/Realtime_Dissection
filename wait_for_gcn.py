@@ -10,7 +10,11 @@ def check_for_new_gcn():
         gcns = f.read()
     all_gcn = gcns.split('\n')
     url = 'https://gcn.gsfc.nasa.gov/amon_icecube_gold_bronze_events.html'
-    html= requests.get(url).text.encode('utf8')
+    try:
+        html= requests.get(url).text.encode('utf8')
+    except requests.exceptions.RequestException as e:
+        print('Not able to information stuff from the GCN Website')
+        return
     table = html.split('<!XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX>')[1].split('<!--')[0]
     parsed_html = BeautifulSoup(table, "html5lib")
     for a in parsed_html.find_all('a', href=True):
@@ -26,8 +30,5 @@ def check_for_new_gcn():
     return
 
 while True:
-    try:
-        check_for_new_gcn()
-    except Exception as e:
-        print(e)
+    check_for_new_gcn()
     time.sleep(60)

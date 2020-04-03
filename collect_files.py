@@ -2,11 +2,13 @@ import numpy as np
 import os
 from shutil import copy2, make_archive
 import sys
+sys.path.append('/scratch9/tglauch/Fermi_Tools/get_fermi_data')
 sys.path.append('./lib')
 from lib.read_catalog import read_from_observation 
 import zipfile
 import argparse
-
+import pickle
+from analysis import * 
 
 def zipdir(path, ziph):
     # ziph is zipfile handle
@@ -15,7 +17,7 @@ def zipdir(path, ziph):
             ziph.write(os.path.join(root, file))
 
 p = argparse.ArgumentParser(
-       description = "Calculates Point-Source Trials",
+       description = "collecting realtime pipeline output",
        formatter_class = argparse.RawTextHelpFormatter)
 p.add_argument("--bpath", type=str,
      help='What is the basepath')
@@ -24,9 +26,14 @@ p.add_argument("--src", type=str, required=True,
 args = p.parse_args()
 print('Run with args {}'.format(args))
 
-in_base = args.bpath
+in_base = os.path.normpath(args.bpath)
 src = args.src
-out_base = '/scratch9/tglauch/foteini/'
+analysis_object_path = os.path.join(in_base,'analysis.pickle')
+with open(analysis_object_path, "rb") as f:
+    analysis = pickle.load(f)
+    mjd = analysis.mjd
+add_name = in_base.split('/')[-1]
+out_base = os.path.join('/scratch9/tglauch/foteini/', add_name)
 
 in_path = os.path.join(in_base, src)
 out_path = os.path.join(out_base, src)
@@ -53,6 +60,10 @@ for d in dirs:
     for f in copy_files:
         copy2(os.path.join(lc_base, d, f),
               os.path.join(lc_out, d))
+    mjds = d.split('_')
+    if (float(mjds[0]) < mjd) & (float(mjds[1]) > mjd):
+        copy2(os.path.join(lc_base, d, 'sed.pdf'),
+              os.path.join(out_path))
 all_mission_dir = os.path.join(lc_out, 'full_mission')
 if not os.path.exists(all_mission_dir):
     os.makedirs(all_mission_dir)

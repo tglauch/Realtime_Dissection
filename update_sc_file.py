@@ -4,20 +4,30 @@ from astropy.io import fits
 import requests
 import os
 
+
+url = 'https://heasarc.gsfc.nasa.gov/FTP/fermi/data/lat/mission/spacecraft/lat_spacecraft_merged.fits'
+current_file = '/scratch8/tglauch/spacecraft_files/current.fits'
+new_file = '/scratch8/tglauch/spacecraft_files/new.fits'
+
 def get_sc_file():
     try:
-        filename = wget.download('https://heasarc.gsfc.nasa.gov/FTP/fermi/data/lat/mission/spacecraft/lat_spacecraft_merged.fits',
-                                 out='/scratch8/tglauch/spacecraft_files/new.fits')
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(new_file, 'w+b') as f:
+                for chunk in r.iter_content(chunk_size=8192): 
+                    if chunk: # filter out keep-alive new chunks
+                        f.write(chunk)    
     except Exception as inst:
         print('Faild to Download new Spacecraft data')
         print(inst)
         return False
-    new_file = fits.open('/scratch8/tglauch/spacecraft_files/new.fits')
-    print('\n Photon Data from: {} to {}'.format(new_file[1].header['TSTART'], new_file[1].header['TSTOP']))
-    new_file.close()
-    os.remove('/scratch8/tglauch/spacecraft_files/current.fits')
-    os.rename('/scratch8/tglauch/spacecraft_files/new.fits',
-              '/scratch8/tglauch/spacecraft_files/current.fits')
+    if os.path.exists(current_file):
+        os.remove(current_file)
+    os.rename(new_file, current_file)
+    check_file = fits.open(current_file)
+    print('\n Photon Data from: {} to {}'.format(check_file[1].header['TSTART'],
+                                                 check_file[1].header['TSTOP']))
+    check_file.close()
     return True
 
 def check_for_new_sc_file():
@@ -35,10 +45,7 @@ def check_for_new_sc_file():
     return
 
 while True:
-    try:
-        check_for_new_sc_file()
-    except Exception as e:
-        print(e)
+    check_for_new_sc_file()
     print('Wait...')
     time.sleep(30 * 60)
     
