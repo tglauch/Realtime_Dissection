@@ -30,7 +30,7 @@ src_encoding = {'5BZQ' : -2, '5BZB': -2 , '5BZU': -2, '3HSP': -1, 'CRATES': -3,
 sc_file_path = '/scratch8/tglauch/spacecraft_files/current.fits'
 
 files = collections.OrderedDict([
-     ('4fgl', {'file': '4fgl.1.csv',
+     ('4fgl', {'file': '4fgldr2.1.csv',
               'keys': ['Source_Name', 'RA', 'Dec']}),
      ('3fgl', {'file': '3fgl.1.csv',
               'keys': ['name', 'ra', 'dec']}),
@@ -85,20 +85,26 @@ class Analysis(object):
         nu_peak_dnn = NuPeakCalculator(dec=self.dec)
         redshift_dnn = RedshiftCalculator(dec=self.dec)
         for src in self.srcs:
-            if os.path.exists(src.mw_data_path):
-                nu_peak = nu_peak_dnn.make_prediction(src.mw_data_path, src.dec,
-                                                      exclude_nu_band=[],
-                                                      mask_catalog=['DEBL', 'SPIRE250',
-                                                                    'SPIRE350', 'SPIRE500'],
-                                                      return_sed = False, verbose=True) 
-                src.nu_peak = nu_peak[0]
-                src.nu_peak_err = nu_peak[1]
-                nu_peak = redshift_dnn.make_prediction(src.mw_data_path, src.dec,
-                                                      exclude_nu_band=[],
-                                                      mask_catalog=['DEBL'],
-                                                      return_sed = False, verbose=True)
-                src.redshift = nu_peak[0]
-                src.redshift_err = nu_peak[1]
+            print('Make DNN prediction for source {}'.format(src.name))
+            try:
+                if os.path.exists(src.mw_data_path):
+                    nu_peak = nu_peak_dnn.make_prediction(src.mw_data_path, src.dec,
+                                                          exclude_nu_band=[],
+                                                          mask_catalog=['DEBL', 'SPIRE250',
+                                                                        'SPIRE350', 'SPIRE500'],
+                                                          return_sed = False, verbose=True) 
+                    src.nu_peak = nu_peak[0]
+                    src.nu_peak_err = nu_peak[1]
+                    print(src.nu_peak)
+                    nu_peak = redshift_dnn.make_prediction(src.mw_data_path, src.dec,
+                                                          exclude_nu_band=[],
+                                                          mask_catalog=['DEBL'],
+                                                          return_sed = False, verbose=True)
+                    src.redshift = nu_peak[0]
+                    src.redshift_err = nu_peak[1]
+            except Exception as e:
+                print('Could not make DNN prediction')
+                print(e)
         return
 
     def calc_gal_coords(self):
@@ -114,12 +120,14 @@ class Analysis(object):
             try:
                 plot.make_ts_plot_legend(tsm, self.srcs, self.max_dist)
                 plot.make_ts_plot(tsm, self.srcs, self.vou_sources,
+                                  bf_ra=self.ra, bf_dec = self.dec,
                                   plt_mode='tsmap', error90 = self.err90)
             except Exception as inst:
                 warnings.warn("Couldn't create TS map {}".format(tsm))
                 print(inst)
             try:
                 plot.make_ts_plot(tsm, self.srcs, self.vou_sources,
+                                  bf_ra=self.ra, bf_dec = self.dec,
                                   plt_mode='residmap',  error90=self.err90)
             except Exception as inst:
                 warnings.warn("Couldn't create residual map {}".format(tsm))
@@ -466,7 +474,7 @@ class Analysis(object):
                 src.plt_style = copy.copy(cat_dict[src.plt_code][1])
                 src.plt_style['color'] = 'grey'
                 continue
-            if marker_counter[src.plt_code] > len(marker_colors):
+            if marker_counter[src.plt_code] > len(marker_colors)-1:
                 print('no more colors for this sourcetype {}.Falling back to default'.format(src.name))
                 src.plt_style = copy.copy(cat_dict[src.plt_code][1])
                 continue
@@ -492,7 +500,7 @@ class Analysis(object):
         return 
    
     def get_add_info(self, src_of_interest):
-        data = fits.open(os.path.join(self.this_path,'lib',  'gll_psc_v19.fit'))
+        data = fits.open(os.path.join(self.this_path,'lib',  'gll_psc_v23.fit'))
         eflux = data[1].data['Energy_Flux100']
         inds = np.argsort(eflux)[::-1]
         eflux = eflux[inds]

@@ -108,7 +108,11 @@ class Source(object):
             fgl_name = fgl_name[0]
             print('Looking for OVRO data for {} ({})'.format(self.name, fgl_name))
             ovro_name = fgl_name[5:10] + fgl_name[12:]
-            html= requests.get('http://www.astro.caltech.edu/ovroblazars/HL28/csv/{}.csv'.format(ovro_name))
+            try:
+                html= requests.get('http://www.astro.caltech.edu/ovroblazars/HL28/csv/{}.csv'.format(ovro_name), verify=False)
+            except Exception as e:
+                print(e)
+                return
             if html.ok:
                 print('Data Found')
                 with open(os.path.join(self.bpath, 'add_data', 'ovro.csv'), 'w+') as ofile:
@@ -121,8 +125,9 @@ class Source(object):
 
     def make_lc_plot(self, mjd):
         self.get_ovro_data()
-        self.swift=None
+        #self.swift=None
         self.collect_xray()
+        print(self.swift)
         for i, lc_key in enumerate(self.lightcurves.keys()):
             try:
                 if i == 0:
@@ -164,12 +169,18 @@ class Source(object):
     def get_mw_data(self):
         this_path = os.getcwd()
         if '4FGL' in self.name:
-            data = fits.open('./lib/gll_psc_v19.fit')[1].data
+            data = fits.open('./lib/gll_psc_v23.fit')[1].data
             ind = np.where(data['Source_Name']==self.name)[0]
-            m_ax = float(data[ind]['Conf_95_SemiMajor']) * 60
-            min_ax = float(data[ind]['Conf_95_SemiMinor']) * 60
-            loc_str= '{} {} {} {}'.format(2 * np.max([m_ax, min_ax]), m_ax, min_ax,
-                                          float(data[ind]['Conf_95_PosAng']))
+            try:
+                m_ax = float(data[ind]['Conf_95_SemiMajor']) * 60
+                min_ax = float(data[ind]['Conf_95_SemiMinor']) * 60
+                pos_angle=float(data[ind]['Conf_95_PosAng'])
+            except Exception as e:
+                print('No fermi contaiment given...fallback to default value')
+                m_ax = 0.1 * 60
+                min_ax = 0.1 * 60
+                pos_angle = 0.0
+            loc_str= '{} {} {} {}'.format(2 * np.max([m_ax, min_ax]), m_ax, min_ax, pos_angle)
             ofolder = os.path.join(self.bpath, 'vou_counterpart')
             if os.path.exists(ofolder):
                 shutil.rmtree(ofolder)
@@ -218,34 +229,32 @@ class Source(object):
         return
 
     def collect_xray(self):
+        print('Collect X-Ray Data')
+        self.swift = None
         if not os.path.exists(self.mw_data_path):
             self.get_mw_data() 
         try:
             idata = np.genfromtxt(self.mw_data_path, skip_header=4,
-                                  usecols=[1,2,3,4,6], dtype=[np.float,np.float,np.float,np.float,object])
+                                  usecols=[1,2,3,4,7], dtype=[np.float,np.float,np.float,np.float,object])
         except Exception as inst:
             print(inst)
-            self.swift=None
             return
+        if len(idata) == 0 :
+            return False
         idata = np.array([list(i) for i in idata])
         try:
             idata = idata[idata[:,4] == 'OUSXB']
-            self.swift=None
-            return
         except Exception as inst:
             print(inst)
-            self.swift=None
             return
         idata = np.array(idata[:,0:4],dtype=np.float)
         idata[:,1] = idata[:,1] - idata[:,0]
         idata[:,2] = idata[:,0] - idata[:,2]
         if not os.path.exists(os.path.join(self.bpath, 'add_data')):
             os.makedirs(os.path.join(self.bpath, 'add_data'))
-        #if len(idata) >0:
-        #    np.savetxt(os.path.join(self.bpath, 'add_data', 'swift.csv'), idata)
-        #    self.swift = os.path.join(self.bpath, 'add_data', 'swift.csv')
-        #else:
-        #    self.swift = None  
+        if len(idata) >0:
+            np.savetxt(os.path.join(self.bpath, 'add_data', 'swift.csv'), idata)
+            self.swift = os.path.join(self.bpath, 'add_data', 'swift.csv')
         return
 
 
@@ -265,7 +274,7 @@ class Source(object):
             files = [os.path.join(add_data_path, i) for i in os.listdir(add_data_path)]
             for f in files:
                 print('Read from {}'.format(f))
-                self.mw_idata = np.concatenate([self.mw_idata, read_from_observation(f)])
+                #self.mw_idata = np.concatenate([self.mw_idata, read_from_observation(f)])
         return
 
     def source_summary(self, bpath, mjd, mode='mid'):

@@ -11,6 +11,28 @@ from astropy.io import fits
 import imageio
 from scipy.interpolate import interp1d
 
+def send_mail(subject):
+    # Import smtplib for the actual sending function
+    import smtplib
+
+    # Here are the email package modules we'll need
+    from email.mime.image import MIMEImage
+    from email.mime.multipart import MIMEMultipart
+
+    # Create the container (outer) email message.
+    msg = MIMEMultipart()
+    msg['Subject'] = subject
+    # me == the sender's email address
+    # family = the list of all recipients' email addresses
+    msg['From'] = 'theo.glauch@tum.de'
+    msg['To'] = 'theo.glauch@tum.de , giommipaolo@gmail.com'
+    msg.preamble = 'A new IceCube alert'
+
+    # Send the email via our own SMTP server.
+    s = smtplib.SMTP('localhost')
+    s.sendmail(me, family, msg.as_string())
+    s.quit()
+
 def get_symbol(src_code):
     src_code = str(src_code)
     if src_code == '-1111':
@@ -106,7 +128,7 @@ odtype = np.dtype([('name', np.unicode, 32), ('ra', np.float32), ('dec', np.floa
 path_settings = {'sed': 'all_year/sed',
                  'lc': 'lightcurve'}
 #vou_path = '/scratch9/tglauch/Software/VOU_Blazars/v2/bin/vou-blazars'
-vou_path ='/home/ga53lag/Software/VOU_Blazars/v5/VOU_Blazars//bin/vou-blazars'
+vou_path ='/home/ga53lag/Software/VOU_Blazars/v6/VOU_Blazars//bin/vou-blazars'
 partition_t = {'kta':'2:30:00', 'long':'2-00:00:00', 'xtralong': '7-00:00:00'}
 
 def get_68_psf(E):
@@ -193,7 +215,12 @@ def get_lc_time3fgl(src_of_interest, emin=1e3):
 # MeV; 2: 100 to 300 MeV; 3: 300 MeV to 1 GeV; 4: 1 to 3 GeV; 5: 3 to 10 GeV; 6:10 to 30 GeV; 7:  30 to 300 GeV)
 
 def get_lc_time4fgl(src_of_interest, emin=1e3):
-    data = fits.open('./lib/gll_psc_v19.fit')
+    data = fits.open('./lib/gll_psc_v23.fit')
+
+    #only here because source in the vou output do not appear in the 4FGL catalog
+    if len(np.where(data[1].data['Source_Name']==src_of_interest)[0]) == 0:
+        return 365
+
     src_ind = np.where(data[1].data['Source_Name']==src_of_interest)[0][0]
 
     E_bins = [50,100,300,1000,3000,10000,30000,300000]

@@ -161,9 +161,11 @@ def make_lc_plot(lat_basepath, mjd, source, radio=None, xray=None, **kwargs):
     n_panels = 2
     lcs = ['fermi_flux', 'fermi_index']
     if radio is not None:
+        print('Add radio data to lightcurve')
         lcs.append('radio')
         n_panels += 1
     if xray is not None:
+        print('Add x-ray data to the lightcurve')
         lcs.append('xray')
         n_panels += 1
     height_per_panel = 0.8 / n_panels
@@ -195,7 +197,7 @@ def make_lc_plot(lat_basepath, mjd, source, radio=None, xray=None, **kwargs):
 
 
 def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None, y_max=None,
-                  fig_scale=0.8, add_text=False, markersize=2):
+                  fig_scale=0.8, add_text=False, markersize=2, plot_ulims=False):
     fig, ax = newfig(fig_scale)
     ax.set_xscale('log')
     ax.set_yscale('log') 
@@ -226,16 +228,17 @@ def make_sed_plot(seds_list, mw_idata=None, dec = None, twindow=None, y_min=None
             ax.errorbar(frequency[tot_mask] * hz_to_gev, flux[tot_mask],
                         yerr=yerr, fmt='o', color='red', zorder=2,
                         alpha=0.5, markersize=markersize+0.5,  linestyle='')
-            tot_mask = inds & ulim_mask & ~tmask
-            yerr = 10**np.log10(flux[tot_mask]) - 10**(np.log10(flux[tot_mask])-0.1/8.*factor) 
-            ax.errorbar(frequency[tot_mask] * hz_to_gev, flux[tot_mask],
-                        yerr=yerr, fmt='o', uplims=True, color='grey', zorder=1,
-                        alpha=0.5, markersize=markersize,  linestyle='')
-            tot_mask = inds & ulim_mask & tmask
-            yerr = 10**np.log10(flux[tot_mask]) - 10**(np.log10(flux[tot_mask])-0.1/8.*factor)   
-            ax.errorbar(frequency[tot_mask] * hz_to_gev, flux[tot_mask],
-                        yerr=yerr, fmt='o', uplims=True, color='red', zorder=2,
-                        alpha=0.5, markersize=markersize+0.5,  linestyle='')
+            if plot_ulims:
+                tot_mask = inds & ulim_mask & ~tmask
+                yerr = 10**np.log10(flux[tot_mask]) - 10**(np.log10(flux[tot_mask])-0.1/8.*factor) 
+                ax.errorbar(frequency[tot_mask] * hz_to_gev, flux[tot_mask],
+                            yerr=yerr, fmt='o', uplims=True, color='grey', zorder=1,
+                            alpha=0.5, markersize=markersize,  linestyle='')
+                tot_mask = inds & ulim_mask & tmask
+                yerr = 10**np.log10(flux[tot_mask]) - 10**(np.log10(flux[tot_mask])-0.1/8.*factor)   
+                ax.errorbar(frequency[tot_mask] * hz_to_gev, flux[tot_mask],
+                            yerr=yerr, fmt='o', uplims=True, color='red', zorder=2,
+                            alpha=0.5, markersize=markersize+0.5,  linestyle='')
     for i, sed_list in enumerate(seds_list):
         basepath = sed_list[0]
         sed_col = sed_list[1]
@@ -449,17 +452,17 @@ def make_counterparts_plot(basepath, ra, dec, plt_radius, save_path='.', vou_can
     factorm = 1./wcs.wcs.cdelt[0]
     factorp = 1./wcs.wcs.cdelt[1]
     print plt_radius*factorm, plt_radius*factorp
-    #ax.set_xlim(plt_radius*factorm, plt_radius*factorp)
-    #ax.set_ylim(plt_radius*factorm, plt_radius*factorp)    
+    ax.set_xlim(plt_radius*factorm, plt_radius*factorp)
+    ax.set_ylim(plt_radius*factorm, plt_radius*factorp)    
     print('Save Counterpart Plot')
     fig.savefig(os.path.join(save_path, 'counterparts.pdf'), bbox_inches='tight')
-    fig.savefig(os.path.join(save_path, 'counterparts.png'), bbox_inches='tight', dpi=500)
+    fig.savefig(os.path.join(save_path, 'counterparts.png'), bbox_inches='tight', dpi=300)
     return
 
 
 
 
-def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, yaxis=True, error90=None):
+def make_ts_plot(plt_basepath, srcs, vou_cand, bf_ra=None, bf_dec=None, plt_mode='tsmap', legend=False, yaxis=True, error90=None):
     plt.clf()
     fname = 'fit1_pointsource_powerlaw_2.00_{}.fits'.format(plt_mode)
     fits_path = os.path.join(plt_basepath, fname)
@@ -482,11 +485,7 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
         ticks = 2 
         cmap = re_cmap
     bfpath = os.path.join(plt_basepath, '../bf.txt')
-    if os.path.exists(bfpath):
-        bfdata = np.genfromtxt(bfpath, delimiter=',')
-        bf_ra = bfdata[0]
-        bf_dec = bfdata[1]
-    else:
+    if bf_ra is None:
         bf_ra = hdu.header['CRVAL1']
         bf_dec = hdu.header['CRVAL2']
     fig = plt.figure(figsize=figsize(0.4, 1.))
@@ -525,7 +524,7 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
         ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
         print('Use new circle')
     cpath = os.path.join(plt_basepath, '../contour50.txt')
-    if False: #os.path.exists(cpath):
+    if cpath: #os.path.exists(cpath):
         cdata = np.genfromtxt(cpath, delimiter=' ')
         cdata = np.vstack([cdata,cdata[0]])
         pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
@@ -577,8 +576,8 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, plt_mode='tsmap', legend=False, y
             marker='o', color='blue',
             ms=3, fillstyle='none', zorder=2)
     
-    #ax.set_xlim(0, hdu.data.shape[1])
-    #ax.set_ylim(0, hdu.data.shape[0]) 
+    ax.set_xlim(0, hdu.data.shape[1])
+    ax.set_ylim(0, hdu.data.shape[0]) 
     ax2=fig.add_axes((.0, .80,0.7, 0.05))
     plt_cbar = fig.colorbar(cbar, orientation="horizontal", cax=ax2,
                             ticks=np.arange(minmax[0], minmax[1] , ticks))

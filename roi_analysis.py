@@ -90,6 +90,12 @@ if os.path.exists(analysis_object_path):
     with open(analysis_object_path, "rb") as f:
         analysis = pickle.load(f)
     analysis.update_gcn()
+    if isinstance(args['ra'], float) & isinstance(args['dec'], float):
+        print('Update best-fit ra and dec')
+        analysis.ra = args['ra']
+        analysis.dec = args['dec']
+        analysis.calc_src_distances_to_bf()
+         
 else:
     ## read GCN
     if args['gcn'] is not None:
@@ -154,7 +160,6 @@ if args['adaptive_scaling']:
 
 analysis.set_src_plot_style()
 analysis.make_counterparts_plot()
-analysis.classify()
 
 if args['lat_analysis']:
     logging.info('Start the Fermi LAT Analysis pipeline')
@@ -216,6 +221,7 @@ if args['lat_analysis']:
         pickle.dump(analysis, f)
 
 # Wait for jobs to finish....
+analysis.classify()
 mins = 0
 final_pdf = False
 prev_len_jobs = -1
@@ -258,5 +264,6 @@ while not final_pdf:
     if os.path.exists(analysis_object_path):
         os.remove(analysis_object_path)
     with open(analysis_object_path, "wb") as f:
-        pickle.dump(analysis, f)    
+        pickle.dump(analysis, f)
+    
 #    print_to_slack('Fit Results', analysis.pdf_out_path)
