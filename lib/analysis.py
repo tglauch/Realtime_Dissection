@@ -1,4 +1,4 @@
-from functions import GreatCircleDistance, path_settings, vou_path, get_68_psf, submit_fit, cat_dict
+from functions import GreatCircleDistance, path_settings, vou_path, get_95_psf, submit_fit, cat_dict
 import numpy as np
 from source_class import Source, Ellipse 
 import collections
@@ -15,34 +15,37 @@ import string
 import random
 import plot
 import shutil
-import pyfits as fits
+from astropy.io import fits
 import warnings
 import copy
-
+import sys
+from DNNSed.DNNnupeak import NuPeakCalculator
+from DNNSed.DNNredshift import RedshiftCalculator
+ 
 marker_colors = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99','#b15928']
 
 src_encoding = {'5BZQ' : -2, '5BZB': -2 , '5BZU': -2, '3HSP': -1, 'CRATES': -3,
                 '3FGL': -10, '4FGL': -10, 'FHL': -10}
 
-sc_file_path = '/scratch9/tglauch/Realtime_Dissection/sc_files/current.fits'
+sc_file_path = '/scratch8/tglauch/spacecraft_files/current.fits'
 
 files = collections.OrderedDict([
-     ('4fgl', {'file': '4fgl.1.csv',
+     ('4fgl', {'file': '4fgldr2.1.csv',
               'keys': ['Source_Name', 'RA', 'Dec']}),
      ('3fgl', {'file': '3fgl.1.csv',
               'keys': ['name', 'ra', 'dec']}),
      ('3fhl', {'file': '3fhl.1.csv',
               'keys': ['name', 'ra', 'dec']}),
-     ('FermiGRB', {'file': 'fgrb.1.csv',
-                   'keys' : ['GRB','RAJ2000','DEJ2000']}),
-     ('5bzcat', {'file': '5bzcat.1.csv',
-                'keys': ['Name', 'RAJ2000', 'DEJ2000']}),
      ('3hsp', {'file': '3hsp.1.csv',
               'keys': ['Name', 'ra', 'dec']}),
+     ('5bzcat', {'file': '5bzcat.1.csv',
+                'keys': ['Name', 'RAJ2000', 'DEJ2000']}),
+     ('FermiGRB', {'file': 'fgrb.1.csv',
+                   'keys' : ['gcn_name','ra','dec']}),
      ('fermi8yr', {'file': 'fermi8yr.1.csv',
-                  'keys': ['Source_Name', 'RAJ2000', 'DEJ2000']}),
-     ('crates', {'file': 'crates.1.csv',
-                'keys': ['name', 'ra', 'dec']})])
+                  'keys': ['Source_Name', 'RAJ2000', 'DEJ2000']}),])
+#     ('crates', {'file': 'crates.1.csv',
+#                'keys': ['name', 'ra', 'dec']})])
 
 
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
@@ -72,10 +75,37 @@ class Analysis(object):
         self.srcprob_path = None
         self.id = id_generator(size=5) 
         self.notice_date = 'None'
-        self.radius = 180
+        self.radius = 200
+        self.max_dist = 3.
         self.this_path = None
         return
 
+
+    def classify(self):
+        nu_peak_dnn = NuPeakCalculator(dec=self.dec)
+        redshift_dnn = RedshiftCalculator(dec=self.dec)
+        for src in self.srcs:
+            print('Make DNN prediction for source {}'.format(src.name))
+            try:
+                if os.path.exists(src.mw_data_path):
+                    nu_peak = nu_peak_dnn.make_prediction(src.mw_data_path, src.dec,
+                                                          exclude_nu_band=[],
+                                                          mask_catalog=['DEBL', 'SPIRE250',
+                                                                        'SPIRE350', 'SPIRE500'],
+                                                          return_sed = False, verbose=True) 
+                    src.nu_peak = nu_peak[0]
+                    src.nu_peak_err = nu_peak[1]
+                    print(src.nu_peak)
+                    nu_peak = redshift_dnn.make_prediction(src.mw_data_path, src.dec,
+                                                          exclude_nu_band=[],
+                                                          mask_catalog=['DEBL'],
+                                                          return_sed = False, verbose=True)
+                    src.redshift = nu_peak[0]
+                    src.redshift_err = nu_peak[1]
+            except Exception as e:
+                print('Could not make DNN prediction')
+                print(e)
+        return
 
     def calc_gal_coords(self):
         c = SkyCoord(self.ra, self.dec, frame='icrs', unit="deg")
@@ -86,15 +116,18 @@ class Analysis(object):
 
     def make_ts_map_plots(self):
         for tsm in self.ts_maps:
+            print('Make plot for {}'.format(tsm))
             try:
-                plot.make_ts_plot(tsm, self.srcs, self.vou_sources,
-                                  plt_mode='tsmap', error90 = self.err90)
                 plot.make_ts_plot_legend(tsm, self.srcs, self.max_dist)
+                plot.make_ts_plot(tsm, self.srcs, self.vou_sources,
+                                  bf_ra=self.ra, bf_dec = self.dec,
+                                  plt_mode='tsmap', error90 = self.err90)
             except Exception as inst:
                 warnings.warn("Couldn't create TS map {}".format(tsm))
                 print(inst)
             try:
                 plot.make_ts_plot(tsm, self.srcs, self.vou_sources,
+                                  bf_ra=self.ra, bf_dec = self.dec,
                                   plt_mode='residmap',  error90=self.err90)
             except Exception as inst:
                 warnings.warn("Couldn't create residual map {}".format(tsm))
@@ -105,18 +138,34 @@ class Analysis(object):
         sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {} --free_diff'
         if emin is None:
             emin = self.ts_emin
-        sargs = sargs.format(get_68_psf(emin), self.fermi_data, emin, self.ra, self.dec)
+        sargs = sargs.format(get_95_psf(emin), self.fermi_data, emin, self.ra, self.dec)
         self.srcprob_path = srcprob_path
         submit_fit(sargs, srcprob_path, srcs=self.srcs, sub_file=self.id+'.sub', ana_type='srcprob', partition='xtralong')
         return
 
     def adaptive_radius(self):
         if isinstance(self.err90, float):
-            self.radius = np.max([2 * 60. * self.err90, 60.])
+            self.radius = np.max([1.5 * 60. * self.err90, 60.])
         elif isinstance(self.err90, Ellipse):
-            self.radius = np.max([2 * self.err90.get_max_extension(), 60])
+            self.radius = np.max([1.5 * self.err90.get_max_extension(), 60])
+        self.max_dist = self.radius/60.
         return
         
+
+    def mask_sources(self):
+        if isinstance(self.err90, float):
+            for src in self.srcs:
+                src.in_err=True
+                if src.dist > self.max_dist:
+                    src.in_err = False
+        elif isinstance(self.err90, Ellipse):
+            for src in self.srcs:
+                src.in_err = True
+                ra_bool = np.abs(src.ra - self.err90.center_ra) > (1.5 * self.err90.ra_ax)
+                dec_bool = np.abs(src.dec - self.err90.center_dec) > (1.5 * self.err90.dec_ax)
+                if (ra_bool | dec_bool):
+                    src.in_err = False
+        return
 
     def make_ts_map(self, ts_map_path, emin=None, trange=None):
         sargs = ' --free_radius {} --data_path {} --use_4FGL --emin {} --ra {} --dec {} --roiwidth {} --free_diff'
@@ -124,9 +173,9 @@ class Analysis(object):
             emin = self.ts_emin
         if trange is not None:
            sargs = sargs + ' --time_range {} {}'.format(trange[0], trange[1])
-        sargs = sargs.format(get_68_psf(emin), self.fermi_data, emin, self.ra, self.dec, 2*self.radius/60.)
+        sargs = sargs.format(get_95_psf(emin), self.fermi_data, emin, self.ra, self.dec, 2*self.radius/60.)
         self.ts_maps.append(ts_map_path)
-        submit_fit(sargs, ts_map_path, sub_file=self.id+'.sub', ana_type='TS_Map', partition='xtralong') # change back to xtralong
+        submit_fit(sargs, ts_map_path, sub_file=self.id+'.sub', ana_type='TS_Map', partition='xtralong')
         return
 
     def make_pdf(self, src_latex, final_pdf=True):
@@ -189,12 +238,45 @@ class Analysis(object):
 
 
     def make_counterparts_plot(self):
-        self.set_src_plot_style()
         self.get_vou_candidates()
-        print self.radius/60.
         plot.make_counterparts_plot(self.bpath, self.ra, self.dec, self.radius/60., save_path = self.vou_out,  vou_cand=self.vou_sources, srcs=self.srcs,
                                     max_dist=self.max_dist, legend=False, yaxis=True, error90=self.err90)
         return
+
+
+    def make_aladin_plot(self):
+        with open('./htmlcode/aladin.html') as ifile:
+             aladin_code = ifile.read()
+
+        temp_str  = 'overlay.add(A.circle( {ra} ,  {dec}, .05, {{color: \'{color}\'}} )); \n \
+                     overlay.add(A.circle( {ra} ,  {dec}, .0027, {{color: \'{color}\'}} )); \n \
+                     cat.addSources([A.source({ra} , {dec}, {{name: \' Nr. {name}\'}})]);\n'
+        circle_str = ''
+        for j, src in enumerate(self.vou_sources):
+            circle_str += temp_str.format(ra=src[0], dec=src[1], color='blue', name=j)
+        for src in self.srcs:
+            circle_str += temp_str.format(ra=src.ra, dec=src.dec, color='red', name=src.name)
+        cpath = os.path.join(self.bpath, 'contour.txt')
+        cpath_df= os.path.join(self.bpath, 'contour_df.txt')
+        nlist = []
+        if os.path.exists(cpath):
+            cdata = np.degrees(np.genfromtxt(cpath, delimiter=' '))
+            for i in cdata:
+                nlist.append(list(i)) 
+        elif os.path.exists(cpath_df):
+            cdata =  np.degrees(np.genfromtxt(cpath_df, delimiter=' '))
+            for i in cdata:
+                nlist.append([i[1], i[0]])
+        elif isinstance(self.err90, Ellipse):
+            t = np.linspace(0, 2*np.pi, 100)
+            ra = self.err90.center_ra + self.err90.ra_ax * np.cos(t)
+            dec = self.err90.center_dec + self.err90.dec_ax * np.sin(t)
+            for i in (zip(ra,dec)):
+                nlist.append(list(i))
+        circle_str += 'overlay.add(A.polyline({pos_arr}, {{color:\'white\'}}));'.format(pos_arr=str(nlist))           
+        aladin_code = aladin_code.format(ra=self.ra, dec=self.dec, circles=circle_str)
+        return aladin_code
+            
 
 
     def ROI_analysis(self):
@@ -213,12 +295,11 @@ class Analysis(object):
         else:
             print('This type of error regions is not supported yet')
         print cmd
-        for i in range(2):
+        for i in range(1): # With new version only need to run ones?!?!
             subprocess.call(cmd)
 
         # Setup Variables
         out_str = self.get_sources()
-        self.make_counterparts_plot()
         self.calc_gal_coords()
         headline = '*Result for {}* [ra: {:.1f}  dec: {:.1f} , gal_l: {:.1f}, gal_b: {:.1f} ]\n'.format(self.event_name,
                                                                                self.ra, self.dec, self.gal_l, self.gal_b)
@@ -343,10 +424,7 @@ class Analysis(object):
                          ('DEJ2000', '<f8')]
                 temp = temp.astype(dtype)
             for src in temp:
-                if key == 'FermiGRB':
-                    name = 'GRB' + src[files[key]['keys'][0]]
-                else:
-                    name = src[files[key]['keys'][0]]
+                name = src[files[key]['keys'][0]]
                 src_obj = Source(name,
                                  src[files[key]['keys'][1]],
                                  src[files[key]['keys'][2]])
@@ -381,7 +459,6 @@ class Analysis(object):
                 ostr +=  '\n Associations: {}'.format(', '.join(src.names))
             print(ostr)
             out_str += ostr + '\n\n'
-        self.set_src_plot_style()
         return out_str
 
     def set_src_plot_style(self):
@@ -391,17 +468,22 @@ class Analysis(object):
         for sty in marker_styles:
             marker_counter[sty] = 0
         for src in self.srcs:
-            if src.dist > self.max_dist:
+            if not hasattr(src, 'in_err'):
+                self.mask_sources()
+            if not src.in_err:
                 src.plt_style = copy.copy(cat_dict[src.plt_code][1])
+                src.plt_style['color'] = 'grey'
                 continue
-            if marker_counter[src.plt_code] > len(marker_colors):
+            if marker_counter[src.plt_code] > len(marker_colors)-1:
                 print('no more colors for this sourcetype {}.Falling back to default'.format(src.name))
                 src.plt_style = copy.copy(cat_dict[src.plt_code][1])
                 continue
             src.plt_style = copy.copy(cat_dict[src.plt_code][1])
             src.plt_style['color'] = marker_colors[marker_counter[src.plt_code]]
             marker_counter[src.plt_code] += 1
-            print src.plt_style
+        for src in self.srcs:
+            print('name: {} dist: {:.1f} in_err: {} plt_style: {}'.format(src.name, src.dist, src.in_err,
+                                                                          src.plt_style))
         return    
 
 
@@ -418,7 +500,7 @@ class Analysis(object):
         return 
    
     def get_add_info(self, src_of_interest):
-        data = fits.open(os.path.join(self.this_path,'lib',  'gll_psc_v19.fit'))
+        data = fits.open(os.path.join(self.this_path,'lib',  'gll_psc_v23.fit'))
         eflux = data[1].data['Energy_Flux100']
         inds = np.argsort(eflux)[::-1]
         eflux = eflux[inds]
@@ -431,27 +513,54 @@ class Analysis(object):
 
 
     def create_html(self):
-        mask = [True if src.dist < self.max_dist else False for src in self.srcs]
+        mask = [src.in_err for src in self.srcs]
         counterparts = np.array([src for src in np.array(self.srcs)[mask] if not 'CRATES' in src.name])
-        inds = np.argsort([src.dist for src in counterparts])
-        counterparts = counterparts[inds][:2]
+        #inds = np.argsort([src.dist for src in counterparts])
+       # counterparts = counterparts[inds]
         html_files = os.path.join(self.bpath, '{}/IceCube{}_files'.format(self.event_name, self.event_name[2:]))
         if os.path.exists(html_files):
             shutil.rmtree(html_files)
-        shutil.copytree('./htmlcode/IceCubeTemplate_Candidates_files/', html_files)
-        index_html = os.path.join(self.bpath, '{}/index.html'.format(self.event_name))
-        shutil.copyfile('./htmlcode/IceCubeTemplate_{}Candidates.html'.format(len(counterparts)),
-                        index_html)
-        with open(index_html, 'r') as f:
+        shutil.copytree('./htmlcode/', html_files)
+        src_string = ''
+        for i, src in enumerate(counterparts):
+            with open(os.path.join(html_files, 'src.html'), 'r') as f:
+                in_str = f.read()
+                print('Make HTML string for {}'.format(src.name))
+                src_string += in_str.format(num=i+1,
+                                            ra = src.ra,
+                                            dec = src.dec,
+                                            src_name=src.name,
+                                            dist=src.dist,
+                                            fermi = src.fermi_sigma,
+                                            nu = src.nu_peak,
+                                            nu_err = src.nu_peak_err,
+                                            z = src.redshift,
+                                            z_err = src.redshift_err, 
+                                            alt_names= ', '.join(src.names),
+                                            sed_path='CandSED{}.png'.format(i+1),
+                                            lc_path='CandLC{}.png'.format(i+1))
+
+        c = SkyCoord(self.ra, self.dec, frame='icrs', unit="deg")
+        gal = c.galactic      
+        aladin_str = self.make_aladin_plot()
+        with open(os.path.join(html_files, 'template.html'), 'r') as f:
             code = f.read()
-            code = code.replace('IceCube yyyy', 'IceCube {}'.format(self.event_name[2:]))
-            code = code.replace('ICyyyy', self.event_name)
-            code = code.replace('MJD aaaa', 'MJD {}'.format(self.mjd))
-            code = code.replace('gggg', str(9999))
-            code = code.replace('tttt', self.event_name[2:])
-            code = code.replace('rrrr', self.event_name[2:])
+            code = code.format(mjd = self.mjd,
+                               src_summary=src_string,
+                               ev_name_full = self.event_name.replace('IC', 'IceCube-')+'A',
+                               ev_name = self.event_name,
+                               dec = self.dec,
+                               ra = self.ra,
+                               gal_lat = gal.b.deg,  
+                               ts_mjd1 = self.tsmjd1,
+                               ts_mjd2 =  self.tsmjd2,
+                               ts_full_mjd1 = self.mjd_range[0],
+                               ts_full_mjd2 = self.mjd_range[1],
+                               ts_length = self.tsmjd2 - self.tsmjd1,
+                               aladin_text = aladin_str,
+                               )
             
-        with open(index_html, 'w') as f:
+        with open(os.path.join(html_files, 'index.html'), 'w') as f:
             f.write(code)
         
         rxmap_eps = os.path.join(self.vou_out, 'RX_map.eps')
@@ -470,6 +579,9 @@ class Analysis(object):
         if os.path.exists(os.path.join(self.bpath, 'ts_map/tsmap.png')):
             shutil.copyfile(os.path.join(self.bpath, 'ts_map/tsmap.png'), 
                             os.path.join(html_files, 'tsmap-full.png'))
+        if os.path.exists(os.path.join(self.bpath, 'ts_map/legend.png')):
+            shutil.copyfile(os.path.join(self.bpath, 'ts_map/legend.png'),
+                            os.path.join(html_files, 'legend.png'))
         if os.path.exists(os.path.join(self.bpath, 'ts_map_short/tsmap.png')):
             shutil.copyfile(os.path.join(self.bpath, 'ts_map_short/tsmap.png'),
                             os.path.join(html_files, 'tsmap_200.png'))
@@ -491,16 +603,18 @@ class Analysis(object):
                         if (self.mjd <= float(fold.split('_')[1])) and (self.mjd > float(fold.split('_')[0])):
                             sed_path = os.path.join(lc_base,fold)
                             break
-                print(os.path.join(html_files, 'CANDSED{}.png'.format(i+1)))
-                shutil.copyfile(os.path.join(sed_path, 'sed.png'), os.path.join(html_files, 'CandSED{}.png'.format(i+1)))
+                print(os.path.join(html_files, 'CandSED{}.png'.format(i+1)))
+                if os.path.exists(os.path.join(sed_path, 'sed.png')):
+                    shutil.copyfile(os.path.join(sed_path, 'sed.png'), os.path.join(html_files, 'CandSED{}.png'.format(i+1)))
             else:
                 print('SED seems to be not ready, yet')
-            print('CANDLC{}.png'.format(i+1))
             if os.path.exists(lc_path):
                 shutil.copyfile(lc_path, os.path.join(html_files, 'CandLC{}.png'.format(i+1)))
-        self.upload_html()
+        self.upload_html(html_files)
         return
 
-    def upload_html(self):
-        os.system('scp -r {} tglauch@cobalt.icecube.wisc.edu:/home/tglauch/public_html/Reports/'.format(os.path.join(self.bpath, self.event_name)))
+    def upload_html(self, html_files):
+        cmd = 'rsync -r {}/* tglauch@cobalt.icecube.wisc.edu:/home/tglauch/public_html/Reports/{}/'.format(html_files, self.event_name)
+        print(cmd)
+        os.system(cmd)
         return

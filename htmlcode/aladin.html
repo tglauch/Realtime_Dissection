@@ -1,0 +1,46 @@
+<script type="text/javascript">
+hipsDir = location.href;
+hipsDir = hipsDir.substring(0,hipsDir.lastIndexOf("/",hipsDir.length))+'/HIPS_GRBSurvey';
+document.getElementById("hipsBase").innerHTML=hipsDir;
+</script>
+<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>
+<div id="infoDiv">&nbsp; </div>
+<div id="aladin-lite-div" style="width:90vw;height:90vh;"></div>
+<script type="text/javascript">
+var aladin = $.aladin("#aladin-lite-div", {{survey: 'P/DSS/colored', showSimbadPointerControl:
+true,fov:15.00,target:'{ra}   {dec}'}});
+var cat = A.catalog();
+aladin.addCatalog(cat);
+aladin.on('objectHovered', function(object) {{
+    var msg;
+    if (object) {{
+        msg = 'Object ' + object.data.name + ' R.A. = ' + object.ra + ', Dec. = ' + object.dec;
+    }}
+    else {{
+        msg = ' Move the mouse (or click) on a source for details  ';
+    }}
+    $('#infoDiv').html(msg);
+}});
+var objClicked;
+aladin.on('objectClicked', function(object) {{
+    var msg;
+    if (object) {{
+        objClicked = object;
+      object.select();
+        msg = 'You clicked on object ' + object.data.name + ' located at R.A. = ' + object.ra + ', Dec. = ' + object.dec
+    }}
+    else {{
+        objClicked.deselect();
+        msg = 'You clicked in void';
+    }}
+    $('#infoDiv').html(msg);
+}});
+aladin.createImageSurvey('Swift XRT @ OpenUniverse', 'Swift XRT @ OpenUniverse',
+hipsDir, 'equatorial', 7, {{imgFormat: 'png'}});
+var overlay = A.graphicOverlay({{color: 'cyan', lineWidth: 5}});
+aladin.addOverlay(overlay);
+{circles}
+</script>
+<script type="text/javascript">
+document.getElementById("hipsBase").innerHTML=hips
+</script>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<!-- Template by Quackit.com -->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+
+    <title>Corporate 1</title>
+
+    <!-- Bootstrap Core CSS -->
+    <link href="../css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom CSS: You can use this stylesheet to override any Bootstrap styles and/or apply your own styles -->
+    <link href="../css/custom.css" rel="stylesheet">
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+        <div class="container">
+            <!-- Logo and responsive toggle -->
+            <div class="navbar-header">
+                <a class="navbar-brand" href="http://www.openuniverse.asi.it/">
+                	<img src="OU-logo.png" alt="", width="140"> 
+                </a>
+                <img src="TUM_IAS_MS_farbig_RGB.jpg", width="60">  
+            </div>
+
+            <!-- Navbar links -->
+            <div class="collapse navbar-collapse" id="navbar">
+                <ul class="nav navbar-nav">
+                    <li class="active">
+                        <a href="index.html">Latest Event</a>
+                    </li>
+                    <li>
+                        <a href="about.html">About the Project</a>
+                    </li>
+                    <li>
+                        <a href="#">Other Neutrino Events</a>
+                    </li>
+                </ul>
+
+				<!-- Search -->
+				<form class="navbar-form navbar-right" role="search">
+					<div class="form-group">
+						<input type="text" class="form-control">
+					</div>
+					<button type="submit" class="btn btn-default">Search</button>
+				</form>
+
+            </div>
+            <!-- /.navbar-collapse -->
+        </div>
+        <!-- /.container -->
+    </nav>
+
+	<div class="jumbotron feature">
+		<div class="container">
+			<h1> {ev_name_full}</h1>
+			<p>Want to add some basic information here?</p>
+			<p><a class="btn btn-default" href="{ev_name}.pdf">See the full report</a></p>
+		</div>
+	</div>
+
+    <!-- Content -->
+    <div class="container">
+
+        <!-- Heading -->
+        <div class="row">
+            <div class="col-lg-12">
+                <h1 class="page-header">{ev_name_full}
+                    <small>Basic Information</small>
+                </h1>
+                <p>On MJD {mjd:.2f} the IceCube Neutrino Observatory reported the detection of the highly-energetic neutrino {ev_name_full} (GCN 9999). Due to the high-energy and the track-like signature the event has a good positional uncertainty and is likely of astrophysical origin.  With the goal of contributing to the identification of the corresponding electromagnetic counterpart we report here a brief summary of the results of our multi-wavelength dissection of the region around the event. <br> <br>
+
+                The automatic pipeline processing performs a multi-wavelength analysis similar to that presented by Padovani et al. 2017 for IC170922 and consists of a) a search for blazar and other possible candidates counterparts using the VOU-BLazars tool, b) a detailed analysis of the Fermi-LAT gamma-ray emission around the IceCube error region in a temporal window close to the neutrino detection and the full Fermi data set, and c) the production of the broad band SED and of the light-curves of the most promising candidates. </p>
+            </div>
+        </div>
+        <!-- /.row -->
+
+        <div class="row">
+            <div class="col-lg-12">
+                <h1 class="page-header">Counterpart Identification
+                    <small>VOU-Blazar Result</small>
+                </h1>
+                <p>Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd </p>
+           </div>
+        </div>
+
+        <!-- Feature Row -->
+        <div class="row">
+            <article class="col-md-4 article-intro">
+                    <img class="img-responsive img-rounded" src="VOU-RXmap.png" alt="">
+                <p>Radio, X-ray and gamma-ray sources in thearea including the error region of IC190730.   Radio sources appear as red filled circles, X-ray sources as open blue circles, and gamma-ray sources as purple open triangles. Symbol size is proportional to source intensity.</p>
+            </article>s
+            <article class="col-md-4 article-intro">
+                <img class="img-responsive img-rounded" src="VOU-candidates.png" alt="">
+                <p>Chart of the area around the error region of IC190730 showing candidate blazars (based on radio to X-ray flux ratio), objects from selected catalogues (5BZCat, 3HSP, PSR), and flat-spectrum radio sources, and gamma-ray sources. Blazar types are color coded as follows: orange for HBLs, cyan for IBLs and dark blue for LBLs. Catalogued sources appear as: yellow diamonds  for BZCAT blazars , yellow stars  for 3HSP blazars, and  blue pentagons for pulsars.   Flat spectrum radio sources with no X-ray counterpart appear as red filled circles with an open blue square superposed. </p>
+            </article>
+        </div>
+        <!-- /.row -->
+        <!-- Feature Row -->
+
+        <div class="row">
+            <div class="col-lg-12">
+                <h1 class="page-header">Gamma-Ray Emission
+                    <small>Fermi-LAT TS Maps</small>
+                </h1>
+                <p>Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd </p>
+           </div>
+        </div>
+  
+
+        <div class="row">
+            <article class="col-md-4 article-intro">
+                <img class="img-responsive img-rounded" src="tsmap_200.png" alt="">
+                <p>Fermi-LAT TS map of the region built with photons with energy larger than 1 GeV integrated over the entire Fermi mission, up to the neutrino arrival. As in the previous TS map all catalogued (4FGL) sources in the area have been subtracted. </p>
+            </article>
+            <article class="col-md-4 article-intro">
+                <img class="img-responsive img-rounded" src="tsmap-full.png" alt="">
+                <p>Fermi-LAT TS map of the region built with photons with energy larger than 1 GeV integrated over the entire Fermi mission, up to the neutrino arrival.  As in the previous TS map all catalogued (4FGL) sources in the area have been subtracted.  </p>
+            </article>
+        </div>
+    <!-- /.container -->
+
+
+       <div class="row">
+            <div class="col-lg-12">
+                <h1 class="page-header">SEDs and Lightcurves
+                </h1>
+            </div> 
+
+        {src_summary}   
+        
+        </div>
+    </div>
+
+	<footer>
+		<div class="footer-blurb">
+			<div class="container">
+				<div class="row">
+                For more information and the complete report see LINK TO REPORT
+				</div>
+				<!-- /.row -->	
+			</div>
+        </div>
+        
+        <div class="small-print">
+        	<div class="container">
+        		<p><a href="#">Terms &amp; Conditions</a> <a href="#">Contact</a></p>
+        		<p>Copyright &copy; T.Glauch & P.Giommi (2019) </p>
+        	</div>
+        </div>
+	</footer>
+
+	
+    <!-- jQuery -->
+    <script src="js/jquery-1.11.3.min.js"></script>
+
+    <!-- Bootstrap Core JavaScript -->
+    <script src="js/bootstrap.min.js"></script>
+	
+	<!-- IE10 viewport bug workaround -->
+	<script src="js/ie10-viewport-bug-workaround.js"></script>
+	
+	<!-- Placeholder Images -->
+	<script src="js/holder.min.js"></script>
+	
+</body>
+
+</html>

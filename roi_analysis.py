@@ -2,6 +2,7 @@
 
 
 # run for example as python roi_analysis.py --mjd 55497.30 --ra 88.95 --dec 0.50 --adaptive_scaling --max_dist 0.8 --err90 0.48 -0.53 0.25 -0.21
+
 import logging
 #logging.getLogger().setLevel(logging.INFO)
 logging.info('Imports')
@@ -42,7 +43,7 @@ def parseArguments():
     parser.add_argument(
         "--dt", help="Length of time window to analyze", type=float)
     parser.add_argument(
-        "--radius", help="Radius of the region to analyze", type=str, default="180")
+        "--radius", help="Radius of the region to analyze in arcmin", type=str, default="240")
     parser.add_argument(
         "--emin", help="Lower energy bound for SED", type=float, default=100)
     parser.add_argument(
@@ -65,9 +66,9 @@ def parseArguments():
         action="store_true", default = False)
     parser.add_argument(
         "--basepath", help = 'Basepath for the Output',
-        type=str, default = '/scratch9/tglauch/realtime_service/output/')
+        type=str, default = '/scratch8/tglauch/dissection_output/')
     parser.add_argument(
-        "--max_dist", help = 'Radius of sources to be included', type=float, default=2.5)
+        "--max_dist", help = 'Radius of sources to be included in degrees', type=float, default=3.5)
     parser.add_argument(
         "--err90", help= 'The 90 percent error ellipse. Format:  ra1 ra2 dec1 dec2', nargs='+')
     parser.add_argument(
@@ -89,6 +90,12 @@ if os.path.exists(analysis_object_path):
     with open(analysis_object_path, "rb") as f:
         analysis = pickle.load(f)
     analysis.update_gcn()
+    if isinstance(args['ra'], float) & isinstance(args['dec'], float):
+        print('Update best-fit ra and dec')
+        analysis.ra = args['ra']
+        analysis.dec = args['dec']
+        analysis.calc_src_distances_to_bf()
+         
 else:
     ## read GCN
     if args['gcn'] is not None:
@@ -132,16 +139,27 @@ analysis.sort_sources_by_prio()
 if args['vou']:
     # Run VOU Tool
     logging.info('Start the VOU analysis pipeline')
-    analysis.ROI_analysis()
-    for src in analysis.srcs:
-        bpath_src = os.path.join(bpath, src.name.replace(' ', '_'))
-        src.setup_folders(bpath_src)
-    if os.path.exists(analysis_object_path):
-        os.remove(analysis_object_path)
-    with open(analysis_object_path, "wb") as f:
-        pickle.dump(analysis, f)
+    if args['overwrite']:
+        for src in analysis.srcs:
+            print('Re-run SED for {} at dec {} ra {}'.format(src.name, src.dec, src.ra))
+            src.get_mw_data()
+    else:
+        analysis.ROI_analysis()
+        for src in analysis.srcs:
+            bpath_src = os.path.join(bpath, src.name.replace(' ', '_'))
+            src.setup_folders(bpath_src)
+        if os.path.exists(analysis_object_path):
+            os.remove(analysis_object_path)
+        with open(analysis_object_path, "wb") as f:
+            pickle.dump(analysis, f)
 
 # Start the gamma-ray analysis
+
+if args['adaptive_scaling']:
+    analysis.mask_sources()
+
+analysis.set_src_plot_style()
+analysis.make_counterparts_plot()
 
 if args['lat_analysis']:
     logging.info('Start the Fermi LAT Analysis pipeline')
@@ -180,7 +198,7 @@ if args['lat_analysis']:
         if make_pdf:
             continue
         print(' \n \n {} is at a distance {:.1f} deg'.format(src.name, src.dist))
-        if src.dist > analysis.max_dist:
+        if not src.in_err:
             continue
         src.get_mw_data()
         add_srcs = [src] #analysis.srcs 
@@ -203,6 +221,7 @@ if args['lat_analysis']:
         pickle.dump(analysis, f)
 
 # Wait for jobs to finish....
+analysis.classify()
 mins = 0
 final_pdf = False
 prev_len_jobs = -1
@@ -225,8 +244,9 @@ while not final_pdf:
         analysis.make_counterparts_plot() 
         analysis.make_ts_map_plots()
         for src in analysis.srcs:
-            if src.dist > analysis.max_dist:
+            if not src.in_err:
                 continue
+            print('Make Plots for Sources {} at distance {:.1f}'.format(src.name, src.dist))
             src.make_lc_plot(analysis.mjd)
             if analysis.emin < 1e3: 
                 src.make_sed_lightcurve(lcs=['default', '1GeV'])
@@ -235,10 +255,15 @@ while not final_pdf:
     logging.info('Make PDF..')
     src_latex = ''
     for src in analysis.srcs:
-        if src.dist > analysis.max_dist:
+        if not src.in_err:
             continue
         src_latex += src.source_summary(analysis.bpath, analysis.mjd, mode=analysis.mode)
     analysis.make_pdf(src_latex, final_pdf = final_pdf)
     analysis.create_html()
-    print_to_slack('New Fit Result on https://icecube.wisc.edu/~tglauch/Reports/{}/'.format(analysis.event_name))    
+    print_to_slack('New Fit Result on https://icecube.wisc.edu/~tglauch/Reports/{}/'.format(analysis.event_name))
+    if os.path.exists(analysis_object_path):
+        os.remove(analysis_object_path)
+    with open(analysis_object_path, "wb") as f:
+        pickle.dump(analysis, f)
+    
 #    print_to_slack('Fit Results', analysis.pdf_out_path)
