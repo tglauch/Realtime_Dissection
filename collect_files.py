@@ -81,6 +81,7 @@ for f in more_data:
             np.savetxt(sed_file, add_data, fmt="%s")
 zip_path = os.path.normpath(out_path)+'.zip'
 make_archive(out_path, 'zip', out_path)
+
 #print('Create Zip File in {}'.format(zip_path))
 #zipf = zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED)
 #zipdir(out_path, zipf)

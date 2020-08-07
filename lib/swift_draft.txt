@@ -1,0 +1,18 @@
+The likely association of TXS0506+056 and of several other blazars with IceCube astrophysical neutrinos (e.g. Giommi et al. 2020,
+arXiv:2001.09355 and references therein) is the observational basis of maturing evidence that blazars may be the counterparts of
+at least a fraction of high-energy astrophysical neutrinos. In an effort to build a public database of quasi-simultaneous
+multi-messenger observations of possible neutrino counterparts we propose to make short XRT ToO observations of the blazars inside
+or close to the uncertainty area of astrophysical high-energy neutrinos shortly after the IceCube (or other neutrino observatory)
+detection.
+Since the uncertainty in the arrival direction of astrophysical neutrinos is often very large compared to the field of view of
+XRT, this approach is complementary to the much more expensive tiling coverage of the IceCube error region, which in most cases
+cannot be completely covered.
+
+A relatively short (e.g. 3Ks) observation of each blazar in the error region of IC200615A  would be sufficient to determine the X-ray
+flux level and the spectral slope, therefore allowing the detection of a possible on-going flare or of an unusual spectral shape,
+which could turn out to be crucial information for the possible association of the blazar with the neutrino.
+
+An automatic analysis carried out immediately after the arrival of IC200615A with the VOU-Blazars tool
+(Chang et al. 2019) and with a multi-frequency analysis pipeline (Glauch et al in preparation), identified the
+the following xx known blazars inside the uncertainty region of IC200615A or in the area immediately surrounding it,
+which we propose as Swift ToO targets

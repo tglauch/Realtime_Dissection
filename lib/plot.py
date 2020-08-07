@@ -21,6 +21,8 @@ from regions import EllipseSkyRegion
 from astropy.coordinates import SkyCoord
 from add_classes import Lightcurve, Ellipse
 from functions import radio_circle, xray_circle, get_circle_size, get_symbol
+from scipy.interpolate import InterpolatedUnivariateSpline
+from scipy.integrate import quad
 
 markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7, 'H','d', 'v' ,'^', '<', '>', 1, 2, 3 ,8, '+' ,'h']
 ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'])
@@ -524,7 +526,7 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, bf_ra=None, bf_dec=None, plt_mode
         ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
         print('Use new circle')
     cpath = os.path.join(plt_basepath, '../contour50.txt')
-    if cpath: #os.path.exists(cpath):
+    if os.path.exists(cpath):
         cdata = np.genfromtxt(cpath, delimiter=' ')
         cdata = np.vstack([cdata,cdata[0]])
         pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
@@ -606,6 +608,7 @@ def get_index(flux_dict):
         return flux_dict['spectral_pars']['alpha']['value'] 
 
 def get_index_err(flux_dict):
+    ret = -1
     if flux_dict['SpectrumType']=='PowerLaw':
         ret = flux_dict['spectral_pars']['Index']['error']
     elif flux_dict['SpectrumType']=='LogParabola':
