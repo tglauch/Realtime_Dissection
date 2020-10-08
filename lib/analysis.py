@@ -225,10 +225,10 @@ class Analysis(object):
             shutil.copyfile('./latex/sample.bib', os.path.join(self.bpath, 'sample.bib'))
         os.chdir(self.bpath)
         cmds  = [
-            ['pdflatex', '-interaction', 'nonstopmode', self.event_name + '.tex'],
+            ['pdflatex', '-interaction', 'nonstopmode', '-interaction', 'batchmode', self.event_name + '.tex'],
             ['bibtex', self.event_name + '.aux'],
-            ['pdflatex', '-interaction', 'nonstopmode',  self.event_name + '.tex'],
-            ['pdflatex', '-interaction', 'nonstopmode',  self.event_name + '.tex'],
+            ['pdflatex', '-interaction', 'nonstopmode', '-interaction', 'batchmode',  self.event_name + '.tex'],
+            ['pdflatex', '-interaction', 'nonstopmode', '-interaction', 'batchmode', self.event_name + '.tex'],
         ]
         for c in cmds:
             subprocess.call(c)

@@ -61,13 +61,14 @@ def check_for_new_sc_file():
             with open(last_update_file, 'w') as f:
                 f.write(html)
         else:
-            print('File not updated...trying again later')
+            print('File not updated...try again')
+            check_for_new_sc_file()
         print('Finished')
     return
 
 while True:
     check_for_new_sc_file()
     print('Wait...')
-    time.sleep(30 * 60)
+    time.sleep(60 * 60)
     
     
