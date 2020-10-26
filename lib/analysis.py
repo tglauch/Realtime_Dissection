@@ -21,7 +21,9 @@ import copy
 import sys
 from DNNSed.DNNnupeak import NuPeakCalculator
 from DNNSed.DNNredshift import RedshiftCalculator
- 
+from email.mime.text import MIMEText
+import smtplib
+
 marker_colors = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99','#b15928']
 
 src_encoding = {'5BZQ' : -2, '5BZB': -2 , '5BZU': -2, '3HSP': -1, 'CRATES': -3,
@@ -80,6 +82,23 @@ class Analysis(object):
         self.this_path = None
         return
 
+
+
+    def send_mail(self):
+        ev_link='https://icecube.wisc.edu/~tglauch/Reports/{}/'.format(self.event_name)
+        # Create the container (outer) email message.
+        msg = MIMEText('A new IceCube alert just came in...results will soon appear on {}'.format(ev_link))
+        msg['Subject'] = 'New Alert {}'.format(self.event_name)
+        me = 'theo.glauch@tum.de'
+        to = ['theo.glauch@tum.de', 'giommipaolo@gmail.com']
+        msg['From'] = me
+        msg['To'] = ', '.join(to)
+
+        # Send the email via our own SMTP server.
+        s = smtplib.SMTP('localhost')
+        s.sendmail(me, to, msg.as_string())
+        s.quit()
+        return
 
     def classify(self):
         nu_peak_dnn = NuPeakCalculator(dec=self.dec)
@@ -398,7 +417,16 @@ class Analysis(object):
         self.srcs = [self.srcs[j] for j in new_order]
         # Remove Later!!!
         return
-    
+   
+
+    def remove_close_sources(self):
+        clean_list = []
+        for src in self.srcs: 
+            if src.dist <= self.max_dist:
+                clean_list.append(src)
+        self.srcs = clean_list
+        return
+
     def get_sources(self):
         for key in list(files):
             if not os.path.exists(files[key]['file']):
@@ -444,12 +472,16 @@ class Analysis(object):
             for k, j in enumerate(to_delete):
                 del(self.srcs[j - k])
             i += 1
-
-
-        fmt_str = '*{}* {}\n ra: {:.2f} deg |  dec: {:.2f} deg | distance: {:.2f} deg [ra: {:.2f} deg , dec: {:.2f} deg]'
         self.calc_src_distances_to_bf()
+        self.remove_close_sources()
         self.sort_sources_by_distance()
         self.sort_sources_by_prio()
+        if len(self.srcs) == 0:
+            print('No source in given Radius. Use ROI center as sources')
+            src_obj = Source('VOUJ{}{}{}'.format(self.ra, str(int(np.sign(self.dec)))[0], np.abs(self.dec)),
+                             self.ra, self.dec)
+            self.srcs.append(src_obj)
+        fmt_str = '*{}* {}\n ra: {:.2f} deg |  dec: {:.2f} deg | distance: {:.2f} deg [ra: {:.2f} deg , dec: {:.2f} deg]'
         out_str = ''
         for src in self.srcs:
             add_info = self.get_add_info(src.name)
@@ -614,7 +646,8 @@ class Analysis(object):
         return
 
     def upload_html(self, html_files):
-        cmd = 'rsync -r {}/* tglauch@cobalt.icecube.wisc.edu:/home/tglauch/public_html/Reports/{}/'.format(html_files, self.event_name)
+        dest = os.path.join(self.upload_dest, self.event_name)
+        cmd = 'rsync -r {}/* tglauch@cobalt.icecube.wisc.edu:{}/'.format(html_files, dest)
         print(cmd)
         os.system(cmd)
         return

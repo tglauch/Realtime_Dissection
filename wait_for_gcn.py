@@ -30,7 +30,7 @@ def check_for_new_gcn():
             print(full_href)
             all_gcn.append(full_href)
             all_gcn = [i for i in all_gcn if i != '']
-            send_mail()
+#            send_mail()
             ex_str = 'screen -d -m -S newevent bash -c \'python roi_analysis.py --gcn {}\''.format(full_href)
             print(ex_str)
             os.system(ex_str)

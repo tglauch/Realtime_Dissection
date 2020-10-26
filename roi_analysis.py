@@ -68,6 +68,9 @@ def parseArguments():
         "--basepath", help = 'Basepath for the Output',
         type=str, default = '/scratch8/tglauch/dissection_output/')
     parser.add_argument(
+        "--upload_dest", help = 'Upload path on Remote server',
+        type=str, default = '/home/tglauch/public_html/Reports/')
+    parser.add_argument(
         "--max_dist", help = 'Radius of sources to be included in degrees', type=float, default=3.5)
     parser.add_argument(
         "--err90", help= 'The 90 percent error ellipse. Format:  ra1 ra2 dec1 dec2', nargs='+')
@@ -115,6 +118,8 @@ else:
         t = Time(analysis.mjd, format='mjd')
         ev_str = 'IC{}{:02d}{:02d}'.format(str(t.datetime.year)[-2:],
                                            t.datetime.month, t.datetime.day)
+    if os.path.exists(os.path.join(args['basepath'], ev_str)):
+        ev_str = ev_str+'B'
     bpath = os.path.join(args['basepath'], ev_str)
     analysis_object_path = os.path.join(bpath,'analysis.pickle')
     analysis.bpath = bpath
@@ -122,6 +127,7 @@ else:
     analysis.event_name = ev_str
     analysis.radius = float(args['radius'])
     analysis.max_dist = float(args['max_dist'])
+    analysis.upload_dest = args['upload_dest']
     args['vou'] = True
     args['lat_analysis'] = True
 analysis.bpath=bpath
@@ -224,6 +230,8 @@ if args['lat_analysis']:
 analysis.classify()
 mins = 0
 final_pdf = False
+if args['gcn'] is not None:
+    analysis.send_mail()
 prev_len_jobs = -1
 while not final_pdf:
     if not make_pdf:
@@ -260,7 +268,8 @@ while not final_pdf:
         src_latex += src.source_summary(analysis.bpath, analysis.mjd, mode=analysis.mode)
     analysis.make_pdf(src_latex, final_pdf = final_pdf)
     analysis.create_html()
-    print_to_slack('New Fit Result on https://icecube.wisc.edu/~tglauch/Reports/{}/'.format(analysis.event_name))
+    print_to_slack('New Fit Result on https://icecube.wisc.edu/~tglauch/{}/{}/'.format(analysis.upload_dest.split('public_html')[1],
+                                                                                       analysis.event_name))
     if os.path.exists(analysis_object_path):
         os.remove(analysis_object_path)
     with open(analysis_object_path, "wb") as f:

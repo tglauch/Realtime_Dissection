@@ -1,6 +1,6 @@
 import numpy as np
 from functions import GreatCircleDistance, vou_path, path_settings, get_lc_time3fgl, \
-                      get_lc_time4fgl,get_95_psf, submit_fit, make_gif
+                      get_lc_time4fgl,get_95_psf, submit_fit, make_gif, PrintException
 from astropy.io import fits
 from myfunctions import MET_to_MJD, dict_to_nparray, ts_to_pval, pval_to_sigma
 import os
@@ -130,13 +130,14 @@ class Source(object):
         print(self.swift)
         for i, lc_key in enumerate(self.lightcurves.keys()):
             try:
+                print(self.lightcurves)
                 if i == 0:
                     plot.make_lc_plot(self.lightcurves[lc_key].bpath, mjd, self.name, radio=self.ovro, xray=self.swift)
                 else:
                     plot.make_lc_plot(self.lightcurves[lc_key].bpath, mjd, self.name)
-            except Exception as inst:
+            except:
                 warnings.warn("Couldn't create {} lightcurve for {}".format(lc_key, self.name))
-                print(inst)
+                PrintException()
         return 
     
     def angular_distance(self, ra, dec):

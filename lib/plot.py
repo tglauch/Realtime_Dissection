@@ -106,7 +106,7 @@ def plot_fermi_index(ax, basepath, mjd, source, **kwargs):
     lc_arr = dict_to_nparray(lc_dict)
     if '4FGL' in source:
         if kwargs.get('4fgl_average', True):
-            catalog = fits.open('./lib/gll_psc_v19.fit')
+            catalog = fits.open('./lib/gll_psc_v23.fit')
             names = catalog[1].data['Source_Name']
             ind = np.where(names == source)[0][0]
             av_gamma = catalog[1].data[ind]['PL_Index']
@@ -176,6 +176,7 @@ def make_lc_plot(lat_basepath, mjd, source, radio=None, xray=None, **kwargs):
     axes = []
     xminmax = None
     for i, lc in enumerate(lcs):
+        print('Add axes for lightcurve {}'.format(lc))
         new_ax= fig.add_axes((.0, 0.2+ i*height_per_panel,1.,height_per_panel))
         new_ax= func_dict[lc](new_ax, path_dict[lc], mjd, source, **kwargs)
         axes.append(new_ax)
@@ -421,7 +422,7 @@ def make_counterparts_plot(basepath, ra, dec, plt_radius, save_path='.', vou_can
     cpath = os.path.join(basepath, 'contour.txt')
     cpath_rad = os.path.join(basepath, 'contour_rad.txt')
     if os.path.exists(cpath):
-        cdata = np.genfromtxt(cpath, delimiter=' ')
+        cdata = np.genfromtxt(cpath, delimiter=' ', skip_header=1)
         cdata = np.vstack([cdata,cdata[0]])
         pix = get_pix_pos(wcs, np.degrees(cdata[:,0]), np.degrees(cdata[:,1]))
         ax.plot(pix[0], pix[1], color='b', linewidth=0.5)

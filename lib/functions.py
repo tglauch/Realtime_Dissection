@@ -10,6 +10,18 @@ from myfunctions import dict_to_nparray
 from astropy.io import fits
 import imageio
 from scipy.interpolate import interp1d
+import linecache
+import sys
+
+def PrintException():
+    exc_type, exc_obj, tb = sys.exc_info()
+    f = tb.tb_frame
+    lineno = tb.tb_lineno
+    filename = f.f_code.co_filename
+    linecache.checkcache(filename)
+    line = linecache.getline(filename, lineno, f.f_globals)
+    print('EXCEPTION IN ({}, LINE {} "{}"): {}'.format(filename, lineno, line.strip(), exc_obj))
+    return
 
 def send_mail(subject):
     # Import smtplib for the actual sending function
