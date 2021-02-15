@@ -11,7 +11,8 @@ from add_classes import Lightcurve, Ellipse
 import multiprocessing
 from read_catalog import read_from_observation
 import requests
- 
+import copy
+
 ul_ts_threshold = 4
 MeV_to_erg = 1.60218e-6
 
@@ -34,6 +35,7 @@ class Source(object):
         self.fermi_sigma = -1
         self.redshift = -1
         self.redshift_err = -1
+        self.plt_code = -10 
         return
 
     def make_sed_lightcurve(self, lcs=['default']):
@@ -231,12 +233,12 @@ class Source(object):
 
     def collect_xray(self):
         print('Collect X-Ray Data')
-        self.swift = None
+        self.swift = []
         if not os.path.exists(self.mw_data_path):
             self.get_mw_data() 
         try:
             idata = np.genfromtxt(self.mw_data_path, skip_header=4,
-                                  usecols=[1,2,3,4,7], dtype=[np.float,np.float,np.float,np.float,object])
+                                  usecols=[0,1,2,3,4,7], dtype=[np.float,np.float,np.float,np.float,np.float,object])
         except Exception as inst:
             print(inst)
             return
@@ -244,18 +246,26 @@ class Source(object):
             return False
         idata = np.array([list(i) for i in idata])
         try:
-            idata = idata[idata[:,4] == 'OUSXB']
+            idata = idata[idata[:,5] == 'OUSXB']
         except Exception as inst:
             print(inst)
             return
-        idata = np.array(idata[:,0:4],dtype=np.float)
-        idata[:,1] = idata[:,1] - idata[:,0]
-        idata[:,2] = idata[:,0] - idata[:,2]
+        idata = np.array(idata[:,0:5],dtype=np.float)
+        idata_save = copy.deepcopy(idata)
+        idata_save[:,0] = idata[:, -1]
+        idata_save[:,1] = idata[:,0]
+        idata_save[:,2] = idata[:,1]
+        idata_save[:,3] = idata[:,2]
+        idata_save[:,4] = idata[:,3] 
+        #idata[:,1] = idata[:,1] - idata[:,0]
+        #idata[:,2] = idata[:,0] - idata[:,2]
         if not os.path.exists(os.path.join(self.bpath, 'add_data')):
             os.makedirs(os.path.join(self.bpath, 'add_data'))
         if len(idata) >0:
-            np.savetxt(os.path.join(self.bpath, 'add_data', 'swift.csv'), idata)
-            self.swift = os.path.join(self.bpath, 'add_data', 'swift.csv')
+            np.savetxt(os.path.join(self.bpath, 'add_data', 'swift.csv'), idata_save)
+            self.swift.append(os.path.join(self.bpath, 'add_data', 'swift.csv'))
+        if 'xrtproc.csv' in os.listdir(os.path.join(self.bpath, 'add_data')):
+            self.swift.append(os.path.join(self.bpath, 'add_data', 'xrtproc.csv'))
         return
 
 
@@ -275,7 +285,9 @@ class Source(object):
             files = [os.path.join(add_data_path, i) for i in os.listdir(add_data_path)]
             for f in files:
                 print('Read from {}'.format(f))
-                #self.mw_idata = np.concatenate([self.mw_idata, read_from_observation(f)])
+                add_data_res = read_from_observation(f)
+                if not add_data_res is False:
+                    self.mw_idata = np.concatenate([self.mw_idata, read_from_observation(f)])
         return
 
     def source_summary(self, bpath, mjd, mode='mid'):

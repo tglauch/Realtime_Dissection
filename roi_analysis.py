@@ -118,8 +118,14 @@ else:
         t = Time(analysis.mjd, format='mjd')
         ev_str = 'IC{}{:02d}{:02d}'.format(str(t.datetime.year)[-2:],
                                            t.datetime.month, t.datetime.day)
-    if os.path.exists(os.path.join(args['basepath'], ev_str)):
-        ev_str = ev_str+'B'
+    alphabet = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
+    for alp in alphabet: 
+        if os.path.exists(os.path.join(args['basepath'], ev_str+alp)):
+            continue
+        else:
+            ev_str = ev_str+alp
+            break
+
     bpath = os.path.join(args['basepath'], ev_str)
     analysis_object_path = os.path.join(bpath,'analysis.pickle')
     analysis.bpath = bpath
@@ -252,9 +258,10 @@ while not final_pdf:
         analysis.make_counterparts_plot() 
         analysis.make_ts_map_plots()
         for src in analysis.srcs:
+            print('--------  {} (distance: {:.1f} )---------'.format(src.name, src.dist))
             if not src.in_err:
+                print('Source not in error circle...continue')
                 continue
-            print('Make Plots for Sources {} at distance {:.1f}'.format(src.name, src.dist))
             src.make_lc_plot(analysis.mjd)
             if analysis.emin < 1e3: 
                 src.make_sed_lightcurve(lcs=['default', '1GeV'])
@@ -268,8 +275,9 @@ while not final_pdf:
         src_latex += src.source_summary(analysis.bpath, analysis.mjd, mode=analysis.mode)
     analysis.make_pdf(src_latex, final_pdf = final_pdf)
     analysis.create_html()
-    print_to_slack('New Fit Result on https://icecube.wisc.edu/~tglauch/{}/{}/'.format(analysis.upload_dest.split('public_html')[1],
-                                                                                       analysis.event_name))
+    if not analysis.upload_dest is False:
+        print_to_slack('New Fit Result on https://icecube.wisc.edu/~tglauch/{}/{}/'.format(analysis.upload_dest.split('public_html')[1],
+                                                                                           analysis.event_name))
     if os.path.exists(analysis_object_path):
         os.remove(analysis_object_path)
     with open(analysis_object_path, "wb") as f:

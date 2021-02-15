@@ -271,10 +271,10 @@ class Analysis(object):
                      overlay.add(A.circle( {ra} ,  {dec}, .0027, {{color: \'{color}\'}} )); \n \
                      cat.addSources([A.source({ra} , {dec}, {{name: \' Nr. {name}\'}})]);\n'
         circle_str = ''
-        for j, src in enumerate(self.vou_sources):
-            circle_str += temp_str.format(ra=src[0], dec=src[1], color='blue', name=j)
-        for src in self.srcs:
-            circle_str += temp_str.format(ra=src.ra, dec=src.dec, color='red', name=src.name)
+        #for j, src in enumerate(self.vou_sources):
+        #    circle_str += temp_str.format(ra=src[0], dec=src[1], color='blue', name=j)
+        #for src in self.srcs:
+        #    circle_str += temp_str.format(ra=src.ra, dec=src.dec, color='red', name=src.name)
         cpath = os.path.join(self.bpath, 'contour.txt')
         cpath_df= os.path.join(self.bpath, 'contour_df.txt')
         nlist = []
@@ -481,6 +481,7 @@ class Analysis(object):
             src_obj = Source('VOUJ{}{}{}'.format(self.ra, str(int(np.sign(self.dec)))[0], np.abs(self.dec)),
                              self.ra, self.dec)
             self.srcs.append(src_obj)
+            self.calc_src_distances_to_bf()
         fmt_str = '*{}* {}\n ra: {:.2f} deg |  dec: {:.2f} deg | distance: {:.2f} deg [ra: {:.2f} deg , dec: {:.2f} deg]'
         out_str = ''
         for src in self.srcs:
@@ -579,7 +580,7 @@ class Analysis(object):
             code = f.read()
             code = code.format(mjd = self.mjd,
                                src_summary=src_string,
-                               ev_name_full = self.event_name.replace('IC', 'IceCube-')+'A',
+                               ev_name_full = self.event_name.replace('IC', 'IceCube-'),
                                ev_name = self.event_name,
                                dec = self.dec,
                                ra = self.ra,
@@ -646,6 +647,8 @@ class Analysis(object):
         return
 
     def upload_html(self, html_files):
+        if self.upload_dest is False:
+            return
         dest = os.path.join(self.upload_dest, self.event_name)
         cmd = 'rsync -r {}/* tglauch@cobalt.icecube.wisc.edu:{}/'.format(html_files, dest)
         print(cmd)

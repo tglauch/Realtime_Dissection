@@ -23,6 +23,7 @@ from add_classes import Lightcurve, Ellipse
 from functions import radio_circle, xray_circle, get_circle_size, get_symbol
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.integrate import quad
+from read_catalog import read_from_observation
 
 markers = ['o', 's', 'P', 'p', '*' , 'x', 'X', 'D', 4, 5, 6, 7, 'H','d', 'v' ,'^', '<', '>', 1, 2, 3 ,8, '+' ,'h']
 ts_cmap = LinearSegmentedColormap.from_list('mycmap', ['white', 'red', '#800000'])
@@ -146,9 +147,17 @@ def plot_radio(ax, basepath, mjd, source, **kwargs):
 
 
 def plot_xray(ax, basepath, mjd, source, **kwargs):
-    idata = np.genfromtxt(basepath, delimiter=' ')
-    ax.errorbar(idata[:,3], idata[:,0]*1e13, yerr=idata[:,1]*1e13, linestyle='',
-                 ecolor='blue', fmt='o', color='blue',  ms=2)
+    idata = []
+    for bp in basepath:
+        idata.append(read_from_observation(bp))
+    try:
+        idata = np.concatenate(idata)
+    except:
+        ax.plot([], [])
+        print('No X-Ray data found')
+        return ax
+    ax.errorbar(idata[:,-1], idata[:,1]*1e13, yerr=np.array([idata[:,1] - idata[:,2], idata[:,3] - idata[:,1]])*1e13,
+                 linestyle='', ecolor='blue', fmt='o', color='blue',  ms=2)
     ax.axvline(mjd, color='#696969', linestyle='--')
     ax.set_ylabel(r'$10^{-13}\,$'+r'erg cm$^{-2}$ s$^{-1}$', labelpad=5)
     return ax
@@ -500,12 +509,6 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, bf_ra=None, bf_dec=None, plt_mode
         cdata = np.vstack([cdata,cdata[0]])
         pix = get_pix_pos(wcs, np.degrees(cdata[:,0]), np.degrees(cdata[:,1]))
         ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
-    elif os.path.exists(cpath_rad):
-        print('Use dfit Contour')
-        cdata = np.genfromtxt(cpath_rad, delimiter=' ', skip_header=1)
-        cdata = np.vstack([cdata,cdata[0]])
-        pix = get_pix_pos(wcs, 360 + np.degrees(cdata[:,1]), np.degrees(cdata[:,0]))
-        ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
     elif error90 is not None:
         if isinstance(error90, float):
             vertex = (hdu.header['CRVAL1']*u.degree,hdu.header['CRVAL2']*u.degree) #long, lat
@@ -526,6 +529,12 @@ def make_ts_plot(plt_basepath, srcs, vou_cand, bf_ra=None, bf_dec=None, plt_mode
         pix = get_pix_pos(wcs, cdata[:,0], cdata[:,1])
         ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
         print('Use new circle')
+    if os.path.exists(cpath_rad):
+        print('Use dfit Contour')
+        cdata = np.genfromtxt(cpath_rad, delimiter=' ', skip_header=1)
+        cdata = np.vstack([cdata,cdata[0]])
+        pix = get_pix_pos(wcs, np.degrees(cdata[:,1]), np.degrees(cdata[:,0]))
+        ax.plot(pix[0], pix[1], color='b', linewidth=0.5)
     cpath = os.path.join(plt_basepath, '../contour50.txt')
     if os.path.exists(cpath):
         cdata = np.genfromtxt(cpath, delimiter=' ')
