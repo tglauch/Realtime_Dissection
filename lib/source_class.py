@@ -183,48 +183,56 @@ class Source(object):
                 m_ax = 0.1 * 60
                 min_ax = 0.1 * 60
                 pos_angle = 0.0
-            loc_str= '{} {} {} {}'.format(2 * np.max([m_ax, min_ax]), m_ax, min_ax, pos_angle)
+            loc_str= '--FOV {} --major {} --minor {} --angle {}'.format(2 * np.max([m_ax, min_ax]), m_ax, min_ax, pos_angle)
             ofolder = os.path.join(self.bpath, 'vou_counterpart')
             if os.path.exists(ofolder):
                 shutil.rmtree(ofolder)
             os.makedirs(ofolder)
             os.chdir(ofolder)
-            for i in range(1):
-                os.system('{vou_path} {ra} {dec} {loc_str}'.format(vou_path=vou_path, ra=self.ra,
-                                                                   dec=self.dec,loc_str=loc_str))
-            if not os.path.exists('candidates.eps'):
+            os.system('{vou_path} --ra {ra} --dec {dec} {loc_str}'.format(vou_path=vou_path, ra=self.ra,
+                                                                           dec=self.dec,loc_str=loc_str))
+            if not os.path.exists(os.path.join(ofolder, 'tmp', 'candidates.eps')):
                 fname_new = os.path.join(ofolder, self.name.replace(' ', '_').replace('.','_') + '.ps')
-                cand_ps = os.path.join(ofolder, 'candidates.ps')
+                cand_ps = os.path.join(ofolder, 'tmp', 'candidates.ps')
                 os.rename(cand_ps, fname_new)
                 os.system('ps2eps -B ' + fname_new)
             else:
-                cand_eps = os.path.join(ofolder, 'candidates.eps')
-                fname_new = os.path.join(ofolder, self.name.replace(' ', '_').replace('.','_') + '.eps')
+                cand_eps = os.path.join(ofolder, 'tmp',  'candidates.eps')
+                fname_new = os.path.join(ofolder, 'tmp', self.name.replace(' ', '_').replace('.','_') + '.eps')
                 os.rename(cand_eps, fname_new)
             os.chdir(this_path)
-            cp_info = np.array(np.genfromtxt(os.path.join(ofolder, 'candidates_posix.txt'), dtype=float), ndmin=2)
+            cp_info = np.array(np.genfromtxt(os.path.join(ofolder, 'tmp', 'candidates_posix.txt'), dtype=float), ndmin=2)
             if len(cp_info) == 0:
                 cp_ra = self.ra
                 cp_dec = self.dec
             else:
                 try:
-                    cp_ra = cp_info[:,0][0]
-                    cp_dec = cp_info[:,1][0]
-                    print('Found Counterpart at ra {}, dec {}'.format(cp_ra, cp_dec))
+                    this_len = 0
+                    for k in len(cp_info):
+                        t_cp_ra = cp_info[:,0][0]
+                        t_cp_dec = cp_info[:,1][0]
+                        pre_str = '{vou_path} --ra {ra} --dec {dec} --mode -s'
+                        form_str = pre_str.format(vou_path=vou_path, ra=t_cp_ra, dec=t_cp_dec)
+                        os.system(form_str)
+                        mw_idata = np.atleast_2d(np.genfromtxt('tmp/Sed.txt', skip_header=4,
+                                                               usecols=(0,1,2,3,4)))
+                        if len(mw_idata) > this_len:
+                            cp_ra = t_cp_ra
+                            cp_dec = t_cp_dec                
+                        print('Found Counterpart at ra {}, dec {}'.format(cp_ra, cp_dec))
                 except Exception as inst:
                     cp_ra = self.ra
                     cp_dec = self.dec
         else:
             cp_ra = self.ra
             cp_dec = self.dec
-        pre_str = '{vou_path} {ra} {dec} {loc_str} -s'
-        form_str = pre_str.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec,loc_str=1)
+        pre_str = '{vou_path} --ra {ra} --dec {dec} --mode -s'
+        form_str = pre_str.format(vou_path=vou_path, ra=cp_ra, dec=cp_dec)
         print('Fetch SED with command \n {}'.format(form_str))
-        for i in range(1):
-            os.system(form_str)
-        if os.path.exists('Sed.txt'):
+        os.system(form_str)
+        if os.path.exists('tmp/Sed.txt'):
             print('Move Sed.txt to {}'.format(self.mw_data_path))
-            shutil.move('Sed.txt', self.mw_data_path)
+            shutil.move('tmp/Sed.txt', self.mw_data_path)
         else:
             print('There is no File called Sed.txt')
         self.set_mw_data()
@@ -364,7 +372,7 @@ class Source(object):
         if os.path.exists(gev_lc):
             l_str += fig_str.format(width = 0.8, path = gev_lc, caption='1GeV light curve for {}'.format(self.name))
         if ('4FGL' in self.name) | ('3FGL' in self.name):
-            cp_candidate_path = os.path.join(bpath_src, 'vou_counterpart', self.name.replace(' ', '_').replace('.','_') + '.eps')
+            cp_candidate_path = os.path.join(bpath_src, 'vou_counterpart', 'tmp', self.name.replace(' ', '_').replace('.','_') + '.eps')
             if os.path.exists(cp_candidate_path):
                 l_str += fig_str.format(width = 0.7, path = cp_candidate_path, caption='Possible couterparts for {}'.format(self.name))
         l_str += '\\clearpage \n'

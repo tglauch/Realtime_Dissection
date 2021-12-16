@@ -6,13 +6,13 @@ source /home/ga53lag/Software/Realtime_Dissection/vou_py/bin/activate
 
 2. Execute the Code
 
-python roi_analysis.py --ra [1] --dec [2] --mjd [3] --max_dist [4] --basepath [5] --upload_dest False
+python /home/ga53lag/Software/Realtime_Dissection/roi_analysis.py --ra [1] --dec [2] --mjd [3] --max_dist [4] --basepath [5] --upload_dest False
 
 [1] ra in degrees
 [2] dec in degrees
 [3] mjd 
 [4] maximum distances of sources to include
 [5] basepath where all the analysis results are stored
-use --upload_dest if html should be uploaded somewhere to cobalt
+use --upload_dest if html should be uploaded somewhere to IceCube's cobalt
 
 

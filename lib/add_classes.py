@@ -24,9 +24,10 @@ class Ellipse(object):
         return
 
     def get_vou_cmd(self, radius):
-        return [str(self.center_ra), str(self.center_dec), str(radius), str(np.max([60. * self.ra_ax, 60. *
-self.dec_ax])),
-                str(np.min([60. * self.ra_ax, 60. * self.dec_ax])), str(self.rotation + 90)]
+        return ['--ra', str(self.center_ra), '--dec',  str(self.center_dec), '--FOV', str(radius),
+                '--major', str(np.max([60. * self.ra_ax, 60. * self.dec_ax])),
+                '--minor', str(np.min([60. * self.ra_ax, 60. * self.dec_ax])),
+                '--angle', str(self.rotation + 90)]
 
     def get_max_extension(self):
         return np.max([60. * self.ra_ax, 60. * self.dec_ax ])

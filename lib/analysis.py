@@ -77,8 +77,8 @@ class Analysis(object):
         self.srcprob_path = None
         self.id = id_generator(size=5) 
         self.notice_date = 'None'
-        self.radius = 200
-        self.max_dist = 3.
+        self.radius = 120
+        self.max_dist = 2.
         self.this_path = None
         return
 
@@ -306,16 +306,16 @@ class Analysis(object):
 
         if isinstance(self.err90, float):
             print('Run VOU with cicular error')
-            cmd = [vou_path, str(self.ra), str(self.dec), str(self.radius), str(self.err90 * 60)]
+            cmd = [vou_path, '--ra' , str(self.ra), '--dec', str(self.dec),
+                   '--FOV', str(self.radius), '--radius', str(self.err90 * 60)]
         elif isinstance(self.err90, Ellipse):
             print('Run VOU with elliptical error')
             cmd = [vou_path]
             cmd.extend(self.err90.get_vou_cmd(self.radius))
         else:
             print('This type of error regions is not supported yet')
-        print cmd
-        for i in range(1): # With new version only need to run ones?!?!
-            subprocess.call(cmd)
+        print(cmd)
+        subprocess.call(cmd)
 
         # Setup Variables
         out_str = self.get_sources()
@@ -326,18 +326,18 @@ class Analysis(object):
         print_to_slack(sum_text)
 
         # Convert VOU Blazar Output
-        rx_ps = os.path.join(self.vou_out, 'RX_map.ps')
-        os.system('ps2eps -B ' + rx_ps)
-        cand_ps = os.path.join(self.vou_out, 'candidates.ps')
-        os.system('ps2eps -B ' + cand_ps)
+#        rx_ps = os.path.join(self.vou_out, 'RX_map.ps')
+#       os.system('ps2eps -B ' + rx_ps)
+#        cand_ps = os.path.join(self.vou_out, 'candidates.ps')
+#        os.system('ps2eps -B ' + cand_ps)
         #Create VOU Source Summary
         with open('./short_output', 'w+') as ofile:
             ofile.write(out_str.replace('\n' ,'\\\ \n'))
-        with open('./phase1', 'r') as ifile:
+        with open('./tmp/phase1', 'r') as ifile:
             lines = ifile.read().split('Gamma-ray Counterparts')[0]
             lines = re.sub('\\[..?;.?m', ' ', lines)
             lines = lines.replace('[0m', ' ')
-            print_to_slack('', pic=os.path.join(self.vou_out, 'candidates.eps'))
+            print_to_slack('', pic=os.path.join(self.vou_out,'tmp', 'candidates.eps'))
         with open('./full_output', 'w+') as ofile:
             ofile.write(lines.replace('\n' ,'\\\ \n'))
         os.chdir(self.this_path)
@@ -429,9 +429,9 @@ class Analysis(object):
 
     def get_sources(self):
         for key in list(files):
-            if not os.path.exists(files[key]['file']):
+            if not os.path.exists(os.path.join('tmp',files[key]['file'])):
                 continue
-            temp = np.genfromtxt(files[key]['file'], dtype=None,
+            temp = np.genfromtxt(os.path.join('tmp',files[key]['file']), dtype=None,
                                  names=True, delimiter=',')
             temp = np.atleast_1d(temp)
             if key == '5bzcat':
@@ -464,20 +464,29 @@ class Analysis(object):
                         for j in range(i + 1, len(self.srcs))]
             to_delete = []
             for j, diff in enumerate(ang_diff):
-                if diff < 0.2:
+                if diff < 0.1:
                     if not self.srcs[i + j + 1].name in self.srcs[i].names \
                         and self.srcs[i + j + 1].name != self.srcs[i].name:
                             self.srcs[i].names.append(self.srcs[i + j + 1].name)
                     to_delete.append(i + j + 1)
+            ra_new = None
+            dec_new = None
+            for k, j in enumerate(to_delete):
+                if ('HSP' in self.srcs[j].name) or (('5BZ' in self.srcs[j].name) and (ra_new is None)):
+                    ra_new = self.srcs[j].ra
+                    dec_new = self.srcs[j].dec
             for k, j in enumerate(to_delete):
                 del(self.srcs[j - k])
+            if ra_new is not None:
+                self.srcs[i].ra = ra_new
+                self.srcs[i].dec = dec_new
             i += 1
         self.calc_src_distances_to_bf()
         self.remove_close_sources()
         self.sort_sources_by_distance()
         self.sort_sources_by_prio()
         if len(self.srcs) == 0:
-            print('No source in given Radius. Use ROI center as sources')
+            print('No source in given Radius. Use ROI center as possible source')
             src_obj = Source('VOUJ{}{}{}'.format(self.ra, str(int(np.sign(self.dec)))[0], np.abs(self.dec)),
                              self.ra, self.dec)
             self.srcs.append(src_obj)
@@ -521,7 +530,7 @@ class Analysis(object):
 
 
     def get_vou_candidates(self):
-        x = np.genfromtxt(os.path.join(self.vou_out, 'find_out_temp.txt'),
+        x = np.genfromtxt(os.path.join(self.vou_out, 'tmp', 'find_out_temp.txt'),
                           dtype=[np.float, np.float, int])
         mask = []
         for i in x:
@@ -596,8 +605,8 @@ class Analysis(object):
         with open(os.path.join(html_files, 'index.html'), 'w') as f:
             f.write(code)
         
-        rxmap_eps = os.path.join(self.vou_out, 'RX_map.eps')
-        rxmap_png = os.path.join(self.vou_out, 'RX_map.png')
+        rxmap_eps = os.path.join(self.vou_out, 'tmp', 'RX_map.eps')
+        rxmap_png = os.path.join(self.vou_out, 'tmp', 'RX_map.png')
         os.system('convert -density 288 {} {}'.format(rxmap_eps, rxmap_png))
 
         #candidates_eps = os.path.join(self.vou_out, 'candidates.eps')
